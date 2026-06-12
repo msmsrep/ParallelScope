@@ -2,6 +2,7 @@
 using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Input;
 using ParallelFiler.ViewModels;
 
 namespace ParallelFiler;
@@ -19,6 +20,11 @@ public partial class MainWindow : Window
 
         _viewModel = new MainWindowViewModel();
         DataContext = _viewModel;
+
+        if (_viewModel.RootFolders.Count > 0)
+        {
+            _viewModel.AddressInput = _viewModel.RootFolders[0].Path;
+        }
     }
 
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -51,6 +57,22 @@ public partial class MainWindow : Window
         {
             SyncTreeSelectionToCurrentPath();
         }
+    }
+
+    private void AddressGoButton_Click(object sender, RoutedEventArgs e)
+    {
+        NavigateByAddressInput();
+    }
+
+    private void AddressTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        NavigateByAddressInput();
+        e.Handled = true;
     }
 
     private void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -182,5 +204,16 @@ public partial class MainWindow : Window
         }
 
         return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private void NavigateByAddressInput()
+    {
+        if (_viewModel.TryNavigateByAddressInput())
+        {
+            SyncTreeSelectionToCurrentPath();
+            return;
+        }
+
+        MessageBox.Show("指定されたフォルダへ移動できません。パスを確認してください。", "移動エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 }

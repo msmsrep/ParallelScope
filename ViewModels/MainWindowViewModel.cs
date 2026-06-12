@@ -10,6 +10,7 @@ public class MainWindowViewModel : ObservableObject
     private ObservableCollection<FolderItemViewModel> _rootFolders;
     private ObservableCollection<FileItemViewModel> _fileItems;
     private string _currentPath = string.Empty;
+    private string _addressInput = string.Empty;
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
 
@@ -35,6 +36,12 @@ public class MainWindowViewModel : ObservableObject
                 OnPropertyChanged(nameof(CanGoUp));
             }
         }
+    }
+
+    public string AddressInput
+    {
+        get => _addressInput;
+        set => SetProperty(ref _addressInput, value);
     }
 
     public bool CanGoBack => _backHistory.Count > 0;
@@ -117,6 +124,11 @@ public class MainWindowViewModel : ObservableObject
         return NavigateTo(parentPath, true);
     }
 
+    public bool TryNavigateByAddressInput()
+    {
+        return NavigateTo(AddressInput, true);
+    }
+
     public bool NavigateTo(string folderPath, bool addToHistory)
     {
         if (string.IsNullOrWhiteSpace(folderPath))
@@ -172,6 +184,7 @@ public class MainWindowViewModel : ObservableObject
             }
 
             CurrentPath = folderPath;
+            AddressInput = folderPath;
             return true;
         }
         catch (UnauthorizedAccessException)
