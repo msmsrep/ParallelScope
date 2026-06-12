@@ -1,0 +1,14 @@
+{
+  "editor.formatOnSave": true,
+  // JS/TS/HTML などは Prettier
+  //   "editor.defaultFormatter": "esbenp.prettier-vscode",
+
+  // XML は Red Hat XML
+  "[xml]": {
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  },
+  // XAML も Red Hat XML
+  "[xaml]": {
+    "editor.defaultFormatter": "redhat.vscode-xml"
+  }
+}

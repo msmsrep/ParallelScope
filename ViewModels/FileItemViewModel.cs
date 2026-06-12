@@ -2,15 +2,31 @@ namespace ParallelFiler.ViewModels;
 
 public class FileItemViewModel
 {
+    public string FullPath { get; set; }
     public string Name { get; set; }
     public string SizeText { get; set; }
+    public string TypeText { get; set; }
     public string ModifiedTime { get; set; }
+    public bool IsFolder { get; set; }
 
-    public FileItemViewModel(string name, long sizeBytes, DateTime modifiedTime)
+    public FileItemViewModel(string fullPath, string name, long sizeBytes, DateTime modifiedTime)
     {
+        FullPath = fullPath;
         Name = name;
         SizeText = FormatFileSize(sizeBytes);
+        TypeText = "ファイル";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
+        IsFolder = false;
+    }
+
+    public FileItemViewModel(string fullPath, string name, DateTime modifiedTime)
+    {
+        FullPath = fullPath;
+        Name = name;
+        SizeText = string.Empty;
+        TypeText = "フォルダ";
+        ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
+        IsFolder = true;
     }
 
     private static string FormatFileSize(long bytes)
