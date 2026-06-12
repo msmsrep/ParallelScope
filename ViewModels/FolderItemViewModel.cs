@@ -24,7 +24,7 @@ public class FolderItemViewModel
         get
         {
             _subFolders ??= new ObservableCollection<FolderItemViewModel>();
-            
+
             // 初回のみサブフォルダを読み込む
             if (_subFolders.Count == 0)
             {
