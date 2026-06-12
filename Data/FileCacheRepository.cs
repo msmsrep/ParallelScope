@@ -13,7 +13,7 @@ public sealed record CachedFileSystemEntry(
 
 public class FileCacheRepository
 {
-    private readonly DbContextOptions<PublicContext> _dbOptions;
+    private readonly DbContextOptions<ParallelFilerDbContext> _dbOptions;
 
     public FileCacheRepository()
     {
@@ -23,9 +23,12 @@ public class FileCacheRepository
         Directory.CreateDirectory(appDataDir);
 
         var dbPath = Path.Combine(appDataDir, "parallelfiler.sqlite");
-        _dbOptions = new DbContextOptionsBuilder<PublicContext>()
+        _dbOptions = new DbContextOptionsBuilder<ParallelFilerDbContext>()
             .UseSqlite($"Data Source={dbPath}")
             .Options;
+
+        using var db = CreateDbContext();
+        db.Database.EnsureCreated();
     }
 
     public List<CachedFileSystemEntry> GetEntriesByParentPath(string parentPath)
@@ -78,8 +81,8 @@ public class FileCacheRepository
         db.SaveChanges();
     }
 
-    private PublicContext CreateDbContext()
+    private ParallelFilerDbContext CreateDbContext()
     {
-        return new PublicContext(_dbOptions);
+        return new ParallelFilerDbContext(_dbOptions);
     }
 }
