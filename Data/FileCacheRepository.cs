@@ -28,7 +28,7 @@ public class FileCacheRepository
             .Options;
 
         using var db = CreateDbContext();
-        db.Database.EnsureCreated();
+        db.Database.Migrate();
     }
 
     public List<CachedFileSystemEntry> GetEntriesByParentPath(string parentPath)
