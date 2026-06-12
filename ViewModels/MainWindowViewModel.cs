@@ -9,6 +9,13 @@ namespace ParallelFiler.ViewModels;
 
 public class MainWindowViewModel : ObservableObject
 {
+    private static readonly EnumerationOptions NonRecursiveEnumerationOptions = new()
+    {
+        RecurseSubdirectories = false,
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint
+    };
+
     private ObservableCollection<FolderItemViewModel> _rootFolders;
     private ObservableCollection<FileItemViewModel> _fileItems;
     private string _currentPath = string.Empty;
@@ -244,27 +251,65 @@ public class MainWindowViewModel : ObservableObject
     {
         var dirInfo = new DirectoryInfo(folderPath);
 
-        var folders = dirInfo.GetDirectories()
+        var folders = dirInfo
+            .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
             .OrderBy(d => d.Name)
-            .Select(d => new CachedFileSystemEntry(
-                folderPath,
-                d.FullName,
-                d.Name,
-                true,
-                null,
-                d.LastWriteTimeUtc));
+            .Select(d => TryCreateFolderEntry(folderPath, d))
+            .Where(e => e is not null)
+            .Cast<CachedFileSystemEntry>();
 
-        var files = dirInfo.GetFiles()
+        var files = dirInfo
+            .EnumerateFiles("*", NonRecursiveEnumerationOptions)
             .OrderBy(f => f.Name)
-            .Select(f => new CachedFileSystemEntry(
-                folderPath,
-                f.FullName,
-                f.Name,
-                false,
-                f.Length,
-                f.LastWriteTimeUtc));
+            .Select(f => TryCreateFileEntry(folderPath, f))
+            .Where(e => e is not null)
+            .Cast<CachedFileSystemEntry>();
 
         return folders.Concat(files).ToList();
+    }
+
+    private static CachedFileSystemEntry? TryCreateFolderEntry(string parentPath, DirectoryInfo directory)
+    {
+        try
+        {
+            return new CachedFileSystemEntry(
+                parentPath,
+                directory.FullName,
+                directory.Name,
+                true,
+                null,
+                directory.LastWriteTimeUtc);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static CachedFileSystemEntry? TryCreateFileEntry(string parentPath, FileInfo file)
+    {
+        try
+        {
+            return new CachedFileSystemEntry(
+                parentPath,
+                file.FullName,
+                file.Name,
+                false,
+                file.Length,
+                file.LastWriteTimeUtc);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
     }
 
     private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items)

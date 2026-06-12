@@ -5,6 +5,13 @@ namespace ParallelFiler.ViewModels;
 
 public class FolderItemViewModel
 {
+    private static readonly EnumerationOptions NonRecursiveEnumerationOptions = new()
+    {
+        RecurseSubdirectories = false,
+        IgnoreInaccessible = true,
+        AttributesToSkip = FileAttributes.ReparsePoint
+    };
+
     private readonly string _path;
     private ObservableCollection<FolderItemViewModel>? _subFolders;
 
@@ -39,7 +46,8 @@ public class FolderItemViewModel
         try
         {
             var dirInfo = new DirectoryInfo(_path);
-            var subDirs = dirInfo.GetDirectories()
+            var subDirs = dirInfo
+                .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
                 .OrderBy(d => d.Name)
                 .Select(d => new FolderItemViewModel(d.FullName));
 
