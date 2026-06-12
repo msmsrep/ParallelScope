@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelFiler.Data;
 
 namespace ParallelFiler.ViewModels;
 
@@ -13,6 +15,9 @@ public class MainWindowViewModel : ObservableObject
     private string _addressInput = string.Empty;
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
+    private readonly FileCacheRepository _fileCacheRepository;
+    private readonly SynchronizationContext _uiContext;
+    private int _navigationVersion;
 
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
@@ -54,6 +59,8 @@ public class MainWindowViewModel : ObservableObject
     {
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
         _fileItems = new ObservableCollection<FileItemViewModel>();
+        _fileCacheRepository = new FileCacheRepository();
+        _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         InitializeRootFolders();
     }
@@ -160,41 +167,126 @@ public class MainWindowViewModel : ObservableObject
 
     private bool LoadFilesInternal(string folderPath)
     {
-        FileItems.Clear();
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            return false;
+        }
 
         try
         {
-            var dirInfo = new DirectoryInfo(folderPath);
-            var folders = dirInfo.GetDirectories()
-                .OrderBy(d => d.Name)
-                .Select(d => new FileItemViewModel(d.FullName, d.Name, d.LastWriteTime));
-
-            var files = dirInfo.GetFiles()
-                .OrderBy(f => f.Name)
-                .Select(f => new FileItemViewModel(f.FullName, f.Name, f.Length, f.LastWriteTime));
-
-            foreach (var folder in folders)
-            {
-                FileItems.Add(folder);
-            }
-
-            foreach (var file in files)
-            {
-                FileItems.Add(file);
-            }
-
             CurrentPath = folderPath;
             AddressInput = folderPath;
+
+            LoadFromCache(folderPath);
+
+            var navigationVersion = Interlocked.Increment(ref _navigationVersion);
+            _ = RefreshFromFileSystemInBackground(folderPath, navigationVersion);
             return true;
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return false;
         }
         catch
         {
             return false;
         }
+    }
+
+    private void LoadFromCache(string folderPath)
+    {
+        try
+        {
+            var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
+            ReplaceVisibleFileItems(cachedEntries.Select(ToViewModel));
+        }
+        catch
+        {
+            FileItems.Clear();
+        }
+    }
+
+    private async Task RefreshFromFileSystemInBackground(string folderPath, int navigationVersion)
+    {
+        List<CachedFileSystemEntry> liveEntries;
+
+        try
+        {
+            liveEntries = await Task.Run(() => ReadEntriesFromFileSystem(folderPath));
+        }
+        catch
+        {
+            return;
+        }
+
+        try
+        {
+            await Task.Run(() => _fileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
+        }
+        catch
+        {
+            // キャッシュ保存失敗時でも画面更新は継続する
+        }
+
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+            {
+                return;
+            }
+
+            ReplaceVisibleFileItems(liveEntries.Select(ToViewModel));
+        }, null);
+    }
+
+    private static List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
+    {
+        var dirInfo = new DirectoryInfo(folderPath);
+
+        var folders = dirInfo.GetDirectories()
+            .OrderBy(d => d.Name)
+            .Select(d => new CachedFileSystemEntry(
+                folderPath,
+                d.FullName,
+                d.Name,
+                true,
+                null,
+                d.LastWriteTimeUtc));
+
+        var files = dirInfo.GetFiles()
+            .OrderBy(f => f.Name)
+            .Select(f => new CachedFileSystemEntry(
+                folderPath,
+                f.FullName,
+                f.Name,
+                false,
+                f.Length,
+                f.LastWriteTimeUtc));
+
+        return folders.Concat(files).ToList();
+    }
+
+    private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items)
+    {
+        FileItems.Clear();
+
+        foreach (var item in items)
+        {
+            FileItems.Add(item);
+        }
+    }
+
+    private static FileItemViewModel ToViewModel(CachedFileSystemEntry entry)
+    {
+        var modifiedLocalTime = DateTime.SpecifyKind(entry.LastWriteTimeUtc, DateTimeKind.Utc).ToLocalTime();
+
+        if (entry.IsFolder)
+        {
+            return new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime);
+        }
+
+        return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
     }
 
     private static string? GetParentPath(string path)
@@ -223,6 +315,11 @@ public class MainWindowViewModel : ObservableObject
         }
 
         return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private static bool IsSamePath(string leftPath, string rightPath)
+    {
+        return string.Equals(NormalizePath(leftPath), NormalizePath(rightPath), StringComparison.OrdinalIgnoreCase);
     }
 
     private void NotifyNavigationStateChanged()
