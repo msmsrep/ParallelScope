@@ -1,0 +1,36 @@
+<Window x:Class="ParallelFiler.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="設定" Height="420" Width="700"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanMinimize">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="対象ルートフォルダ" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+        <ListBox Grid.Row="1" Name="RootPathsListBox"/>
+
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0" Name="NewRootPathTextBox" Height="28" VerticalContentAlignment="Center"/>
+            <Button Grid.Column="1" Content="追加" Width="72" Margin="8,0,0,0" Click="AddRootPathButton_Click"/>
+            <Button Grid.Column="2" Content="削除" Width="72" Margin="8,0,0,0" Click="RemoveRootPathButton_Click"/>
+        </Grid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="キャンセル" Width="90" Margin="0,0,8,0" IsCancel="True"/>
+            <Button Content="保存" Width="90" IsDefault="True" Click="SaveButton_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>
