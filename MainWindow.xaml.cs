@@ -72,11 +72,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddressGoButton_Click(object sender, RoutedEventArgs e)
-    {
-        NavigateByAddressInput();
-    }
-
     private void AddressTextBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
