@@ -18,11 +18,37 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Menu Grid.Row="0" Grid.ColumnSpan="3">
-            <MenuItem Header="設定">
-                <MenuItem Header="設定を開く" Click="OpenSettingsMenuItem_Click"/>
-            </MenuItem>
-        </Menu>
+        <Grid Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,8,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <Menu Grid.Column="0" HorizontalAlignment="Left">
+                <MenuItem Header="設定">
+                    <MenuItem Header="設定を開く" Click="OpenSettingsMenuItem_Click"/>
+                </MenuItem>
+            </Menu>
+
+            <Grid Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                    <Button Content="← 戻る" Width="80" Margin="0,0,6,0" Click="BackButton_Click"
+                            IsEnabled="{Binding CanGoBack}"/>
+                    <Button Content="進む →" Width="80" Margin="0,0,6,0" Click="ForwardButton_Click"
+                            IsEnabled="{Binding CanGoForward}"/>
+                    <Button Content="↑ 上へ" Width="80" Click="UpButton_Click"
+                            IsEnabled="{Binding CanGoUp}"/>
+                </StackPanel>
+
+                <TextBox Grid.Column="1" Text="{Binding AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
+                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
+            </Grid>
+        </Grid>
 
         <!-- 左側: フォルダツリー -->
         <Grid Grid.Row="1" Grid.Column="0" Background="#F5F5F5">
@@ -50,31 +76,7 @@
 
         <!-- 右側: ファイル一覧 -->
         <Grid Grid.Row="1" Grid.Column="2" Background="White">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0" Margin="10,10,10,5">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <Button Content="← 戻る" Width="80" Margin="0,0,6,0" Click="BackButton_Click"
-                            IsEnabled="{Binding CanGoBack}"/>
-                    <Button Content="進む →" Width="80" Margin="0,0,6,0" Click="ForwardButton_Click"
-                            IsEnabled="{Binding CanGoForward}"/>
-                    <Button Content="↑ 上へ" Width="80" Click="UpButton_Click"
-                            IsEnabled="{Binding CanGoUp}"/>
-                </StackPanel>
-
-                <TextBox Grid.Column="1" Text="{Binding AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
-                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
-            </Grid>
-
-            <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="10,0,10,10"
+            <DataGrid Grid.Row="0" ItemsSource="{Binding FileItems}" Margin="10,10,10,10"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
