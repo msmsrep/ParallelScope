@@ -23,6 +23,7 @@ public class MainWindowViewModel : ObservableObject
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
     private readonly FileCacheRepository _fileCacheRepository;
+    private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
     private int _navigationVersion;
 
@@ -67,6 +68,7 @@ public class MainWindowViewModel : ObservableObject
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
         _fileItems = new ObservableCollection<FileItemViewModel>();
         _fileCacheRepository = new FileCacheRepository();
+        _appSettingsRepository = new AppSettingsRepository();
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         InitializeRootFolders();
@@ -74,14 +76,18 @@ public class MainWindowViewModel : ObservableObject
 
     private void InitializeRootFolders()
     {
-        // ドライブをルートとして表示
-        foreach (var drive in DriveInfo.GetDrives())
-        {
-            if (drive.IsReady)
-            {
-                RootFolders.Add(new FolderItemViewModel(drive.RootDirectory.FullName));
-            }
-        }
+        var settings = _appSettingsRepository.Load();
+        ApplyRootPaths(settings.RootPaths, false);
+    }
+
+    public IReadOnlyList<string> GetConfiguredRootPaths()
+    {
+        return RootFolders.Select(x => x.Path).ToList();
+    }
+
+    public void ApplyRootPaths(IEnumerable<string> rootPaths)
+    {
+        ApplyRootPaths(rootPaths, true);
     }
 
     public bool LoadFiles(string folderPath)
@@ -372,5 +378,104 @@ public class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(CanGoForward));
         OnPropertyChanged(nameof(CanGoUp));
+    }
+
+    private void ApplyRootPaths(IEnumerable<string> rootPaths, bool saveSettings)
+    {
+        var normalizedRootPaths = NormalizeRootPaths(rootPaths).ToList();
+        if (normalizedRootPaths.Count == 0)
+        {
+            normalizedRootPaths = GetFallbackDriveRoots().ToList();
+        }
+
+        RootFolders.Clear();
+        foreach (var rootPath in normalizedRootPaths)
+        {
+            RootFolders.Add(new FolderItemViewModel(rootPath));
+        }
+
+        if (saveSettings)
+        {
+            _appSettingsRepository.Save(new AppSettings
+            {
+                RootPaths = normalizedRootPaths
+            });
+        }
+
+        var currentRoot = RootFolders.FirstOrDefault();
+        if (currentRoot is null)
+        {
+            CurrentPath = string.Empty;
+            AddressInput = string.Empty;
+            FileItems.Clear();
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(CurrentPath)
+            || !RootFolders.Any(x => IsAncestorOrSamePath(x.Path, CurrentPath)))
+        {
+            NavigateTo(currentRoot.Path, false);
+        }
+    }
+
+    private static IEnumerable<string> NormalizeRootPaths(IEnumerable<string> rootPaths)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in rootPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string normalized;
+            try
+            {
+                normalized = NormalizePath(path);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(normalized) || !Directory.Exists(normalized))
+            {
+                continue;
+            }
+
+            if (seen.Add(normalized))
+            {
+                yield return normalized;
+            }
+        }
+    }
+
+    private static IEnumerable<string> GetFallbackDriveRoots()
+    {
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            if (drive.IsReady)
+            {
+                yield return drive.RootDirectory.FullName;
+            }
+        }
+    }
+
+    private static bool IsAncestorOrSamePath(string ancestorPath, string targetPath)
+    {
+        var normalizedAncestor = NormalizePath(ancestorPath);
+        var normalizedTarget = NormalizePath(targetPath);
+
+        if (string.Equals(normalizedAncestor, normalizedTarget, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        var prefix = normalizedAncestor.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedAncestor
+            : normalizedAncestor + Path.DirectorySeparatorChar;
+
+        return normalizedTarget.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
     }
 }

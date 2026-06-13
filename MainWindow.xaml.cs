@@ -21,10 +21,23 @@ public partial class MainWindow : Window
         _viewModel = new MainWindowViewModel();
         DataContext = _viewModel;
 
-        if (_viewModel.RootFolders.Count > 0)
+        SyncTreeSelectionToCurrentPath();
+    }
+
+    private void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SettingsWindow(_viewModel.GetConfiguredRootPaths())
         {
-            _viewModel.AddressInput = _viewModel.RootFolders[0].Path;
+            Owner = this
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
         }
+
+        _viewModel.ApplyRootPaths(dialog.ResultRootPaths);
+        SyncTreeSelectionToCurrentPath();
     }
 
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

@@ -7,14 +7,25 @@
         mc:Ignorable="d"
         Title="ParallelFiler" Height="600" Width="1000">
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="300"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
+        <Menu Grid.Row="0" Grid.ColumnSpan="3">
+            <MenuItem Header="設定">
+                <MenuItem Header="設定を開く" Click="OpenSettingsMenuItem_Click"/>
+            </MenuItem>
+        </Menu>
+
         <!-- 左側: フォルダツリー -->
-        <Grid Grid.Column="0" Background="#F5F5F5">
+        <Grid Grid.Row="1" Grid.Column="0" Background="#F5F5F5">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
@@ -34,11 +45,11 @@
         </Grid>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" 
+        <GridSplitter Grid.Row="1" Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" 
                       Background="#CCCCCC" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->
-        <Grid Grid.Column="2" Background="White">
+        <Grid Grid.Row="1" Grid.Column="2" Background="White">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
