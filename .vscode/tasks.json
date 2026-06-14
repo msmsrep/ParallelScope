@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/ParallelFiler.csproj",
+                "${workspaceFolder}/ParallelScope.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/ParallelFiler.csproj",
+                "${workspaceFolder}/ParallelScope.csproj",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/ParallelFiler.csproj"
+                "${workspaceFolder}/ParallelScope.csproj"
             ],
             "problemMatcher": "$msCompile"
         }

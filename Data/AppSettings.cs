@@ -1,4 +1,4 @@
-namespace ParallelFiler.Data;
+namespace ParallelScope.Data;
 
 public sealed class AppSettings
 {

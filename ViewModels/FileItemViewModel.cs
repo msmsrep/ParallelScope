@@ -1,4 +1,4 @@
-namespace ParallelFiler.ViewModels;
+namespace ParallelScope.ViewModels;
 
 public class FileItemViewModel
 {

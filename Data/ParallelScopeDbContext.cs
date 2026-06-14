@@ -1,12 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace ParallelFiler.Data;
+namespace ParallelScope.Data;
 
-public class ParallelFilerDbContext : DbContext
+public class ParallelScopeDbContext : DbContext
 {
     public DbSet<FileSystemEntryEntity> FileSystemEntries => Set<FileSystemEntryEntity>();
 
-    public ParallelFilerDbContext(DbContextOptions<ParallelFilerDbContext> options)
+    public ParallelScopeDbContext(DbContextOptions<ParallelScopeDbContext> options)
         : base(options)
     {
     }

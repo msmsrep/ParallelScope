@@ -1,7 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 
-namespace ParallelFiler.ViewModels;
+namespace ParallelScope.ViewModels;
 
 public class FolderItemViewModel
 {

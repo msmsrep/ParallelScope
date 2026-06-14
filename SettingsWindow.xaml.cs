@@ -2,7 +2,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
 
-namespace ParallelFiler;
+namespace ParallelScope;
 
 public partial class SettingsWindow : Window
 {
