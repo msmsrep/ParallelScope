@@ -83,6 +83,28 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter)
+        {
+            return;
+        }
+
+        ExecuteSearch();
+        e.Handled = true;
+    }
+
+    private void SearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        ExecuteSearch();
+    }
+
+    private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.SearchQuery = string.Empty;
+        _viewModel.ClearSearch();
+    }
+
     private void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (sender is not DataGrid dataGrid)
@@ -223,5 +245,15 @@ public partial class MainWindow : Window
         }
 
         MessageBox.Show("指定されたフォルダへ移動できません。パスを確認してください。", "移動エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private void ExecuteSearch()
+    {
+        if (_viewModel.SearchCurrentPath())
+        {
+            return;
+        }
+
+        MessageBox.Show("検索対象のフォルダへ移動してから検索してください。", "検索エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 }
