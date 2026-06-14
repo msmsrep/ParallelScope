@@ -50,6 +50,30 @@ public class FileCacheRepository
             .ToList();
     }
 
+    public List<CachedFileSystemEntry> SearchEntriesUnderPath(string rootPath, string nameQuery)
+    {
+        using var db = CreateDbContext();
+
+        var normalizedRootPath = NormalizePath(rootPath);
+        var rootWithSeparator = normalizedRootPath.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedRootPath
+            : normalizedRootPath + Path.DirectorySeparatorChar;
+
+        return db.FileSystemEntries
+            .AsNoTracking()
+            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && x.Name.Contains(nameQuery))
+            .OrderByDescending(x => x.IsFolder)
+            .ThenBy(x => x.Name)
+            .Select(x => new CachedFileSystemEntry(
+                x.ParentPath,
+                x.FullPath,
+                x.Name,
+                x.IsFolder,
+                x.SizeBytes,
+                x.LastWriteTimeUtc))
+            .ToList();
+    }
+
     public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
         using var db = CreateDbContext();
@@ -84,5 +108,23 @@ public class FileCacheRepository
     private ParallelScopeDbContext CreateDbContext()
     {
         return new ParallelScopeDbContext(_dbOptions);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        var fullPath = Path.GetFullPath(path);
+        var rootPath = Path.GetPathRoot(fullPath);
+
+        if (!string.IsNullOrEmpty(rootPath) && string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return fullPath;
+        }
+
+        return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 }

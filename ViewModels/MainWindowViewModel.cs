@@ -20,12 +20,16 @@ public class MainWindowViewModel : ObservableObject
     private ObservableCollection<FileItemViewModel> _fileItems;
     private string _currentPath = string.Empty;
     private string _addressInput = string.Empty;
+    private string _searchQuery = string.Empty;
+    private string _searchSummary = string.Empty;
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
     private readonly FileCacheRepository _fileCacheRepository;
     private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
     private int _navigationVersion;
+    private int _searchVersion;
+    private List<FileItemViewModel> _currentDirectoryItems = new();
 
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
@@ -55,6 +59,29 @@ public class MainWindowViewModel : ObservableObject
     {
         get => _addressInput;
         set => SetProperty(ref _addressInput, value);
+    }
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (!SetProperty(ref _searchQuery, value))
+            {
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                ClearSearch();
+            }
+        }
+    }
+
+    public string SearchSummary
+    {
+        get => _searchSummary;
+        private set => SetProperty(ref _searchSummary, value);
     }
 
     public bool CanGoBack => _backHistory.Count > 0;
@@ -149,6 +176,36 @@ public class MainWindowViewModel : ObservableObject
         return NavigateTo(AddressInput, true);
     }
 
+    public bool SearchCurrentPath()
+    {
+        if (string.IsNullOrWhiteSpace(CurrentPath) || !Directory.Exists(CurrentPath))
+        {
+            return false;
+        }
+
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            ClearSearch();
+            return true;
+        }
+
+        var normalizedQuery = SearchQuery.Trim();
+        var searchRootPath = CurrentPath;
+        var searchVersion = Interlocked.Increment(ref _searchVersion);
+
+        SearchSummary = $"{searchRootPath} を \"{normalizedQuery}\" で検索中...";
+        ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
+        _ = SearchInBackground(searchRootPath, normalizedQuery, searchVersion);
+        return true;
+    }
+
+    public void ClearSearch()
+    {
+        Interlocked.Increment(ref _searchVersion);
+        SearchSummary = string.Empty;
+        ReplaceVisibleFileItems(_currentDirectoryItems);
+    }
+
     public bool NavigateTo(string folderPath, bool addToHistory)
     {
         if (string.IsNullOrWhiteSpace(folderPath))
@@ -207,12 +264,96 @@ public class MainWindowViewModel : ObservableObject
         try
         {
             var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
-            ReplaceVisibleFileItems(cachedEntries.Select(ToViewModel));
+            UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
         }
         catch
         {
-            FileItems.Clear();
+            UpdateCurrentDirectoryItems(Array.Empty<FileItemViewModel>());
         }
+    }
+
+    private async Task SearchInBackground(string rootPath, string query, int searchVersion)
+    {
+        List<FileItemViewModel> cacheResults;
+
+        try
+        {
+            cacheResults = await Task.Run(() =>
+                _fileCacheRepository.SearchEntriesUnderPath(rootPath, query)
+                    .Select(ToViewModel)
+                    .ToList());
+        }
+        catch
+        {
+            cacheResults = new List<FileItemViewModel>();
+        }
+
+        if (searchVersion != Volatile.Read(ref _searchVersion)
+            || !IsSamePath(CurrentPath, rootPath)
+            || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (searchVersion != Volatile.Read(ref _searchVersion)
+                || !IsSamePath(CurrentPath, rootPath)
+                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            ReplaceVisibleFileItems(cacheResults);
+            SearchSummary = $"キャッシュ検索: {cacheResults.Count} 件ヒット ({rootPath})";
+        }, null);
+
+        if (cacheResults.Count > 0)
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (searchVersion != Volatile.Read(ref _searchVersion)
+                || !IsSamePath(CurrentPath, rootPath)
+                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            SearchSummary = $"キャッシュ一致なし。ファイルシステム検索中... ({rootPath})";
+        }, null);
+
+        List<FileItemViewModel> fullScanResults;
+        try
+        {
+            fullScanResults = await Task.Run(() => SearchEntriesFromFileSystem(rootPath, query));
+        }
+        catch
+        {
+            fullScanResults = new List<FileItemViewModel>();
+        }
+
+        if (searchVersion != Volatile.Read(ref _searchVersion)
+            || !IsSamePath(CurrentPath, rootPath)
+            || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (searchVersion != Volatile.Read(ref _searchVersion)
+                || !IsSamePath(CurrentPath, rootPath)
+                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            ReplaceVisibleFileItems(fullScanResults);
+            SearchSummary = $"実フォルダ検索: {fullScanResults.Count} 件ヒット ({rootPath})";
+        }, null);
     }
 
     private async Task RefreshFromFileSystemInBackground(string folderPath, int navigationVersion)
@@ -249,7 +390,7 @@ public class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            ReplaceVisibleFileItems(liveEntries.Select(ToViewModel));
+            UpdateCurrentDirectoryItems(liveEntries.Select(ToViewModel));
         }, null);
     }
 
@@ -272,6 +413,64 @@ public class MainWindowViewModel : ObservableObject
             .Cast<CachedFileSystemEntry>();
 
         return folders.Concat(files).ToList();
+    }
+
+    private static List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
+    {
+        var results = new List<FileItemViewModel>();
+        var comparison = StringComparison.OrdinalIgnoreCase;
+
+        foreach (var directoryPath in Directory.EnumerateDirectories(rootPath, "*", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        }).OrderBy(path => path))
+        {
+            try
+            {
+                var directoryInfo = new DirectoryInfo(directoryPath);
+                if (!directoryInfo.Name.Contains(query, comparison))
+                {
+                    continue;
+                }
+
+                results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            IgnoreInaccessible = true,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        }).OrderBy(path => path))
+        {
+            try
+            {
+                var fileInfo = new FileInfo(filePath);
+                if (!fileInfo.Name.Contains(query, comparison))
+                {
+                    continue;
+                }
+
+                results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
+            catch (IOException)
+            {
+            }
+        }
+
+        return results;
     }
 
     private static CachedFileSystemEntry? TryCreateFolderEntry(string parentPath, DirectoryInfo directory)
@@ -325,6 +524,17 @@ public class MainWindowViewModel : ObservableObject
         foreach (var item in items)
         {
             FileItems.Add(item);
+        }
+    }
+
+    private void UpdateCurrentDirectoryItems(IEnumerable<FileItemViewModel> items)
+    {
+        _currentDirectoryItems = items.ToList();
+
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            ReplaceVisibleFileItems(_currentDirectoryItems);
+            SearchSummary = string.Empty;
         }
     }
 
@@ -407,7 +617,9 @@ public class MainWindowViewModel : ObservableObject
         {
             CurrentPath = string.Empty;
             AddressInput = string.Empty;
-            FileItems.Clear();
+            _currentDirectoryItems.Clear();
+            ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
+            SearchSummary = string.Empty;
             return;
         }
 

@@ -76,7 +76,34 @@
 
         <!-- 右側: ファイル一覧 -->
         <Grid Grid.Row="1" Grid.Column="2" Background="White">
-            <DataGrid Grid.Row="0" ItemsSource="{Binding FileItems}" Margin="10,10,10,10"
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="10,10,10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0" Margin="0,0,8,0"
+                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                         Height="28"
+                         VerticalContentAlignment="Center"
+                         KeyDown="SearchTextBox_KeyDown"/>
+                <Button Grid.Column="1" Content="検索" Width="72" Margin="0,0,8,0"
+                        Click="SearchButton_Click"/>
+                <Button Grid.Column="2" Content="クリア" Width="72"
+                        Click="ClearSearchButton_Click"/>
+            </Grid>
+
+            <TextBlock Grid.Row="1" Margin="10,6,10,0" Foreground="#666666"
+                       Text="{Binding SearchSummary}"/>
+
+            <DataGrid Grid.Row="2" ItemsSource="{Binding FileItems}" Margin="10,8,10,10"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
