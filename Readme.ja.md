@@ -1,6 +1,6 @@
 # ParallelScope
 
-[English](./readme.md) | 日本語
+[English](./Readme.md) | 日本語
 
 ParallelScope は、指定した複数ルート配下のフォルダ/ファイルを横断して参照できる Windows 向けデスクトップアプリです。
 WPF で UI を構築し、ローカル SQLite キャッシュを使って表示と検索を高速化しています。
