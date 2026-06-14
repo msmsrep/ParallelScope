@@ -23,6 +23,19 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+
+    <!-- ビルド時にコピー -->
+    <!-- マニフェスト -->
+    <None Include="AppxManifest.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <!-- <CopyToPublishDirectory>Always</CopyToPublishDirectory> -->
+    </None>
+    <!-- アイコン -->
+    <Content Include="Assets\*.*">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      <!-- <CopyToPublishDirectory>Always</CopyToPublishDirectory> -->
+    </Content>
+
   </ItemGroup>
 
 </Project>
