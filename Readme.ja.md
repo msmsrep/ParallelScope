@@ -37,6 +37,8 @@ dotnet run --project ParallelScope.csproj
 
 ```powershell
 dotnet build ParallelScope.csproj
+# リリース
+dotnet publish -c Release
 ```
 
 ## 使い方

@@ -6,6 +6,10 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <!-- ターゲットランタイム -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <!-- MSIXなのでランタイムを含めない -->
+    <SelfContained>false</SelfContained>
   </PropertyGroup>
 
   <ItemGroup>
