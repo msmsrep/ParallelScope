@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text.Json;
 
-namespace ParallelFiler.Data;
+namespace ParallelScope.Data;
 
 public class AppSettingsRepository
 {
@@ -11,7 +11,7 @@ public class AppSettingsRepository
     {
         var appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ParallelFiler");
+            "ParallelScope");
         Directory.CreateDirectory(appDataDir);
 
         _settingsPath = Path.Combine(appDataDir, "settings.json");

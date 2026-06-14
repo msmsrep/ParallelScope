@@ -1,7 +1,7 @@
 using System.IO;
 using Microsoft.EntityFrameworkCore;
 
-namespace ParallelFiler.Data;
+namespace ParallelScope.Data;
 
 public sealed record CachedFileSystemEntry(
     string ParentPath,
@@ -13,17 +13,17 @@ public sealed record CachedFileSystemEntry(
 
 public class FileCacheRepository
 {
-    private readonly DbContextOptions<ParallelFilerDbContext> _dbOptions;
+    private readonly DbContextOptions<ParallelScopeDbContext> _dbOptions;
 
     public FileCacheRepository()
     {
         var appDataDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ParallelFiler");
+            "ParallelScope");
         Directory.CreateDirectory(appDataDir);
 
-        var dbPath = Path.Combine(appDataDir, "parallelfiler.sqlite");
-        _dbOptions = new DbContextOptionsBuilder<ParallelFilerDbContext>()
+        var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
+        _dbOptions = new DbContextOptionsBuilder<ParallelScopeDbContext>()
             .UseSqlite($"Data Source={dbPath}")
             .Options;
 
@@ -81,8 +81,8 @@ public class FileCacheRepository
         db.SaveChanges();
     }
 
-    private ParallelFilerDbContext CreateDbContext()
+    private ParallelScopeDbContext CreateDbContext()
     {
-        return new ParallelFilerDbContext(_dbOptions);
+        return new ParallelScopeDbContext(_dbOptions);
     }
 }

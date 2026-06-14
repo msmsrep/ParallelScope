@@ -3,9 +3,9 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
-using ParallelFiler.Data;
+using ParallelScope.Data;
 
-namespace ParallelFiler.ViewModels;
+namespace ParallelScope.ViewModels;
 
 public class MainWindowViewModel : ObservableObject
 {

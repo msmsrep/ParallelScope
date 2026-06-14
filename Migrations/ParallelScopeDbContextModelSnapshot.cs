@@ -3,21 +3,21 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
-using ParallelFiler.Data;
+using ParallelScope.Data;
 
 #nullable disable
 
-namespace ParallelFiler.Migrations
+namespace ParallelScope.Migrations
 {
-    [DbContext(typeof(ParallelFilerDbContext))]
-    partial class ParallelFilerDbContextModelSnapshot : ModelSnapshot
+    [DbContext(typeof(ParallelScopeDbContext))]
+    partial class ParallelScopeDbContextModelSnapshot : ModelSnapshot
     {
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
 
-            modelBuilder.Entity("ParallelFiler.Data.FileSystemEntryEntity", b =>
+            modelBuilder.Entity("ParallelScope.Data.FileSystemEntryEntity", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()

@@ -3,9 +3,9 @@ using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
-using ParallelFiler.ViewModels;
+using ParallelScope.ViewModels;
 
-namespace ParallelFiler;
+namespace ParallelScope;
 
 /// <summary>
 /// Interaction logic for MainWindow.xaml

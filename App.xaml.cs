@@ -2,7 +2,7 @@
 using System.Data;
 using System.Windows;
 
-namespace ParallelFiler;
+namespace ParallelScope;
 
 /// <summary>
 /// Interaction logic for App.xaml
