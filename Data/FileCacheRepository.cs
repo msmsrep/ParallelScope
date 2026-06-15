@@ -17,12 +17,31 @@ public class FileCacheRepository
 
     public FileCacheRepository()
     {
-        var appDataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "ParallelScope");
+        string appDataDir;
+
+        bool isMsix = Environment.ProcessPath?.Contains(@"\WindowsApps\") ?? false;
+
+        if (isMsix)
+        {
+            // MSIX の LocalState
+            appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Packages",
+                "msmsrep.ParallelScope_77t1an0ygyrva",
+                "LocalState");
+        }
+        else
+        {
+            // 通常のローカルフォルダ
+            appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "ParallelScope");
+        }
+
         Directory.CreateDirectory(appDataDir);
 
         var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
+
         _dbOptions = new DbContextOptionsBuilder<ParallelScopeDbContext>()
             .UseSqlite($"Data Source={dbPath}")
             .Options;

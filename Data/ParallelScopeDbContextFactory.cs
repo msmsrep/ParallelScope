@@ -3,7 +3,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 
 namespace ParallelScope.Data;
-
+/// <summary>
+/// 開発時のデータベースマイグレーション用ファクトリクラス
+/// </summary>
 public class ParallelScopeDbContextFactory : IDesignTimeDbContextFactory<ParallelScopeDbContext>
 {
     public ParallelScopeDbContext CreateDbContext(string[] args)
