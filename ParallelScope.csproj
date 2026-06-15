@@ -10,6 +10,8 @@
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <!-- MSIXなのでランタイムを含めない -->
     <SelfContained>false</SelfContained>
+    <!-- アプリのアイコンをMSIXにも設定 -->
+    <ApplicationIcon>Assets/logo.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
@@ -35,6 +37,9 @@
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <!-- <CopyToPublishDirectory>Always</CopyToPublishDirectory> -->
     </Content>
+
+    <!-- アプリ左上のアイコン -->
+    <Resource Include="Assets/logo.ico" />
 
   </ItemGroup>
 

@@ -193,7 +193,7 @@ public class MainWindowViewModel : ObservableObject
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
-        SearchSummary = $"{searchRootPath} を \"{normalizedQuery}\" で検索中...";
+        SearchSummary = $"Searching \"{normalizedQuery}\" in {searchRootPath}...";
         ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
         _ = SearchInBackground(searchRootPath, normalizedQuery, searchVersion);
         return true;
@@ -305,7 +305,7 @@ public class MainWindowViewModel : ObservableObject
             }
 
             ReplaceVisibleFileItems(cacheResults);
-            SearchSummary = $"キャッシュ検索: {cacheResults.Count} 件ヒット ({rootPath})";
+            SearchSummary = $"Cache search: {cacheResults.Count} hit(s) ({rootPath})";
         }, null);
 
         if (cacheResults.Count > 0)
@@ -322,7 +322,7 @@ public class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            SearchSummary = $"キャッシュ一致なし。ファイルシステム検索中... ({rootPath})";
+            SearchSummary = $"No cache matches. Searching file system... ({rootPath})";
         }, null);
 
         List<FileItemViewModel> fullScanResults;
@@ -352,7 +352,7 @@ public class MainWindowViewModel : ObservableObject
             }
 
             ReplaceVisibleFileItems(fullScanResults);
-            SearchSummary = $"実フォルダ検索: {fullScanResults.Count} 件ヒット ({rootPath})";
+            SearchSummary = $"File system search: {fullScanResults.Count} hit(s) ({rootPath})";
         }, null);
     }
 

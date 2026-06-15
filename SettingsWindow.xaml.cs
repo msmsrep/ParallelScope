@@ -33,13 +33,13 @@ public partial class SettingsWindow : Window
         }
         catch
         {
-            MessageBox.Show("パスの形式が正しくありません。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("The path format is invalid.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         if (!Directory.Exists(normalized))
         {
-            MessageBox.Show("指定されたフォルダが存在しません。", "入力エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("The specified folder does not exist.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -67,7 +67,7 @@ public partial class SettingsWindow : Window
     {
         if (_rootPaths.Count == 0)
         {
-            MessageBox.Show("対象ルートを1件以上追加してください。", "保存エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 

@@ -14,7 +14,7 @@ public class FileItemViewModel
         FullPath = fullPath;
         Name = name;
         SizeText = FormatFileSize(sizeBytes);
-        TypeText = "ファイル";
+        TypeText = "File";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = false;
     }
@@ -24,7 +24,7 @@ public class FileItemViewModel
         FullPath = fullPath;
         Name = name;
         SizeText = string.Empty;
-        TypeText = "フォルダ";
+        TypeText = "Folder";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = true;
     }

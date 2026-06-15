@@ -5,7 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ParallelScope"
         mc:Ignorable="d"
-        Title="ParallelScope" Height="600" Width="1000">
+        Title="ParallelScope" Height="600" Width="1000"
+        Icon="Assets/logo.ico">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -25,8 +26,8 @@
             </Grid.ColumnDefinitions>
 
             <Menu Grid.Column="0" HorizontalAlignment="Left">
-                <MenuItem Header="設定">
-                    <MenuItem Header="設定を開く" Click="OpenSettingsMenuItem_Click"/>
+                <MenuItem Header="Settings">
+                    <MenuItem Header="Open Settings" Click="OpenSettingsMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 
@@ -37,11 +38,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <Button Content="← 戻る" Width="80" Margin="0,0,6,0" Click="BackButton_Click"
+                    <Button Content="← Back" Width="80" Margin="0,0,6,0" Click="BackButton_Click"
                             IsEnabled="{Binding CanGoBack}"/>
-                    <Button Content="進む →" Width="80" Margin="0,0,6,0" Click="ForwardButton_Click"
+                    <Button Content="Forward →" Width="80" Margin="0,0,6,0" Click="ForwardButton_Click"
                             IsEnabled="{Binding CanGoForward}"/>
-                    <Button Content="↑ 上へ" Width="80" Click="UpButton_Click"
+                    <Button Content="↑ Up" Width="80" Click="UpButton_Click"
                             IsEnabled="{Binding CanGoUp}"/>
                 </StackPanel>
 
@@ -57,7 +58,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
-            <TextBlock Grid.Row="0" Text="フォルダ" FontSize="14" FontWeight="Bold" Margin="10,10,10,5"/>
+            <TextBlock Grid.Row="0" Text="Folders" FontSize="14" FontWeight="Bold" Margin="10,10,10,5"/>
             
             <TreeView Grid.Row="1" Name="FolderTreeView" Margin="10,0,10,10" 
                       ItemsSource="{Binding RootFolders}" 
@@ -94,9 +95,9 @@
                          Height="28"
                          VerticalContentAlignment="Center"
                          KeyDown="SearchTextBox_KeyDown"/>
-                <Button Grid.Column="1" Content="検索" Width="72" Margin="0,0,8,0"
+                <Button Grid.Column="1" Content="Search" Width="72" Margin="0,0,8,0"
                         Click="SearchButton_Click"/>
-                <Button Grid.Column="2" Content="クリア" Width="72"
+                <Button Grid.Column="2" Content="Clear" Width="72"
                         Click="ClearSearchButton_Click"/>
             </Grid>
 
@@ -108,10 +109,10 @@
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="ファイル名" Binding="{Binding Name}" Width="*"/>
-                    <DataGridTextColumn Header="種類" Binding="{Binding TypeText}" Width="100"/>
-                    <DataGridTextColumn Header="サイズ" Binding="{Binding SizeText}" Width="100"/>
-                    <DataGridTextColumn Header="更新日時" Binding="{Binding ModifiedTime}" Width="150"/>
+                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="100"/>
+                    <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="100"/>
+                    <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedTime}" Width="150"/>
                 </DataGrid.Columns>
             </DataGrid>
         </Grid>

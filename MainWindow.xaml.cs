@@ -136,7 +136,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"ファイルを開けませんでした: {ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -244,7 +244,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBox.Show("指定されたフォルダへ移動できません。パスを確認してください。", "移動エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show("Could not navigate to the specified folder. Please check the path.", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     private void ExecuteSearch()
@@ -254,6 +254,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBox.Show("検索対象のフォルダへ移動してから検索してください。", "検索エラー", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show("Please navigate to a searchable folder before running a search.", "Search Error", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 }
