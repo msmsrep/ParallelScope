@@ -111,10 +111,10 @@ This is a desktop application and does not perform cookie-based tracking commonl
 
 Users can delete app-stored data by removing the following files.
 
-- `%LOCALAPPDATA%\ParallelScope\settings.json`
-- `%LOCALAPPDATA%\ParallelScope\ParallelScope.sqlite`
+- `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState\settings.json`
+- `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState\ParallelScope.sqlite`
 
-If needed, delete the entire `%LOCALAPPDATA%\ParallelScope` folder.
+Saved data will also be deleted when the app is uninstalled.
 
 ### Contact
 

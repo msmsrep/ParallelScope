@@ -111,10 +111,10 @@ dotnet ef database update
 
 アプリが保存したデータは、以下を削除することで利用者自身が消去できます。
 
-- `%LOCALAPPDATA%\ParallelScope\settings.json`
-- `%LOCALAPPDATA%\ParallelScope\ParallelScope.sqlite`
+- `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState\settings.json`
+- `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState\ParallelScope.sqlite`
 
-必要に応じて `%LOCALAPPDATA%\ParallelScope` フォルダごと削除してください。
+アプリのアンインストール時に保存されたデータも削除されます。
 
 ### お問い合わせ
 
