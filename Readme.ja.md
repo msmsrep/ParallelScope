@@ -53,7 +53,8 @@ dotnet publish -c Release
 
 ## データ保存先
 
-`%LOCALAPPDATA%\ParallelScope` 配下に以下を保存します。
+`%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`以下のフォルダへ保存します。
+アプリのアンインストール時に保存されたデータも削除されます。
 
 - `settings.json`: ルートフォルダ設定
 - `ParallelScope.sqlite`: ファイル一覧キャッシュ
@@ -90,7 +91,7 @@ dotnet ef database update
 - ルートフォルダ設定（`settings.json`）
 - ファイル一覧キャッシュ（`ParallelScope.sqlite`）
 
-保存先は `%LOCALAPPDATA%\ParallelScope` です。
+保存先は `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState` です。
 
 ### データ処理の範囲
 

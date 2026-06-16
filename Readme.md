@@ -53,7 +53,8 @@ dotnet publish -c Release
 
 ## Data Storage
 
-The app stores the following files under `%LOCALAPPDATA%\ParallelScope`.
+It is saved in the folder under `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`.
+Saved data will also be deleted when the app is uninstalled.
 
 - `settings.json`: root folder settings
 - `ParallelScope.sqlite`: file list cache
@@ -90,7 +91,7 @@ However, for application functionality, the following data is stored locally on 
 - Root folder settings (`settings.json`)
 - File list cache (`ParallelScope.sqlite`)
 
-Storage location: `%LOCALAPPDATA%\ParallelScope`
+Storage location: `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`
 
 ### Scope of Data Processing
 
