@@ -30,6 +30,7 @@ public class MainWindowViewModel : ObservableObject
     private int _navigationVersion;
     private int _searchVersion;
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
+    private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
     public ObservableCollection<FolderItemViewModel> RootFolders
@@ -106,7 +107,8 @@ public class MainWindowViewModel : ObservableObject
     {
         var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
-        ApplyRootPaths(settings.RootPaths, false);
+        _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
     public IReadOnlyList<string> GetConfiguredRootPaths()
@@ -119,10 +121,16 @@ public class MainWindowViewModel : ObservableObject
         return _fullScanIntervalHours;
     }
 
-    public void ApplySettings(IEnumerable<string> rootPaths, int fullScanIntervalHours)
+    public IReadOnlyList<string> GetExcludedPaths()
+    {
+        return _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public void ApplySettings(IEnumerable<string> rootPaths, IEnumerable<string> excludedPaths, int fullScanIntervalHours)
     {
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
-        ApplyRootPaths(rootPaths, true);
+        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
     }
 
     public void ApplyRootPaths(IEnumerable<string> rootPaths)
@@ -216,7 +224,7 @@ public class MainWindowViewModel : ObservableObject
     {
         var configuredRootPaths = RootFolders
             .Select(x => x.Path)
-            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && !IsExcludedPath(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -225,7 +233,7 @@ public class MainWindowViewModel : ObservableObject
 
     public Task<int> ScanFolderSubtreeAsync(string folderPath)
     {
-        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath) || IsExcludedPath(folderPath))
         {
             return Task.FromResult(0);
         }
@@ -249,6 +257,11 @@ public class MainWindowViewModel : ObservableObject
 
         var normalizedTargetPath = NormalizePath(folderPath);
         if (string.IsNullOrEmpty(normalizedTargetPath) || !Directory.Exists(normalizedTargetPath))
+        {
+            return false;
+        }
+
+        if (IsExcludedPath(normalizedTargetPath))
         {
             return false;
         }
@@ -473,12 +486,13 @@ public class MainWindowViewModel : ObservableObject
         }, null);
     }
 
-    private static List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
+    private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
 
         var folders = dirInfo
             .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+            .Where(d => !IsExcludedPath(d.FullName))
             .OrderBy(d => d.Name)
             .Select(d => TryCreateFolderEntry(folderPath, d))
             .Where(e => e is not null)
@@ -494,58 +508,91 @@ public class MainWindowViewModel : ObservableObject
         return folders.Concat(files).ToList();
     }
 
-    private static List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
+    private List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
     {
         var results = new List<FileItemViewModel>();
         var comparison = StringComparison.OrdinalIgnoreCase;
 
-        foreach (var directoryPath in Directory.EnumerateDirectories(rootPath, "*", new EnumerationOptions
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(rootPath);
+
+        while (pendingDirectories.Count > 0)
         {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        }).OrderBy(path => path))
-        {
+            var currentPath = pendingDirectories.Pop();
+
+            IEnumerable<string> childDirectories;
             try
             {
-                var directoryInfo = new DirectoryInfo(directoryPath);
-                if (!directoryInfo.Name.Contains(query, comparison))
-                {
-                    continue;
-                }
-
-                results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
+                childDirectories = Directory.EnumerateDirectories(currentPath, "*", NonRecursiveEnumerationOptions)
+                    .Where(path => !IsExcludedPath(path))
+                    .OrderBy(path => path)
+                    .ToList();
             }
             catch (UnauthorizedAccessException)
             {
+                continue;
             }
             catch (IOException)
             {
+                continue;
             }
-        }
 
-        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        }).OrderBy(path => path))
-        {
+            foreach (var directoryPath in childDirectories)
+            {
+                pendingDirectories.Push(directoryPath);
+
+                try
+                {
+                    var directoryInfo = new DirectoryInfo(directoryPath);
+                    if (!directoryInfo.Name.Contains(query, comparison))
+                    {
+                        continue;
+                    }
+
+                    results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
+                }
+            }
+
+            IEnumerable<string> filePaths;
             try
             {
-                var fileInfo = new FileInfo(filePath);
-                if (!fileInfo.Name.Contains(query, comparison))
-                {
-                    continue;
-                }
-
-                results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
+                filePaths = Directory.EnumerateFiles(currentPath, "*", NonRecursiveEnumerationOptions)
+                    .OrderBy(path => path)
+                    .ToList();
             }
             catch (UnauthorizedAccessException)
             {
+                continue;
             }
             catch (IOException)
             {
+                continue;
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (!fileInfo.Name.Contains(query, comparison))
+                    {
+                        continue;
+                    }
+
+                    results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
+                }
             }
         }
 
@@ -572,7 +619,7 @@ public class MainWindowViewModel : ObservableObject
                 continue;
             }
 
-            if (!visitedDirectories.Add(normalizedPath) || !Directory.Exists(normalizedPath))
+            if (!visitedDirectories.Add(normalizedPath) || !Directory.Exists(normalizedPath) || IsExcludedPath(normalizedPath))
             {
                 continue;
             }
@@ -597,7 +644,7 @@ public class MainWindowViewModel : ObservableObject
                 // キャッシュ保存失敗時はスキャンを継続する
             }
 
-            foreach (var folderEntry in entries.Where(x => x.IsFolder).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+            foreach (var folderEntry in entries.Where(x => x.IsFolder && !IsExcludedPath(x.FullPath)).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
             {
                 pendingDirectories.Push(folderEntry.FullPath);
             }
@@ -752,7 +799,12 @@ public class MainWindowViewModel : ObservableObject
         RootFolders.Clear();
         foreach (var rootPath in normalizedRootPaths)
         {
-            RootFolders.Add(new FolderItemViewModel(rootPath));
+            if (IsExcludedPath(rootPath))
+            {
+                continue;
+            }
+
+            RootFolders.Add(new FolderItemViewModel(rootPath, IsExcludedPath));
         }
 
         if (saveSettings)
@@ -760,6 +812,7 @@ public class MainWindowViewModel : ObservableObject
             _appSettingsRepository.Save(new AppSettings
             {
                 RootPaths = normalizedRootPaths,
+                ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
                 FullScanIntervalHours = _fullScanIntervalHours
             });
         }
@@ -846,5 +899,66 @@ public class MainWindowViewModel : ObservableObject
     private static int NormalizeFullScanIntervalHours(int hours)
     {
         return hours > 0 ? hours : AppSettings.DefaultFullScanIntervalHours;
+    }
+
+    private static IEnumerable<string> NormalizeExcludedPaths(IEnumerable<string> excludedPaths)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in excludedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string normalized;
+            try
+            {
+                normalized = NormalizePath(path);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(normalized) || !Directory.Exists(normalized))
+            {
+                continue;
+            }
+
+            if (seen.Add(normalized))
+            {
+                yield return normalized;
+            }
+        }
+    }
+
+    private bool IsExcludedPath(string path)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return false;
+        }
+
+        foreach (var excludedPath in _excludedPaths)
+        {
+            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var prefix = excludedPath.EndsWith(Path.DirectorySeparatorChar)
+                ? excludedPath
+                : excludedPath + Path.DirectorySeparatorChar;
+
+            if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

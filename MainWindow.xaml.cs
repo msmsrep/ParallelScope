@@ -53,7 +53,10 @@ public partial class MainWindow : Window
 
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsWindow(_viewModel.GetConfiguredRootPaths(), _viewModel.GetFullScanIntervalHours())
+        var dialog = new SettingsWindow(
+            _viewModel.GetConfiguredRootPaths(),
+            _viewModel.GetExcludedPaths(),
+            _viewModel.GetFullScanIntervalHours())
         {
             Owner = this
         };
@@ -63,7 +66,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultFullScanIntervalHours);
+        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours);
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 

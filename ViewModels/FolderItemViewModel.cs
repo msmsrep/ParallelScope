@@ -14,6 +14,7 @@ public class FolderItemViewModel : ObservableObject
     };
 
     private readonly string _path;
+    private readonly Func<string, bool>? _isExcludedPath;
     private ObservableCollection<FolderItemViewModel>? _subFolders;
     private bool _isScanning;
 
@@ -43,9 +44,10 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    public FolderItemViewModel(string path)
+    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null)
     {
         _path = path;
+        _isExcludedPath = isExcludedPath;
         DisplayName = GetDisplayName(path);
     }
 
@@ -62,8 +64,9 @@ public class FolderItemViewModel : ObservableObject
             var dirInfo = new DirectoryInfo(_path);
             var subDirs = dirInfo
                 .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+                .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
                 .OrderBy(d => d.Name)
-                .Select(d => new FolderItemViewModel(d.FullName));
+                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath));
 
             foreach (var subDir in subDirs)
             {
