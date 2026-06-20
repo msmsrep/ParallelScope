@@ -268,9 +268,8 @@ public class MainWindowViewModel : ObservableObject
             CurrentPath = folderPath;
             AddressInput = folderPath;
 
-            LoadFromCache(folderPath);
-
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
+            LoadFromCache(folderPath, navigationVersion);
             _ = RefreshFromFileSystemInBackground(folderPath, navigationVersion);
             return true;
         }
@@ -280,12 +279,13 @@ public class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void LoadFromCache(string folderPath)
+    private void LoadFromCache(string folderPath, int navigationVersion)
     {
         try
         {
             var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
             UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
+            _ = ApplyCachedFolderSizesInBackground(folderPath, cachedEntries, navigationVersion);
         }
         catch
         {
@@ -412,6 +412,51 @@ public class MainWindowViewModel : ObservableObject
             }
 
             UpdateCurrentDirectoryItems(liveEntries.Select(ToViewModel));
+            _ = ApplyCachedFolderSizesInBackground(folderPath, liveEntries, navigationVersion);
+        }, null);
+    }
+
+    private async Task ApplyCachedFolderSizesInBackground(string folderPath, IReadOnlyCollection<CachedFileSystemEntry> entries, int navigationVersion)
+    {
+        var folderPaths = entries
+            .Where(x => x.IsFolder)
+            .Select(x => x.FullPath)
+            .ToList();
+
+        if (folderPaths.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<string, long> cachedFolderSizes;
+        try
+        {
+            cachedFolderSizes = await Task.Run(() => _fileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
+        }
+        catch
+        {
+            return;
+        }
+
+        if (cachedFolderSizes.Count == 0)
+        {
+            return;
+        }
+
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+            {
+                return;
+            }
+
+            var fileItems = entries.Select(entry => ToViewModel(entry, cachedFolderSizes)).ToList();
+            UpdateCurrentDirectoryItems(fileItems);
         }, null);
     }
 
@@ -620,6 +665,24 @@ public class MainWindowViewModel : ObservableObject
         if (entry.IsFolder)
         {
             return new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime);
+        }
+
+        return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
+    }
+
+    private static FileItemViewModel ToViewModel(CachedFileSystemEntry entry, IReadOnlyDictionary<string, long> cachedFolderSizes)
+    {
+        var modifiedLocalTime = DateTime.SpecifyKind(entry.LastWriteTimeUtc, DateTimeKind.Utc).ToLocalTime();
+
+        if (entry.IsFolder)
+        {
+            cachedFolderSizes.TryGetValue(entry.FullPath, out var cachedTotalSizeBytes);
+            var hasCachedSize = cachedFolderSizes.ContainsKey(entry.FullPath);
+            return new FileItemViewModel(
+                entry.FullPath,
+                entry.Name,
+                modifiedLocalTime,
+                hasCachedSize ? cachedTotalSizeBytes : null);
         }
 
         return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
