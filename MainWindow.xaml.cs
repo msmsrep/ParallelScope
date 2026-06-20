@@ -24,7 +24,7 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
-    private void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
+    private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SettingsWindow(_viewModel.GetConfiguredRootPaths())
         {
@@ -38,6 +38,11 @@ public partial class MainWindow : Window
 
         _viewModel.ApplyRootPaths(dialog.ResultRootPaths);
         SyncTreeSelectionToCurrentPath();
+
+        if (dialog.ShouldRunFullScan)
+        {
+            await RunFullScanFromSettingsAsync();
+        }
     }
 
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -255,5 +260,28 @@ public partial class MainWindow : Window
         }
 
         MessageBox.Show("Please navigate to a searchable folder before running a search.", "Search Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+    }
+
+    private async Task RunFullScanFromSettingsAsync()
+    {
+        try
+        {
+            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
+            _viewModel.LoadFiles(_viewModel.CurrentPath);
+
+            MessageBox.Show(
+                $"Full scan completed. Updated cache for {scannedFolderCount} folder(s).",
+                "Full Scan",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Full scan failed: {ex.Message}", "Full Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            Mouse.OverrideCursor = null;
+        }
     }
 }

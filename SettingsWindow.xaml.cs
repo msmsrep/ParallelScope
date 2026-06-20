@@ -9,6 +9,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<string> _rootPaths;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
+    public bool ShouldRunFullScan { get; private set; }
 
     public SettingsWindow(IEnumerable<string> currentRootPaths)
     {
@@ -65,14 +66,37 @@ public partial class SettingsWindow : Window
 
     private void SaveButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_rootPaths.Count == 0)
+        if (!CanSave())
         {
-            MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
+        ShouldRunFullScan = false;
         DialogResult = true;
         Close();
+    }
+
+    private void SaveAndFullScanButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanSave())
+        {
+            return;
+        }
+
+        ShouldRunFullScan = true;
+        DialogResult = true;
+        Close();
+    }
+
+    private bool CanSave()
+    {
+        if (_rootPaths.Count > 0)
+        {
+            return true;
+        }
+
+        MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
     }
 
     private static string NormalizePath(string path)
