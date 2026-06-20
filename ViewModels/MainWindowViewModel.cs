@@ -29,6 +29,8 @@ public class MainWindowViewModel : ObservableObject
     private readonly SynchronizationContext _uiContext;
     private int _navigationVersion;
     private int _searchVersion;
+    private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
+    private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
     public ObservableCollection<FolderItemViewModel> RootFolders
@@ -104,12 +106,31 @@ public class MainWindowViewModel : ObservableObject
     private void InitializeRootFolders()
     {
         var settings = _appSettingsRepository.Load();
-        ApplyRootPaths(settings.RootPaths, false);
+        _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
+        _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
     public IReadOnlyList<string> GetConfiguredRootPaths()
     {
         return RootFolders.Select(x => x.Path).ToList();
+    }
+
+    public int GetFullScanIntervalHours()
+    {
+        return _fullScanIntervalHours;
+    }
+
+    public IReadOnlyList<string> GetExcludedPaths()
+    {
+        return _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public void ApplySettings(IEnumerable<string> rootPaths, IEnumerable<string> excludedPaths, int fullScanIntervalHours)
+    {
+        _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
+        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
     }
 
     public void ApplyRootPaths(IEnumerable<string> rootPaths)
@@ -199,6 +220,27 @@ public class MainWindowViewModel : ObservableObject
         return true;
     }
 
+    public Task<int> FullScanConfiguredRootsAsync()
+    {
+        var configuredRootPaths = RootFolders
+            .Select(x => x.Path)
+            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && !IsExcludedPath(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Task.Run(() => ScanFolderSubtrees(configuredRootPaths));
+    }
+
+    public Task<int> ScanFolderSubtreeAsync(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath) || IsExcludedPath(folderPath))
+        {
+            return Task.FromResult(0);
+        }
+
+        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }));
+    }
+
     public void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
@@ -215,6 +257,11 @@ public class MainWindowViewModel : ObservableObject
 
         var normalizedTargetPath = NormalizePath(folderPath);
         if (string.IsNullOrEmpty(normalizedTargetPath) || !Directory.Exists(normalizedTargetPath))
+        {
+            return false;
+        }
+
+        if (IsExcludedPath(normalizedTargetPath))
         {
             return false;
         }
@@ -247,9 +294,8 @@ public class MainWindowViewModel : ObservableObject
             CurrentPath = folderPath;
             AddressInput = folderPath;
 
-            LoadFromCache(folderPath);
-
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
+            LoadFromCache(folderPath, navigationVersion);
             _ = RefreshFromFileSystemInBackground(folderPath, navigationVersion);
             return true;
         }
@@ -259,12 +305,13 @@ public class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void LoadFromCache(string folderPath)
+    private void LoadFromCache(string folderPath, int navigationVersion)
     {
         try
         {
             var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
             UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
+            _ = ApplyCachedFolderSizesInBackground(folderPath, cachedEntries, navigationVersion);
         }
         catch
         {
@@ -391,15 +438,61 @@ public class MainWindowViewModel : ObservableObject
             }
 
             UpdateCurrentDirectoryItems(liveEntries.Select(ToViewModel));
+            _ = ApplyCachedFolderSizesInBackground(folderPath, liveEntries, navigationVersion);
         }, null);
     }
 
-    private static List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
+    private async Task ApplyCachedFolderSizesInBackground(string folderPath, IReadOnlyCollection<CachedFileSystemEntry> entries, int navigationVersion)
+    {
+        var folderPaths = entries
+            .Where(x => x.IsFolder)
+            .Select(x => x.FullPath)
+            .ToList();
+
+        if (folderPaths.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<string, long> cachedFolderSizes;
+        try
+        {
+            cachedFolderSizes = await Task.Run(() => _fileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
+        }
+        catch
+        {
+            return;
+        }
+
+        if (cachedFolderSizes.Count == 0)
+        {
+            return;
+        }
+
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+            {
+                return;
+            }
+
+            var fileItems = entries.Select(entry => ToViewModel(entry, cachedFolderSizes)).ToList();
+            UpdateCurrentDirectoryItems(fileItems);
+        }, null);
+    }
+
+    private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
 
         var folders = dirInfo
             .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+            .Where(d => !IsExcludedPath(d.FullName))
             .OrderBy(d => d.Name)
             .Select(d => TryCreateFolderEntry(folderPath, d))
             .Where(e => e is not null)
@@ -415,62 +508,149 @@ public class MainWindowViewModel : ObservableObject
         return folders.Concat(files).ToList();
     }
 
-    private static List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
+    private List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
     {
         var results = new List<FileItemViewModel>();
         var comparison = StringComparison.OrdinalIgnoreCase;
 
-        foreach (var directoryPath in Directory.EnumerateDirectories(rootPath, "*", new EnumerationOptions
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(rootPath);
+
+        while (pendingDirectories.Count > 0)
         {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        }).OrderBy(path => path))
-        {
+            var currentPath = pendingDirectories.Pop();
+
+            IEnumerable<string> childDirectories;
             try
             {
-                var directoryInfo = new DirectoryInfo(directoryPath);
-                if (!directoryInfo.Name.Contains(query, comparison))
-                {
-                    continue;
-                }
-
-                results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
+                childDirectories = Directory.EnumerateDirectories(currentPath, "*", NonRecursiveEnumerationOptions)
+                    .Where(path => !IsExcludedPath(path))
+                    .OrderBy(path => path)
+                    .ToList();
             }
             catch (UnauthorizedAccessException)
             {
+                continue;
             }
             catch (IOException)
             {
+                continue;
             }
-        }
 
-        foreach (var filePath in Directory.EnumerateFiles(rootPath, "*", new EnumerationOptions
-        {
-            RecurseSubdirectories = true,
-            IgnoreInaccessible = true,
-            AttributesToSkip = FileAttributes.ReparsePoint
-        }).OrderBy(path => path))
-        {
+            foreach (var directoryPath in childDirectories)
+            {
+                pendingDirectories.Push(directoryPath);
+
+                try
+                {
+                    var directoryInfo = new DirectoryInfo(directoryPath);
+                    if (!directoryInfo.Name.Contains(query, comparison))
+                    {
+                        continue;
+                    }
+
+                    results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
+                }
+            }
+
+            IEnumerable<string> filePaths;
             try
             {
-                var fileInfo = new FileInfo(filePath);
-                if (!fileInfo.Name.Contains(query, comparison))
-                {
-                    continue;
-                }
-
-                results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
+                filePaths = Directory.EnumerateFiles(currentPath, "*", NonRecursiveEnumerationOptions)
+                    .OrderBy(path => path)
+                    .ToList();
             }
             catch (UnauthorizedAccessException)
             {
+                continue;
             }
             catch (IOException)
             {
+                continue;
+            }
+
+            foreach (var filePath in filePaths)
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (!fileInfo.Name.Contains(query, comparison))
+                    {
+                        continue;
+                    }
+
+                    results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
+                }
+                catch (UnauthorizedAccessException)
+                {
+                }
+                catch (IOException)
+                {
+                }
             }
         }
 
         return results;
+    }
+
+    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths)
+    {
+        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingDirectories = new Stack<string>(rootPaths.Reverse());
+        var updatedFolderCount = 0;
+
+        while (pendingDirectories.Count > 0)
+        {
+            var currentPath = pendingDirectories.Pop();
+            string normalizedPath;
+
+            try
+            {
+                normalizedPath = NormalizePath(currentPath);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!visitedDirectories.Add(normalizedPath) || !Directory.Exists(normalizedPath) || IsExcludedPath(normalizedPath))
+            {
+                continue;
+            }
+
+            List<CachedFileSystemEntry> entries;
+            try
+            {
+                entries = ReadEntriesFromFileSystem(normalizedPath);
+            }
+            catch
+            {
+                continue;
+            }
+
+            try
+            {
+                _fileCacheRepository.ReplaceEntriesByParentPath(normalizedPath, entries);
+                updatedFolderCount++;
+            }
+            catch
+            {
+                // キャッシュ保存失敗時はスキャンを継続する
+            }
+
+            foreach (var folderEntry in entries.Where(x => x.IsFolder && !IsExcludedPath(x.FullPath)).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+            {
+                pendingDirectories.Push(folderEntry.FullPath);
+            }
+        }
+
+        return updatedFolderCount;
     }
 
     private static CachedFileSystemEntry? TryCreateFolderEntry(string parentPath, DirectoryInfo directory)
@@ -550,6 +730,24 @@ public class MainWindowViewModel : ObservableObject
         return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
     }
 
+    private static FileItemViewModel ToViewModel(CachedFileSystemEntry entry, IReadOnlyDictionary<string, long> cachedFolderSizes)
+    {
+        var modifiedLocalTime = DateTime.SpecifyKind(entry.LastWriteTimeUtc, DateTimeKind.Utc).ToLocalTime();
+
+        if (entry.IsFolder)
+        {
+            cachedFolderSizes.TryGetValue(entry.FullPath, out var cachedTotalSizeBytes);
+            var hasCachedSize = cachedFolderSizes.ContainsKey(entry.FullPath);
+            return new FileItemViewModel(
+                entry.FullPath,
+                entry.Name,
+                modifiedLocalTime,
+                hasCachedSize ? cachedTotalSizeBytes : null);
+        }
+
+        return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
+    }
+
     private static string? GetParentPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
@@ -601,14 +799,21 @@ public class MainWindowViewModel : ObservableObject
         RootFolders.Clear();
         foreach (var rootPath in normalizedRootPaths)
         {
-            RootFolders.Add(new FolderItemViewModel(rootPath));
+            if (IsExcludedPath(rootPath))
+            {
+                continue;
+            }
+
+            RootFolders.Add(new FolderItemViewModel(rootPath, IsExcludedPath));
         }
 
         if (saveSettings)
         {
             _appSettingsRepository.Save(new AppSettings
             {
-                RootPaths = normalizedRootPaths
+                RootPaths = normalizedRootPaths,
+                ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+                FullScanIntervalHours = _fullScanIntervalHours
             });
         }
 
@@ -689,5 +894,71 @@ public class MainWindowViewModel : ObservableObject
             : normalizedAncestor + Path.DirectorySeparatorChar;
 
         return normalizedTarget.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int NormalizeFullScanIntervalHours(int hours)
+    {
+        return hours > 0 ? hours : AppSettings.DefaultFullScanIntervalHours;
+    }
+
+    private static IEnumerable<string> NormalizeExcludedPaths(IEnumerable<string> excludedPaths)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in excludedPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string normalized;
+            try
+            {
+                normalized = NormalizePath(path);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(normalized) || !Directory.Exists(normalized))
+            {
+                continue;
+            }
+
+            if (seen.Add(normalized))
+            {
+                yield return normalized;
+            }
+        }
+    }
+
+    private bool IsExcludedPath(string path)
+    {
+        var normalizedPath = NormalizePath(path);
+        if (string.IsNullOrWhiteSpace(normalizedPath))
+        {
+            return false;
+        }
+
+        foreach (var excludedPath in _excludedPaths)
+        {
+            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            var prefix = excludedPath.EndsWith(Path.DirectorySeparatorChar)
+                ? excludedPath
+                : excludedPath + Path.DirectorySeparatorChar;
+
+            if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

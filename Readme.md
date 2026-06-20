@@ -16,6 +16,15 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
   - If no match is found, a live file system scan runs
 - Double-click in the list to navigate into folders or open files with the default app
 
+## Release
+
+- Ver 1.1.0.0 New features
+  - Periodic scan execution (default 3 hours)
+  - Scan execution from right-clicking a folder
+  - Specification of exclusion folders
+
+- Ver 1.0.0.0 Release
+
 ## Requirements
 
 - Windows

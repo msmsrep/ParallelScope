@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 
 namespace ParallelScope.Data;
@@ -13,6 +14,8 @@ public sealed record CachedFileSystemEntry(
 
 public class FileCacheRepository
 {
+    private static readonly ConcurrentDictionary<string, object> ParentPathLocks = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly DbContextOptions<ParallelScopeDbContext> _dbOptions;
 
     public FileCacheRepository()
@@ -95,22 +98,27 @@ public class FileCacheRepository
 
     public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
+        var normalizedParentPath = NormalizePath(parentPath);
+        var lockObject = ParentPathLocks.GetOrAdd(normalizedParentPath, _ => new object());
+
+        lock (lockObject)
+        {
+            ReplaceEntriesByParentPathInternal(normalizedParentPath, entries);
+        }
+    }
+
+    private void ReplaceEntriesByParentPathInternal(string normalizedParentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
+    {
         using var db = CreateDbContext();
 
-        var oldEntries = db.FileSystemEntries
-            .Where(x => x.ParentPath == parentPath)
-            .ToList();
-
-        if (oldEntries.Count > 0)
-        {
-            db.FileSystemEntries.RemoveRange(oldEntries);
-        }
+        // 追跡済みエンティティ削除の競合を避けるため、対象親パスを一括削除する
+        db.Database.ExecuteSqlInterpolated($"DELETE FROM FileSystemEntries WHERE ParentPath = {normalizedParentPath}");
 
         if (entries.Count > 0)
         {
             var entities = entries.Select(x => new FileSystemEntryEntity
             {
-                ParentPath = x.ParentPath,
+                ParentPath = normalizedParentPath,
                 FullPath = x.FullPath,
                 Name = x.Name,
                 IsFolder = x.IsFolder,
@@ -122,6 +130,109 @@ public class FileCacheRepository
         }
 
         db.SaveChanges();
+    }
+
+    public Dictionary<string, long> GetCachedFolderTotalSizes(string parentPath, IEnumerable<string> folderPaths)
+    {
+        using var db = CreateDbContext();
+
+        if (string.IsNullOrWhiteSpace(parentPath))
+        {
+            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var normalizedParentPath = NormalizePath(parentPath);
+        var parentWithSeparator = normalizedParentPath.EndsWith(Path.DirectorySeparatorChar)
+            ? normalizedParentPath
+            : normalizedParentPath + Path.DirectorySeparatorChar;
+
+        var folderNameToPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in folderPaths)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                continue;
+            }
+
+            string normalizedPath;
+            try
+            {
+                normalizedPath = NormalizePath(path);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!normalizedPath.StartsWith(parentWithSeparator, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var relative = normalizedPath.Substring(parentWithSeparator.Length);
+            if (string.IsNullOrWhiteSpace(relative))
+            {
+                continue;
+            }
+
+            var separatorIndex = relative.IndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+            var firstSegment = separatorIndex >= 0 ? relative[..separatorIndex] : relative;
+
+            if (!string.IsNullOrWhiteSpace(firstSegment))
+            {
+                folderNameToPath[firstSegment] = normalizedPath;
+            }
+        }
+
+        if (folderNameToPath.Count == 0)
+        {
+            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        var cachedFiles = db.FileSystemEntries
+            .AsNoTracking()
+            .Where(x => !x.IsFolder && x.FullPath.StartsWith(parentWithSeparator))
+            .Select(x => new
+            {
+                x.FullPath,
+                SizeBytes = x.SizeBytes ?? 0L
+            })
+            .ToList();
+
+        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in cachedFiles)
+        {
+            if (file.FullPath.Length <= parentWithSeparator.Length)
+            {
+                continue;
+            }
+
+            var relative = file.FullPath.Substring(parentWithSeparator.Length);
+            if (string.IsNullOrWhiteSpace(relative))
+            {
+                continue;
+            }
+
+            var separatorIndex = relative.IndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
+            if (separatorIndex <= 0)
+            {
+                // 親フォルダ直下のファイルは子フォルダ合計に含めない
+                continue;
+            }
+
+            var firstSegment = relative[..separatorIndex];
+            if (!folderNameToPath.TryGetValue(firstSegment, out var folderFullPath))
+            {
+                continue;
+            }
+
+            result.TryGetValue(folderFullPath, out var currentSize);
+            result[folderFullPath] = currentSize + file.SizeBytes;
+        }
+
+        return result;
     }
 
     private ParallelScopeDbContext CreateDbContext()
