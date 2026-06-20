@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:ParallelScope"
         mc:Ignorable="d"
         Title="ParallelScope" Height="600" Width="1000"
-        Icon="Assets/logo.ico">
+        Icon="Assets/logo.ico"
+        FontFamily="Segoe UI Variable Text">
     <Window.Resources>
         <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
             <Setter Property="Text" Value="⟳"/>
@@ -38,7 +39,7 @@
             </Style.Triggers>
         </Style>
     </Window.Resources>
-    <Grid>
+    <Grid Margin="5">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -50,7 +51,8 @@
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Grid Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,8,0">
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
+            <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -80,18 +82,20 @@
                 <TextBox Grid.Column="1" Text="{Binding AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
                          VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
             </Grid>
-        </Grid>
+            </Grid>
+        </Border>
 
         <!-- 左側: フォルダツリー -->
-        <Grid Grid.Row="1" Grid.Column="0" Background="#F5F5F5">
+        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+            <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             
-            <TextBlock Grid.Row="0" Text="Folders" FontSize="14" FontWeight="Bold" Margin="10,10,10,5"/>
+            <TextBlock Grid.Row="0" Text="Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
             
-            <TreeView Grid.Row="1" Name="FolderTreeView" Margin="10,0,10,10" 
+            <TreeView Grid.Row="1" Name="FolderTreeView"
                       ItemsSource="{Binding RootFolders}" 
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
@@ -103,27 +107,29 @@
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding DisplayName}" Foreground="#333333"/>
+                            <TextBlock Text="{Binding DisplayName}"/>
                             <TextBlock Style="{StaticResource ScanningIndicatorStyle}"/>
                         </StackPanel>
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
-        </Grid>
+            </Grid>
+        </Border>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Row="1" Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" 
-                      Background="#CCCCCC" Cursor="SizeWE"/>
+        <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+                      Background="Transparent" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->
-        <Grid Grid.Row="1" Grid.Column="2" Background="White">
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+            <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="10,10,10,0">
+            <Grid Grid.Row="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
@@ -141,10 +147,10 @@
                         Click="ClearSearchButton_Click"/>
             </Grid>
 
-            <TextBlock Grid.Row="1" Margin="10,6,10,0" Foreground="#666666"
-                       Text="{Binding SearchSummary}"/>
+            <TextBlock Grid.Row="1" Text="{Binding SearchSummary}"
+                       Style="{StaticResource SubtleStatusTextStyle}"/>
 
-            <DataGrid Grid.Row="2" ItemsSource="{Binding FileItems}" Margin="10,8,10,10"
+            <DataGrid Grid.Row="2" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
@@ -155,6 +161,7 @@
                     <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedTime}" Width="150"/>
                 </DataGrid.Columns>
             </DataGrid>
-        </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </Window>
