@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Concurrent;
 using Microsoft.EntityFrameworkCore;
 
 namespace ParallelScope.Data;
@@ -13,6 +14,8 @@ public sealed record CachedFileSystemEntry(
 
 public class FileCacheRepository
 {
+    private static readonly ConcurrentDictionary<string, object> ParentPathLocks = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly DbContextOptions<ParallelScopeDbContext> _dbOptions;
 
     public FileCacheRepository()
@@ -95,22 +98,27 @@ public class FileCacheRepository
 
     public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
+        var normalizedParentPath = NormalizePath(parentPath);
+        var lockObject = ParentPathLocks.GetOrAdd(normalizedParentPath, _ => new object());
+
+        lock (lockObject)
+        {
+            ReplaceEntriesByParentPathInternal(normalizedParentPath, entries);
+        }
+    }
+
+    private void ReplaceEntriesByParentPathInternal(string normalizedParentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
+    {
         using var db = CreateDbContext();
 
-        var oldEntries = db.FileSystemEntries
-            .Where(x => x.ParentPath == parentPath)
-            .ToList();
-
-        if (oldEntries.Count > 0)
-        {
-            db.FileSystemEntries.RemoveRange(oldEntries);
-        }
+        // 追跡済みエンティティ削除の競合を避けるため、対象親パスを一括削除する
+        db.Database.ExecuteSqlInterpolated($"DELETE FROM FileSystemEntries WHERE ParentPath = {normalizedParentPath}");
 
         if (entries.Count > 0)
         {
             var entities = entries.Select(x => new FileSystemEntryEntity
             {
-                ParentPath = x.ParentPath,
+                ParentPath = normalizedParentPath,
                 FullPath = x.FullPath,
                 Name = x.Name,
                 IsFolder = x.IsFolder,

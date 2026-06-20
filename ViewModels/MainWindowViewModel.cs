@@ -29,6 +29,7 @@ public class MainWindowViewModel : ObservableObject
     private readonly SynchronizationContext _uiContext;
     private int _navigationVersion;
     private int _searchVersion;
+    private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
     public ObservableCollection<FolderItemViewModel> RootFolders
@@ -104,12 +105,24 @@ public class MainWindowViewModel : ObservableObject
     private void InitializeRootFolders()
     {
         var settings = _appSettingsRepository.Load();
+        _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         ApplyRootPaths(settings.RootPaths, false);
     }
 
     public IReadOnlyList<string> GetConfiguredRootPaths()
     {
         return RootFolders.Select(x => x.Path).ToList();
+    }
+
+    public int GetFullScanIntervalHours()
+    {
+        return _fullScanIntervalHours;
+    }
+
+    public void ApplySettings(IEnumerable<string> rootPaths, int fullScanIntervalHours)
+    {
+        _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
+        ApplyRootPaths(rootPaths, true);
     }
 
     public void ApplyRootPaths(IEnumerable<string> rootPaths)
@@ -746,7 +759,8 @@ public class MainWindowViewModel : ObservableObject
         {
             _appSettingsRepository.Save(new AppSettings
             {
-                RootPaths = normalizedRootPaths
+                RootPaths = normalizedRootPaths,
+                FullScanIntervalHours = _fullScanIntervalHours
             });
         }
 
@@ -827,5 +841,10 @@ public class MainWindowViewModel : ObservableObject
             : normalizedAncestor + Path.DirectorySeparatorChar;
 
         return normalizedTarget.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static int NormalizeFullScanIntervalHours(int hours)
+    {
+        return hours > 0 ? hours : AppSettings.DefaultFullScanIntervalHours;
     }
 }
