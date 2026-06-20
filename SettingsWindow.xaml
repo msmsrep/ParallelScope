@@ -4,8 +4,9 @@
     Title="Settings" Height="420" Width="700"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanMinimize"
-        Icon="Assets/logo.ico">
-    <Grid Margin="12">
+        Icon="Assets/logo.ico"
+        FontFamily="Segoe UI Variable Text">
+    <Grid Margin="10">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -13,11 +14,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Target Root Folders" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8"/>
+        <TextBlock Grid.Row="0" Text="Target Root Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
 
-        <ListBox Grid.Row="1" Name="RootPathsListBox"/>
+        <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="8">
+            <ListBox Name="RootPathsListBox"/>
+        </Border>
 
-        <Grid Grid.Row="2" Margin="0,10,0,0">
+        <Border Grid.Row="2" Margin="0,10,0,0" Style="{StaticResource CardBorderStyle}">
+            <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -27,7 +31,8 @@
             <TextBox Grid.Column="0" Name="NewRootPathTextBox" Height="28" VerticalContentAlignment="Center"/>
             <Button Grid.Column="1" Content="Add" Width="72" Margin="8,0,0,0" Click="AddRootPathButton_Click"/>
             <Button Grid.Column="2" Content="Remove" Width="72" Margin="8,0,0,0" Click="RemoveRootPathButton_Click"/>
-        </Grid>
+            </Grid>
+        </Border>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Save + Full Scan" Width="130" Margin="0,0,8,0" Click="SaveAndFullScanButton_Click"/>
