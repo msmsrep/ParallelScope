@@ -207,7 +207,17 @@ public class MainWindowViewModel : ObservableObject
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return Task.Run(() => FullScanConfiguredRoots(configuredRootPaths));
+        return Task.Run(() => ScanFolderSubtrees(configuredRootPaths));
+    }
+
+    public Task<int> ScanFolderSubtreeAsync(string folderPath)
+    {
+        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        {
+            return Task.FromResult(0);
+        }
+
+        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }));
     }
 
     public void ClearSearch()
@@ -484,7 +494,7 @@ public class MainWindowViewModel : ObservableObject
         return results;
     }
 
-    private int FullScanConfiguredRoots(IReadOnlyCollection<string> rootPaths)
+    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths)
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingDirectories = new Stack<string>(rootPaths.Reverse());

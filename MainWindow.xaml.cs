@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
+using System.Windows.Media;
 using ParallelScope.ViewModels;
 
 namespace ParallelScope;
@@ -51,6 +52,46 @@ public partial class MainWindow : Window
         {
             _viewModel.LoadFiles(folderItem.Path);
         }
+    }
+
+    private void FolderTreeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var treeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (treeViewItem is null)
+        {
+            return;
+        }
+
+        treeViewItem.IsSelected = true;
+        treeViewItem.Focus();
+    }
+
+    private void FolderTreeItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem } treeViewItem)
+        {
+            return;
+        }
+
+        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
+        {
+            return;
+        }
+
+        var menuItem = new MenuItem
+        {
+            Header = "Scan everything under this folder",
+            DataContext = folderItem,
+            IsEnabled = !folderItem.IsScanning
+        };
+        menuItem.Click += ScanFolderMenuItem_Click;
+
+        treeViewItem.ContextMenu = new ContextMenu
+        {
+            DataContext = folderItem
+        };
+        treeViewItem.ContextMenu.Items.Add(menuItem);
     }
 
     private void BackButton_Click(object sender, RoutedEventArgs e)
@@ -108,6 +149,21 @@ public partial class MainWindow : Window
     {
         _viewModel.SearchQuery = string.Empty;
         _viewModel.ClearSearch();
+    }
+
+    private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        if (folderItem.IsScanning)
+        {
+            return;
+        }
+
+        await RunFolderScanAsync(folderItem);
     }
 
     private void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -241,6 +297,21 @@ public partial class MainWindow : Window
         return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
     }
 
+    private static T? GetAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
     private void NavigateByAddressInput()
     {
         if (_viewModel.TryNavigateByAddressInput())
@@ -264,6 +335,8 @@ public partial class MainWindow : Window
 
     private async Task RunFullScanFromSettingsAsync()
     {
+        Mouse.OverrideCursor = Cursors.Wait;
+
         try
         {
             var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
@@ -282,6 +355,36 @@ public partial class MainWindow : Window
         finally
         {
             Mouse.OverrideCursor = null;
+        }
+    }
+
+    private async Task RunFolderScanAsync(FolderItemViewModel folderItem)
+    {
+        folderItem.IsScanning = true;
+
+        try
+        {
+            var scannedFolderCount = await _viewModel.ScanFolderSubtreeAsync(folderItem.Path);
+
+            if (IsAncestorOrSamePath(folderItem.Path, _viewModel.CurrentPath))
+            {
+                _viewModel.LoadFiles(_viewModel.CurrentPath);
+                SyncTreeSelectionToCurrentPath();
+            }
+
+            MessageBox.Show(
+                $"Scan completed. Updated cache for {scannedFolderCount} folder(s).",
+                "Folder Scan",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Scan failed: {ex.Message}", "Folder Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            folderItem.IsScanning = false;
         }
     }
 }
