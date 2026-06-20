@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Threading;
 using ParallelScope.ViewModels;
 
 namespace ParallelScope;
@@ -13,21 +14,46 @@ namespace ParallelScope;
 /// </summary>
 public partial class MainWindow : Window
 {
-    private MainWindowViewModel _viewModel;
+    private readonly MainWindowViewModel _viewModel;
+    private readonly DispatcherTimer _scheduledFullScanTimer;
+    private bool _hasStartedAutomaticFullScan;
+    private bool _isFullScanRunning;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _viewModel = new MainWindowViewModel();
+        _scheduledFullScanTimer = new DispatcherTimer();
+        _scheduledFullScanTimer.Tick += ScheduledFullScanTimer_Tick;
         DataContext = _viewModel;
+        Loaded += MainWindow_Loaded;
+        Closed += MainWindow_Closed;
 
         SyncTreeSelectionToCurrentPath();
     }
 
+    private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_hasStartedAutomaticFullScan)
+        {
+            return;
+        }
+
+        _hasStartedAutomaticFullScan = true;
+        await RunAutomaticFullScanAsync();
+        ConfigureScheduledFullScanTimer();
+    }
+
+    private void MainWindow_Closed(object? sender, EventArgs e)
+    {
+        _scheduledFullScanTimer.Stop();
+        _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
+    }
+
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new SettingsWindow(_viewModel.GetConfiguredRootPaths())
+        var dialog = new SettingsWindow(_viewModel.GetConfiguredRootPaths(), _viewModel.GetFullScanIntervalHours())
         {
             Owner = this
         };
@@ -37,7 +63,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        _viewModel.ApplyRootPaths(dialog.ResultRootPaths);
+        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultFullScanIntervalHours);
+        ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 
         if (dialog.ShouldRunFullScan)
@@ -335,27 +362,7 @@ public partial class MainWindow : Window
 
     private async Task RunFullScanFromSettingsAsync()
     {
-        Mouse.OverrideCursor = Cursors.Wait;
-
-        try
-        {
-            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
-            _viewModel.LoadFiles(_viewModel.CurrentPath);
-
-            MessageBox.Show(
-                $"Full scan completed. Updated cache for {scannedFolderCount} folder(s).",
-                "Full Scan",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Full scan failed: {ex.Message}", "Full Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            Mouse.OverrideCursor = null;
-        }
+        await RunFullScanAsync(showCompletionMessage: true, useWaitCursor: true);
     }
 
     private async Task RunFolderScanAsync(FolderItemViewModel folderItem)
@@ -385,6 +392,84 @@ public partial class MainWindow : Window
         finally
         {
             folderItem.IsScanning = false;
+        }
+    }
+
+    private async void ScheduledFullScanTimer_Tick(object? sender, EventArgs e)
+    {
+        await RunAutomaticFullScanAsync();
+    }
+
+    private void ConfigureScheduledFullScanTimer()
+    {
+        _scheduledFullScanTimer.Stop();
+        _scheduledFullScanTimer.Interval = TimeSpan.FromHours(_viewModel.GetFullScanIntervalHours());
+        _scheduledFullScanTimer.Start();
+    }
+
+    private Task RunAutomaticFullScanAsync()
+    {
+        return RunFullScanAsync(showCompletionMessage: false, useWaitCursor: false);
+    }
+
+    private async Task RunFullScanAsync(bool showCompletionMessage, bool useWaitCursor)
+    {
+        if (_isFullScanRunning)
+        {
+            return;
+        }
+
+        _isFullScanRunning = true;
+        SetRootScanningState(true);
+
+        if (useWaitCursor)
+        {
+            Mouse.OverrideCursor = Cursors.Wait;
+        }
+
+        try
+        {
+            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
+
+            if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
+            {
+                _viewModel.LoadFiles(_viewModel.CurrentPath);
+                SyncTreeSelectionToCurrentPath();
+            }
+
+            if (showCompletionMessage)
+            {
+                MessageBox.Show(
+                    $"Full scan completed. Updated cache for {scannedFolderCount} folder(s).",
+                    "Full Scan",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            if (showCompletionMessage)
+            {
+                MessageBox.Show($"Full scan failed: {ex.Message}", "Full Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        finally
+        {
+            if (useWaitCursor)
+            {
+                Mouse.OverrideCursor = null;
+            }
+
+            SetRootScanningState(false);
+            _isFullScanRunning = false;
+        }
+    }
+
+    private void SetRootScanningState(bool isScanning)
+    {
+        foreach (var rootFolder in _viewModel.RootFolders)
+        {
+            rootFolder.IsScanning = isScanning;
         }
     }
 }

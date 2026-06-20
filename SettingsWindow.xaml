@@ -12,6 +12,7 @@
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Target Root Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
@@ -34,7 +35,21 @@
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+        <Border Grid.Row="3" Margin="0,10,0,0" Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Auto full scan interval"/>
+                <TextBox Grid.Column="1" Name="FullScanIntervalHoursTextBox" Margin="8,0,8,0" Height="28" VerticalContentAlignment="Center"/>
+                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="hours"/>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Save + Full Scan" Width="130" Margin="0,0,8,0" Click="SaveAndFullScanButton_Click"/>
             <Button Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"/>
             <Button Content="Save" Width="90" IsDefault="True" Click="SaveButton_Click"/>

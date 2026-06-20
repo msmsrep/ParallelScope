@@ -7,16 +7,20 @@ namespace ParallelScope;
 public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<string> _rootPaths;
+    private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
+    public int ResultFullScanIntervalHours => _fullScanIntervalHours;
     public bool ShouldRunFullScan { get; private set; }
 
-    public SettingsWindow(IEnumerable<string> currentRootPaths)
+    public SettingsWindow(IEnumerable<string> currentRootPaths, int currentFullScanIntervalHours)
     {
         InitializeComponent();
 
         _rootPaths = new ObservableCollection<string>(currentRootPaths);
+        _fullScanIntervalHours = NormalizeFullScanIntervalHours(currentFullScanIntervalHours);
         RootPathsListBox.ItemsSource = _rootPaths;
+        FullScanIntervalHoursTextBox.Text = _fullScanIntervalHours.ToString();
     }
 
     private void AddRootPathButton_Click(object sender, RoutedEventArgs e)
@@ -90,13 +94,20 @@ public partial class SettingsWindow : Window
 
     private bool CanSave()
     {
-        if (_rootPaths.Count > 0)
+        if (_rootPaths.Count == 0)
         {
-            return true;
+            MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
         }
 
-        MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-        return false;
+        if (!int.TryParse(FullScanIntervalHoursTextBox.Text?.Trim(), out var parsedHours) || parsedHours <= 0)
+        {
+            MessageBox.Show("Enter the auto full scan interval as a positive number of hours.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+
+        _fullScanIntervalHours = parsedHours;
+        return true;
     }
 
     private static string NormalizePath(string path)
@@ -110,5 +121,10 @@ public partial class SettingsWindow : Window
         }
 
         return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private static int NormalizeFullScanIntervalHours(int hours)
+    {
+        return hours > 0 ? hours : Data.AppSettings.DefaultFullScanIntervalHours;
     }
 }
