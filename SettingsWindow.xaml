@@ -1,7 +1,7 @@
 <Window x:Class="ParallelScope.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="Settings" Height="420" Width="700"
+    Title="Settings" Height="620" Width="700"
         WindowStartupLocation="CenterOwner"
         ResizeMode="CanMinimize"
         Icon="Assets/logo.ico"
@@ -11,6 +11,10 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -37,19 +41,39 @@
 
         <Border Grid.Row="3" Margin="0,10,0,0" Style="{StaticResource CardBorderStyle}">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="120"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
 
-                <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Auto full scan interval"/>
-                <TextBox Grid.Column="1" Name="FullScanIntervalHoursTextBox" Margin="8,0,8,0" Height="28" VerticalContentAlignment="Center"/>
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="hours"/>
+            <TextBlock Grid.Column="0" VerticalAlignment="Center" Text="Auto full scan interval"/>
+            <TextBox Grid.Column="1" Name="FullScanIntervalHoursTextBox" Margin="8,0,8,0" Height="28" VerticalContentAlignment="Center"/>
+            <TextBlock Grid.Column="2" VerticalAlignment="Center" Text="hours"/>
             </Grid>
         </Border>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+        <TextBlock Grid.Row="5" Text="Excluded Folders" Style="{StaticResource PaneHeaderTextStyle}" Margin="0,12,0,8"/>
+
+        <Border Grid.Row="6" Style="{StaticResource CardBorderStyle}" Padding="8">
+            <ListBox Name="ExcludedPathsListBox"/>
+        </Border>
+
+        <Border Grid.Row="7" Margin="0,10,0,0" Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBox Grid.Column="0" Name="NewExcludedPathTextBox" Height="28" VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="Add" Width="72" Margin="8,0,0,0" Click="AddExcludedPathButton_Click"/>
+                <Button Grid.Column="2" Content="Remove" Width="72" Margin="8,0,0,0" Click="RemoveExcludedPathButton_Click"/>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="8" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <Button Content="Save + Full Scan" Width="130" Margin="0,0,8,0" Click="SaveAndFullScanButton_Click"/>
             <Button Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"/>
             <Button Content="Save" Width="90" IsDefault="True" Click="SaveButton_Click"/>
