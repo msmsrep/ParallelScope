@@ -19,11 +19,11 @@ public class FileItemViewModel
         IsFolder = false;
     }
 
-    public FileItemViewModel(string fullPath, string name, DateTime modifiedTime)
+    public FileItemViewModel(string fullPath, string name, DateTime modifiedTime, long? cachedTotalSizeBytes = null)
     {
         FullPath = fullPath;
         Name = name;
-        SizeText = string.Empty;
+        SizeText = cachedTotalSizeBytes.HasValue ? FormatFileSize(cachedTotalSizeBytes.Value) : string.Empty;
         TypeText = "Folder";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = true;
