@@ -199,6 +199,17 @@ public class MainWindowViewModel : ObservableObject
         return true;
     }
 
+    public Task<int> FullScanConfiguredRootsAsync()
+    {
+        var configuredRootPaths = RootFolders
+            .Select(x => x.Path)
+            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Task.Run(() => FullScanConfiguredRoots(configuredRootPaths));
+    }
+
     public void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
@@ -471,6 +482,60 @@ public class MainWindowViewModel : ObservableObject
         }
 
         return results;
+    }
+
+    private int FullScanConfiguredRoots(IReadOnlyCollection<string> rootPaths)
+    {
+        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingDirectories = new Stack<string>(rootPaths.Reverse());
+        var updatedFolderCount = 0;
+
+        while (pendingDirectories.Count > 0)
+        {
+            var currentPath = pendingDirectories.Pop();
+            string normalizedPath;
+
+            try
+            {
+                normalizedPath = NormalizePath(currentPath);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!visitedDirectories.Add(normalizedPath) || !Directory.Exists(normalizedPath))
+            {
+                continue;
+            }
+
+            List<CachedFileSystemEntry> entries;
+            try
+            {
+                entries = ReadEntriesFromFileSystem(normalizedPath);
+            }
+            catch
+            {
+                continue;
+            }
+
+            try
+            {
+                _fileCacheRepository.ReplaceEntriesByParentPath(normalizedPath, entries);
+                updatedFolderCount++;
+            }
+            catch
+            {
+                // キャッシュ保存失敗時はスキャンを継続する
+            }
+
+            foreach (var folderEntry in entries.Where(x => x.IsFolder).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+            {
+                pendingDirectories.Push(folderEntry.FullPath);
+            }
+        }
+
+        return updatedFolderCount;
     }
 
     private static CachedFileSystemEntry? TryCreateFolderEntry(string parentPath, DirectoryInfo directory)
