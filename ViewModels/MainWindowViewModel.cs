@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -433,23 +434,51 @@ public class MainWindowViewModel : ObservableObject
     private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
+        var entries = new ConcurrentBag<CachedFileSystemEntry>();
 
-        var folders = dirInfo
-            .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
-            .Where(d => !IsExcludedPath(d.FullName))
-            .OrderBy(d => d.Name)
-            .Select(d => TryCreateFolderEntry(folderPath, d))
-            .Where(e => e is not null)
-            .Cast<CachedFileSystemEntry>();
+        try
+        {
+            var folders = dirInfo
+                .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+                .Where(d => !IsExcludedPath(d.FullName))
+                .OrderBy(d => d.Name)
+                .ToList();
 
-        var files = dirInfo
-            .EnumerateFiles("*", NonRecursiveEnumerationOptions)
-            .OrderBy(f => f.Name)
-            .Select(f => TryCreateFileEntry(folderPath, f))
-            .Where(e => e is not null)
-            .Cast<CachedFileSystemEntry>();
+            // フォルダ処理を並列化
+            Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, d =>
+            {
+                var entry = TryCreateFolderEntry(folderPath, d);
+                if (entry is not null)
+                {
+                    entries.Add(entry);
+                }
+            });
 
-        return folders.Concat(files).ToList();
+            var files = dirInfo
+                .EnumerateFiles("*", NonRecursiveEnumerationOptions)
+                .OrderBy(f => f.Name)
+                .ToList();
+
+            // ファイル処理を並列化
+            Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, f =>
+            {
+                var entry = TryCreateFileEntry(folderPath, f);
+                if (entry is not null)
+                {
+                    entries.Add(entry);
+                }
+            });
+        }
+        catch
+        {
+            // 例外時は空のリストを返す
+        }
+
+        // 結果をソートして返す
+        return entries
+            .OrderByDescending(x => x.IsFolder)
+            .ThenBy(x => x.Name)
+            .ToList();
     }
 
     private List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
@@ -547,7 +576,9 @@ public class MainWindowViewModel : ObservableObject
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingDirectories = new Stack<string>(rootPaths.Reverse());
+        var batchEntries = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>();
         var updatedFolderCount = 0;
+        const int BatchSize = 100;
 
         while (pendingDirectories.Count > 0)
         {
@@ -578,19 +609,39 @@ public class MainWindowViewModel : ObservableObject
                 continue;
             }
 
-            try
+            batchEntries[normalizedPath] = entries;
+            updatedFolderCount++;
+
+            // バッチが一定サイズに達したら、まとめてデータベース更新
+            if (batchEntries.Count >= BatchSize)
             {
-                _fileCacheRepository.ReplaceEntriesByParentPath(normalizedPath, entries);
-                updatedFolderCount++;
-            }
-            catch
-            {
-                // キャッシュ保存失敗時はスキャンを継続する
+                try
+                {
+                    _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                }
+                catch
+                {
+                    // バッチ保存失敗時はスキャンを継続する
+                }
+                batchEntries.Clear();
             }
 
             foreach (var folderEntry in entries.Where(x => x.IsFolder && !IsExcludedPath(x.FullPath)).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
             {
                 pendingDirectories.Push(folderEntry.FullPath);
+            }
+        }
+
+        // 残りのバッチを処理
+        if (batchEntries.Count > 0)
+        {
+            try
+            {
+                _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+            }
+            catch
+            {
+                // バッチ保存失敗時でもスキャン結果は返す
             }
         }
 

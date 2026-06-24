@@ -1,5 +1,6 @@
 using System.IO;
 using System.Collections.Concurrent;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 
 namespace ParallelScope.Data;
@@ -45,12 +46,33 @@ public class FileCacheRepository
 
         var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
 
+        var connectionString = $"Data Source={dbPath};Cache=Shared;";
+
         _dbOptions = new DbContextOptionsBuilder<ParallelScopeDbContext>()
-            .UseSqlite($"Data Source={dbPath}")
+            .UseSqlite(connectionString, options =>
+            {
+                options.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+            })
             .Options;
 
         using var db = CreateDbContext();
         db.Database.Migrate();
+        
+        // PRAGMA最適化設定
+        using (var conn = db.Database.GetDbConnection())
+        {
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                PRAGMA journal_mode = WAL;
+                PRAGMA synchronous = NORMAL;
+                PRAGMA cache_size = -64000;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA query_only = FALSE;
+            ";
+            cmd.ExecuteNonQuery();
+            conn.Close();
+        }
     }
 
     public List<CachedFileSystemEntry> GetEntriesByParentPath(string parentPath)
@@ -106,6 +128,106 @@ public class FileCacheRepository
         lock (lockObject)
         {
             ReplaceEntriesByParentPathInternal(normalizedParentPath, entries);
+        }
+    }
+
+    public void BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
+    {
+        if (entriesByParentPath.Count == 0)
+        {
+            return;
+        }
+
+        // 複数の親パスについてロックを取得
+        var normalizedPathsToLock = entriesByParentPath.Keys
+            .Select(NormalizePath)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var lockObjects = normalizedPathsToLock
+            .Select(path => ParentPathLocks.GetOrAdd(path, _ => new object()))
+            .ToList();
+
+        // 全ロック取得後に処理（デッドロック回避のため順序固定）
+        foreach (var lockObj in lockObjects)
+        {
+            Monitor.Enter(lockObj);
+        }
+
+        try
+        {
+            using var db = CreateDbContext();
+
+            var allParentPaths = entriesByParentPath.Keys.Select(NormalizePath).ToList();
+
+            // トランザクション開始
+            using var transaction = db.Database.BeginTransaction();
+
+            try
+            {
+                // 対象親パスをすべて削除
+                var deleteParams = string.Join(",", allParentPaths.Select((_, i) => $"@p{i}"));
+                var deleteSql = $"DELETE FROM FileSystemEntries WHERE ParentPath IN ({deleteParams})";
+                
+                db.Database.ExecuteSqlRaw(
+                    deleteSql,
+                    allParentPaths.Select((p, i) => new Microsoft.Data.Sqlite.SqliteParameter($"@p{i}", p)).ToArray()
+                );
+
+                // すべてのエントリをバルクインサート
+                var allEntries = new List<(string ParentPath, CachedFileSystemEntry Entry)>();
+                foreach (var (parentPath, entries) in entriesByParentPath)
+                {
+                    var normalizedParentPath = NormalizePath(parentPath);
+                    foreach (var entry in entries)
+                    {
+                        allEntries.Add((normalizedParentPath, entry));
+                    }
+                }
+
+                // 1000件ずつバルクインサート
+                const int bulkSize = 1000;
+                for (int i = 0; i < allEntries.Count; i += bulkSize)
+                {
+                    var batch = allEntries.Skip(i).Take(bulkSize).ToList();
+                    var sb = new StringBuilder(
+                        "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc) VALUES ");
+
+                    var parameters = new List<object>();
+                    for (int j = 0; j < batch.Count; j++)
+                    {
+                        var (parentPath, entry) = batch[j];
+                        if (j > 0) sb.Append(",");
+                        
+                        int pIdx = j * 6;
+                        sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5})");
+
+                        parameters.Add(parentPath);
+                        parameters.Add(entry.FullPath);
+                        parameters.Add(entry.Name);
+                        parameters.Add(entry.IsFolder);
+                        parameters.Add(entry.SizeBytes ?? 0L);
+                        parameters.Add(entry.LastWriteTimeUtc);
+                    }
+
+                    db.Database.ExecuteSqlRaw(sb.ToString(), parameters.ToArray());
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+        }
+        finally
+        {
+            // ロック解放（逆順）
+            for (int i = lockObjects.Count - 1; i >= 0; i--)
+            {
+                Monitor.Exit(lockObjects[i]);
+            }
         }
     }
 
