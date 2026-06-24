@@ -81,9 +81,11 @@ public class FileCacheRepository
             ? normalizedRootPath
             : normalizedRootPath + Path.DirectorySeparatorChar;
 
+        var lowerQuery = nameQuery.ToLowerInvariant();
+
         return db.FileSystemEntries
             .AsNoTracking()
-            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && x.Name.Contains(nameQuery))
+            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && x.Name.ToLower().Contains(lowerQuery))
             .OrderByDescending(x => x.IsFolder)
             .ThenBy(x => x.Name)
             .Select(x => new CachedFileSystemEntry(

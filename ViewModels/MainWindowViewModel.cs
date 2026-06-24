@@ -21,7 +21,6 @@ public class MainWindowViewModel : ObservableObject
     private string _currentPath = string.Empty;
     private string _addressInput = string.Empty;
     private string _searchQuery = string.Empty;
-    private string _searchSummary = string.Empty;
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
     private readonly FileCacheRepository _fileCacheRepository;
@@ -78,12 +77,6 @@ public class MainWindowViewModel : ObservableObject
                 ClearSearch();
             }
         }
-    }
-
-    public string SearchSummary
-    {
-        get => _searchSummary;
-        private set => SetProperty(ref _searchSummary, value);
     }
 
     public bool CanGoBack => _backHistory.Count > 0;
@@ -214,7 +207,6 @@ public class MainWindowViewModel : ObservableObject
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
-        SearchSummary = $"Searching \"{normalizedQuery}\" in {searchRootPath}...";
         ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
         _ = SearchInBackground(searchRootPath, normalizedQuery, searchVersion);
         return true;
@@ -244,7 +236,6 @@ public class MainWindowViewModel : ObservableObject
     public void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
-        SearchSummary = string.Empty;
         ReplaceVisibleFileItems(_currentDirectoryItems);
     }
 
@@ -293,6 +284,7 @@ public class MainWindowViewModel : ObservableObject
         {
             CurrentPath = folderPath;
             AddressInput = folderPath;
+            SearchQuery = string.Empty;
 
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
             LoadFromCache(folderPath, navigationVersion);
@@ -352,54 +344,6 @@ public class MainWindowViewModel : ObservableObject
             }
 
             ReplaceVisibleFileItems(cacheResults);
-            SearchSummary = $"Cache search: {cacheResults.Count} hit(s) ({rootPath})";
-        }, null);
-
-        if (cacheResults.Count > 0)
-        {
-            return;
-        }
-
-        _uiContext.Post(_ =>
-        {
-            if (searchVersion != Volatile.Read(ref _searchVersion)
-                || !IsSamePath(CurrentPath, rootPath)
-                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            SearchSummary = $"No cache matches. Searching file system... ({rootPath})";
-        }, null);
-
-        List<FileItemViewModel> fullScanResults;
-        try
-        {
-            fullScanResults = await Task.Run(() => SearchEntriesFromFileSystem(rootPath, query));
-        }
-        catch
-        {
-            fullScanResults = new List<FileItemViewModel>();
-        }
-
-        if (searchVersion != Volatile.Read(ref _searchVersion)
-            || !IsSamePath(CurrentPath, rootPath)
-            || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _uiContext.Post(_ =>
-        {
-            if (searchVersion != Volatile.Read(ref _searchVersion)
-                || !IsSamePath(CurrentPath, rootPath)
-                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
-            {
-                return;
-            }
-
-            ReplaceVisibleFileItems(fullScanResults);
-            SearchSummary = $"File system search: {fullScanResults.Count} hit(s) ({rootPath})";
         }, null);
     }
 
@@ -714,7 +658,6 @@ public class MainWindowViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(SearchQuery))
         {
             ReplaceVisibleFileItems(_currentDirectoryItems);
-            SearchSummary = string.Empty;
         }
     }
 
@@ -824,7 +767,6 @@ public class MainWindowViewModel : ObservableObject
             AddressInput = string.Empty;
             _currentDirectoryItems.Clear();
             ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
-            SearchSummary = string.Empty;
             return;
         }
 
