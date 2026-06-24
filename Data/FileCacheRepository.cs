@@ -57,7 +57,7 @@ public class FileCacheRepository
 
         using var db = CreateDbContext();
         db.Database.Migrate();
-        
+
         // PRAGMA最適化設定
         using (var conn = db.Database.GetDbConnection())
         {
@@ -168,7 +168,7 @@ public class FileCacheRepository
                 // 対象親パスをすべて削除
                 var deleteParams = string.Join(",", allParentPaths.Select((_, i) => $"@p{i}"));
                 var deleteSql = $"DELETE FROM FileSystemEntries WHERE ParentPath IN ({deleteParams})";
-                
+
                 db.Database.ExecuteSqlRaw(
                     deleteSql,
                     allParentPaths.Select((p, i) => new Microsoft.Data.Sqlite.SqliteParameter($"@p{i}", p)).ToArray()
@@ -198,7 +198,7 @@ public class FileCacheRepository
                     {
                         var (parentPath, entry) = batch[j];
                         if (j > 0) sb.Append(",");
-                        
+
                         int pIdx = j * 6;
                         sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5})");
 
