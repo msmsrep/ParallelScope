@@ -24,9 +24,14 @@ public class ParallelScopeDbContext : DbContext
             entity.Property(x => x.FullPath).IsRequired();
             entity.Property(x => x.Name).IsRequired();
 
+            // インデックス最適化
             entity.HasIndex(x => x.ParentPath);
             entity.HasIndex(x => new { x.ParentPath, x.Name });
             entity.HasIndex(x => x.FullPath).IsUnique();
+
+            // 検索用インデックス（大文字小文字を区別しないスキャン用）
+            entity.HasIndex(x => x.Name);
+            entity.HasIndex(x => new { x.IsFolder, x.Name });
         });
     }
 }

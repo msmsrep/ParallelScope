@@ -125,7 +125,6 @@
             <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
@@ -147,10 +146,7 @@
                         Click="ClearSearchButton_Click"/>
             </Grid>
 
-            <TextBlock Grid.Row="1" Text="{Binding SearchSummary}"
-                       Style="{StaticResource SubtleStatusTextStyle}"/>
-
-            <DataGrid Grid.Row="2" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
+            <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
