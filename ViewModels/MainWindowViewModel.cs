@@ -323,7 +323,10 @@ public class MainWindowViewModel : ObservableObject
         {
             CurrentPath = folderPath;
             AddressInput = folderPath;
-            SearchQuery = string.Empty;
+            // ツリー移動時は進行中のファイル検索をキャンセル
+            Interlocked.Increment(ref _searchVersion);
+            // SearchQuery プロパティセッターを通さず直接フィールド更新して、ClearSearch() が呼ばれないようにする
+            _searchQuery = string.Empty;
 
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
             LoadFromCache(folderPath, navigationVersion);
@@ -741,9 +744,29 @@ public class MainWindowViewModel : ObservableObject
 
     private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items)
     {
-        FileItems.Clear();
+        var itemsList = items.ToList();
 
-        foreach (var item in items)
+        // 変更がない場合はスキップ
+        if (FileItems.Count == itemsList.Count)
+        {
+            bool hasChanges = false;
+            for (int i = 0; i < FileItems.Count; i++)
+            {
+                if (!string.Equals(FileItems[i].FullPath, itemsList[i].FullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    hasChanges = true;
+                    break;
+                }
+            }
+            if (!hasChanges)
+            {
+                return;
+            }
+        }
+
+        // バッチ更新：CollectionViewSourceを使用してUI更新を最小化
+        FileItems.Clear();
+        foreach (var item in itemsList)
         {
             FileItems.Add(item);
         }
