@@ -752,7 +752,8 @@ public class MainWindowViewModel : ObservableObject
             bool hasChanges = false;
             for (int i = 0; i < FileItems.Count; i++)
             {
-                if (!string.Equals(FileItems[i].FullPath, itemsList[i].FullPath, StringComparison.OrdinalIgnoreCase))
+                if (!string.Equals(FileItems[i].FullPath, itemsList[i].FullPath, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(FileItems[i].SizeText, itemsList[i].SizeText, StringComparison.Ordinal))
                 {
                     hasChanges = true;
                     break;
