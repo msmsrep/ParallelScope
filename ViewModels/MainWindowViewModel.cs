@@ -32,7 +32,6 @@ public class MainWindowViewModel : ObservableObject
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
-    private CancellationTokenSource? _fileSystemReadCts;
 
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
@@ -389,64 +388,34 @@ public class MainWindowViewModel : ObservableObject
 
     private async Task RefreshFromFileSystemInBackground(string folderPath, int navigationVersion)
     {
-        // 前のファイルシステム読み込みをキャンセル
-        _fileSystemReadCts?.Cancel();
-        _fileSystemReadCts = new CancellationTokenSource();
-        var cts = _fileSystemReadCts;
-
         List<CachedFileSystemEntry> liveEntries;
 
         try
         {
-            // ネットワークパスの場合はタイムアウトを短くする（5秒）、ローカルは10秒
-            var isNetworkPath = folderPath.StartsWith(@"\\", StringComparison.OrdinalIgnoreCase);
-            var timeoutMs = isNetworkPath ? 5000 : 10000;
-
-            using (cts.Token.Register(() => { }))
-            {
-                var task = Task.Run(() => ReadEntriesFromFileSystem(folderPath, cts.Token), cts.Token);
-                var completedTask = await Task.WhenAny(task, Task.Delay(timeoutMs, cts.Token)).ConfigureAwait(false);
-
-                if (completedTask != task)
-                {
-                    // タイムアウト: キャッシュのみで満足する
-                    return;
-                }
-
-                liveEntries = await task;
-            }
-        }
-        catch (OperationCanceledException)
-        {
-            return;
+            liveEntries = await Task.Run(() => ReadEntriesFromFileSystem(folderPath));
         }
         catch
         {
             return;
         }
 
-        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath) || cts.Token.IsCancellationRequested)
-        {
-            return;
-        }
-
         try
         {
-            await Task.Run(() => _fileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries), cts.Token);
+            await Task.Run(() => _fileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
         }
         catch
         {
             // キャッシュ保存失敗時でも画面更新は継続する
         }
 
-        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath) || cts.Token.IsCancellationRequested)
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
         {
             return;
         }
 
         _uiContext.Post(_ =>
         {
-            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath) || cts.Token.IsCancellationRequested)
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
             {
                 return;
             }
@@ -505,7 +474,7 @@ public class MainWindowViewModel : ObservableObject
         }, null);
     }
 
-    private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath, CancellationToken cancellationToken = default)
+    private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
         var entries = new ConcurrentBag<CachedFileSystemEntry>();
@@ -519,15 +488,8 @@ public class MainWindowViewModel : ObservableObject
                 .ToList();
 
             // フォルダ処理を並列化
-            var parallelOptions = new ParallelOptions 
-            { 
-                MaxDegreeOfParallelism = Environment.ProcessorCount,
-                CancellationToken = cancellationToken
-            };
-
-            Parallel.ForEach(folders, parallelOptions, d =>
+            Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, d =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 var entry = TryCreateFolderEntry(folderPath, d);
                 if (entry is not null)
                 {
@@ -541,19 +503,14 @@ public class MainWindowViewModel : ObservableObject
                 .ToList();
 
             // ファイル処理を並列化
-            Parallel.ForEach(files, parallelOptions, f =>
+            Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, f =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
                 var entry = TryCreateFileEntry(folderPath, f);
                 if (entry is not null)
                 {
                     entries.Add(entry);
                 }
             });
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch
         {
