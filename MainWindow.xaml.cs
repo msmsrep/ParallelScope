@@ -423,7 +423,6 @@ public partial class MainWindow : Window
         }
 
         _isFullScanRunning = true;
-        SetRootScanningState(true);
 
         if (useWaitCursor)
         {
@@ -432,7 +431,7 @@ public partial class MainWindow : Window
 
         try
         {
-            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
+            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsWithProgressAsync();
 
             if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
             {
@@ -463,7 +462,6 @@ public partial class MainWindow : Window
                 Mouse.OverrideCursor = null;
             }
 
-            SetRootScanningState(false);
             _isFullScanRunning = false;
         }
     }

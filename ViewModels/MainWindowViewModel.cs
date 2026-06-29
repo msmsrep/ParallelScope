@@ -224,6 +224,44 @@ public class MainWindowViewModel : ObservableObject
         return Task.Run(() => ScanFolderSubtrees(configuredRootPaths));
     }
 
+    public Task<int> FullScanConfiguredRootsWithProgressAsync()
+    {
+        return Task.Run(async () =>
+        {
+            var totalScannedFolderCount = 0;
+
+            foreach (var rootFolder in RootFolders)
+            {
+                if (string.IsNullOrWhiteSpace(rootFolder.Path) || !Directory.Exists(rootFolder.Path) || IsExcludedPath(rootFolder.Path))
+                {
+                    continue;
+                }
+
+                // UI スレッドでスキャン開始を表示
+                _uiContext.Post(_ =>
+                {
+                    rootFolder.IsScanning = true;
+                }, null);
+
+                try
+                {
+                    var scannedCount = await Task.Run(() => ScanFolderSubtrees(new[] { rootFolder.Path }));
+                    totalScannedFolderCount += scannedCount;
+                }
+                finally
+                {
+                    // UI スレッドでスキャン終了を表示
+                    _uiContext.Post(_ =>
+                    {
+                        rootFolder.IsScanning = false;
+                    }, null);
+                }
+            }
+
+            return totalScannedFolderCount;
+        });
+    }
+
     public Task<int> ScanFolderSubtreeAsync(string folderPath)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath) || IsExcludedPath(folderPath))
