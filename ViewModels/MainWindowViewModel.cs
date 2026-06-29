@@ -32,6 +32,7 @@ public class MainWindowViewModel : ObservableObject
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
+    private int _lastCancelledRootFolderIndex = -1;
 
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
@@ -224,14 +225,20 @@ public class MainWindowViewModel : ObservableObject
         return Task.Run(() => ScanFolderSubtrees(configuredRootPaths));
     }
 
-    public Task<int> FullScanConfiguredRootsWithProgressAsync()
+    public Task<int> FullScanConfiguredRootsWithProgressAsync(CancellationToken cancellationToken = default, int startFromRootIndex = 0)
     {
         return Task.Run(async () =>
         {
             var totalScannedFolderCount = 0;
+            var lastScannedRootIndex = -1;
 
-            foreach (var rootFolder in RootFolders)
+            // RootFolders のスナップショットを取得（列挙中の修正エラーを防止）
+            var rootFoldersList = RootFolders.ToList();
+
+            for (int i = startFromRootIndex; i < rootFoldersList.Count; i++)
             {
+                var rootFolder = rootFoldersList[i];
+
                 if (string.IsNullOrWhiteSpace(rootFolder.Path) || !Directory.Exists(rootFolder.Path) || IsExcludedPath(rootFolder.Path))
                 {
                     continue;
@@ -245,8 +252,15 @@ public class MainWindowViewModel : ObservableObject
 
                 try
                 {
-                    var scannedCount = await Task.Run(() => ScanFolderSubtrees(new[] { rootFolder.Path }));
+                    var scannedCount = await Task.Run(() => ScanFolderSubtrees(new[] { rootFolder.Path }, cancellationToken));
                     totalScannedFolderCount += scannedCount;
+                    lastScannedRootIndex = i;
+                }
+                catch (OperationCanceledException)
+                {
+                    // キャンセルされたルートフォルダのインデックスを記憶
+                    _lastCancelledRootFolderIndex = i;
+                    break;
                 }
                 finally
                 {
@@ -262,14 +276,24 @@ public class MainWindowViewModel : ObservableObject
         });
     }
 
-    public Task<int> ScanFolderSubtreeAsync(string folderPath)
+    public int GetLastCancelledRootFolderIndex()
+    {
+        return _lastCancelledRootFolderIndex;
+    }
+
+    public void ResetLastCancelledRootFolderIndex()
+    {
+        _lastCancelledRootFolderIndex = -1;
+    }
+
+    public Task<int> ScanFolderSubtreeAsync(string folderPath, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath) || IsExcludedPath(folderPath))
         {
             return Task.FromResult(0);
         }
 
-        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }));
+        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }, cancellationToken));
     }
 
     public void ClearSearch()
@@ -622,7 +646,7 @@ public class MainWindowViewModel : ObservableObject
             .ToList();
     }
 
-    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths)
+    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths, CancellationToken cancellationToken = default)
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingDirectories = new Stack<string>(rootPaths.Reverse());
@@ -632,6 +656,12 @@ public class MainWindowViewModel : ObservableObject
 
         while (pendingDirectories.Count > 0)
         {
+            // キャンセル要求をチェックし、gracefulに終了
+            if (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+
             var currentPath = pendingDirectories.Pop();
             string normalizedPath;
 

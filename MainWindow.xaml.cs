@@ -18,6 +18,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
+    private CancellationTokenSource? _fullScanCancellationTokenSource;
 
     public MainWindow()
     {
@@ -49,6 +50,8 @@ public partial class MainWindow : Window
     {
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
+        _fullScanCancellationTokenSource?.Cancel();
+        _fullScanCancellationTokenSource?.Dispose();
     }
 
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -415,18 +418,26 @@ public partial class MainWindow : Window
         return RunFullScanAsync(showCompletionMessage: false, useWaitCursor: false);
     }
 
-    private async Task RunFullScanAsync(bool showCompletionMessage, bool useWaitCursor)
+    private async Task RunFullScanAsync(bool showCompletionMessage, bool useWaitCursor, int startFromRootIndex = 0)
     {
+        bool shouldRetryAfterCancel = false;
+
         if (_isFullScanRunning)
         {
-            return;
+            // スキャン中ならキャンセルして新規スキャンを開始
+            _fullScanCancellationTokenSource?.Cancel();
+            shouldRetryAfterCancel = true;
         }
 
         _isFullScanRunning = true;
 
+        // 新しいCancellationTokenSourceを作成
+        _fullScanCancellationTokenSource = new CancellationTokenSource();
+        var cancellationToken = _fullScanCancellationTokenSource.Token;
+
         try
         {
-            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsWithProgressAsync();
+            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsWithProgressAsync(cancellationToken, startFromRootIndex);
 
             if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
             {
@@ -443,6 +454,23 @@ public partial class MainWindow : Window
                     MessageBoxImage.Information);
             }
         }
+        catch (OperationCanceledException)
+        {
+            // キャンセルされた場合、スキャン終了状態にしてから新規スキャンを開始
+            SetRootScanningState(false);
+            _isFullScanRunning = false;
+
+            if (shouldRetryAfterCancel)
+            {
+                // キャンセルされたルートフォルダのインデックスから新しいスキャンを開始
+                int retryFromRootIndex = _viewModel.GetLastCancelledRootFolderIndex();
+                if (retryFromRootIndex >= 0)
+                {
+                    await RunFullScanAsync(showCompletionMessage, useWaitCursor, retryFromRootIndex);
+                }
+            }
+            return;
+        }
         catch (Exception ex)
         {
             if (showCompletionMessage)
@@ -454,6 +482,7 @@ public partial class MainWindow : Window
         {
             SetRootScanningState(false);
             _isFullScanRunning = false;
+            _viewModel.ResetLastCancelledRootFolderIndex();
         }
     }
 
