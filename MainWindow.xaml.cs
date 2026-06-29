@@ -424,11 +424,6 @@ public partial class MainWindow : Window
 
         _isFullScanRunning = true;
 
-        if (useWaitCursor)
-        {
-            Mouse.OverrideCursor = Cursors.Wait;
-        }
-
         try
         {
             var scannedFolderCount = await _viewModel.FullScanConfiguredRootsWithProgressAsync();
@@ -457,11 +452,7 @@ public partial class MainWindow : Window
         }
         finally
         {
-            if (useWaitCursor)
-            {
-                Mouse.OverrideCursor = null;
-            }
-
+            SetRootScanningState(false);
             _isFullScanRunning = false;
         }
     }

@@ -465,7 +465,12 @@ public class MainWindowViewModel : ObservableObject
             }
 
             var fileItems = entries.Select(entry => ToViewModel(entry, cachedFolderSizes)).ToList();
-            UpdateCurrentDirectoryItems(fileItems);
+
+            // 変更がある場合のみ更新
+            if (HaveItemsChanged(_currentDirectoryItems, fileItems))
+            {
+                UpdateCurrentDirectoryItems(fileItems);
+            }
         }, null);
     }
 
@@ -515,7 +520,7 @@ public class MainWindowViewModel : ObservableObject
         // 結果をソートして返す
         return entries
             .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
 
@@ -607,7 +612,11 @@ public class MainWindowViewModel : ObservableObject
             }
         }
 
-        return results;
+        // キャッシュ検索と同じソート順序に統一
+        return results
+            .OrderByDescending(x => x.IsFolder)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths)
@@ -742,12 +751,48 @@ public class MainWindowViewModel : ObservableObject
 
     private void UpdateCurrentDirectoryItems(IEnumerable<FileItemViewModel> items)
     {
-        _currentDirectoryItems = items.ToList();
+        var newItems = items.ToList();
+
+        // 変更がない場合は何もしない
+        if (!HaveItemsChanged(_currentDirectoryItems, newItems))
+        {
+            return;
+        }
+
+        _currentDirectoryItems = newItems;
 
         if (string.IsNullOrWhiteSpace(SearchQuery))
         {
             ReplaceVisibleFileItems(_currentDirectoryItems);
         }
+    }
+
+    private static bool HaveItemsChanged(IReadOnlyList<FileItemViewModel> oldItems, IReadOnlyList<FileItemViewModel> newItems)
+    {
+        // 数が異なる場合は変更あり
+        if (oldItems.Count != newItems.Count)
+        {
+            return true;
+        }
+
+        // 各アイテムを比較
+        for (int i = 0; i < oldItems.Count; i++)
+        {
+            var oldItem = oldItems[i];
+            var newItem = newItems[i];
+
+            // FullPath、名前、サイズテキスト、更新日時、フォルダフラグを比較
+            if (!string.Equals(oldItem.FullPath, newItem.FullPath, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(oldItem.Name, newItem.Name, StringComparison.Ordinal)
+                || !string.Equals(oldItem.SizeText, newItem.SizeText, StringComparison.Ordinal)
+                || !string.Equals(oldItem.ModifiedTime, newItem.ModifiedTime, StringComparison.Ordinal)
+                || oldItem.IsFolder != newItem.IsFolder)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static FileItemViewModel ToViewModel(CachedFileSystemEntry entry)

@@ -83,7 +83,7 @@ public class FileCacheRepository
             .AsNoTracking()
             .Where(x => x.ParentPath == parentPath)
             .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .Select(x => new CachedFileSystemEntry(
                 x.ParentPath,
                 x.FullPath,
@@ -109,7 +109,7 @@ public class FileCacheRepository
             .AsNoTracking()
             .Where(x => x.FullPath.StartsWith(rootWithSeparator) && x.Name.ToLower().Contains(lowerQuery))
             .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .Select(x => new CachedFileSystemEntry(
                 x.ParentPath,
                 x.FullPath,
