@@ -151,7 +151,16 @@
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTemplateColumn Header="Name" Width="*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" Margin="4,0" VerticalAlignment="Center">
+                                    <Image Source="{Binding Icon}" Width="16" Height="16" Margin="0,0,8,0"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="100"/>
                     <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="100"/>
                     <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedTime}" Width="150"/>
