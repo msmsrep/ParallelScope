@@ -2,6 +2,7 @@ using System.IO;
 using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using ParallelScope.Common;
 
 namespace ParallelScope.Data;
 
@@ -21,28 +22,7 @@ public class FileCacheRepository
 
     public FileCacheRepository()
     {
-        string appDataDir;
-
-        bool isMsix = Environment.ProcessPath?.Contains(@"\WindowsApps\") ?? false;
-
-        if (isMsix)
-        {
-            // MSIX の LocalState
-            appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages",
-                "msmsrep.ParallelScope_77t1an0ygyrva",
-                "LocalState");
-        }
-        else
-        {
-            // 通常のローカルフォルダ
-            appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ParallelScope");
-        }
-
-        Directory.CreateDirectory(appDataDir);
+        var appDataDir = AppDataLocation.GetAppDataDirectory();
 
         var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
 
@@ -366,19 +346,6 @@ public class FileCacheRepository
 
     private static string NormalizePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return string.Empty;
-        }
-
-        var fullPath = Path.GetFullPath(path);
-        var rootPath = Path.GetPathRoot(fullPath);
-
-        if (!string.IsNullOrEmpty(rootPath) && string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return fullPath;
-        }
-
-        return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathUtility.NormalizePath(path);
     }
 }

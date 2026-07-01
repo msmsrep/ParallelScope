@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using ParallelScope.Common;
 
 namespace ParallelScope.Data;
 
@@ -9,29 +10,7 @@ public class AppSettingsRepository
 
     public AppSettingsRepository()
     {
-        string appDataDir;
-
-        bool isMsix = Environment.ProcessPath?.Contains(@"\WindowsApps\") ?? false;
-
-        if (isMsix)
-        {
-            // MSIX の LocalState
-            appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Packages",
-                "msmsrep.ParallelScope_77t1an0ygyrva",
-                "LocalState");
-        }
-        else
-        {
-            // 通常のローカルフォルダ
-            appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "ParallelScope");
-        }
-
-        Directory.CreateDirectory(appDataDir);
-
+        var appDataDir = AppDataLocation.GetAppDataDirectory();
         _settingsPath = Path.Combine(appDataDir, "settings.json");
     }
 

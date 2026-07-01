@@ -4,6 +4,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Common;
 using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
@@ -551,101 +552,6 @@ public class MainWindowViewModel : ObservableObject
             .ToList();
     }
 
-    private List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
-    {
-        var results = new List<FileItemViewModel>();
-        var comparison = StringComparison.OrdinalIgnoreCase;
-
-        var pendingDirectories = new Stack<string>();
-        pendingDirectories.Push(rootPath);
-
-        while (pendingDirectories.Count > 0)
-        {
-            var currentPath = pendingDirectories.Pop();
-
-            IEnumerable<string> childDirectories;
-            try
-            {
-                childDirectories = Directory.EnumerateDirectories(currentPath, "*", NonRecursiveEnumerationOptions)
-                    .Where(path => !IsExcludedPath(path))
-                    .OrderBy(path => path)
-                    .ToList();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-            catch (IOException)
-            {
-                continue;
-            }
-
-            foreach (var directoryPath in childDirectories)
-            {
-                pendingDirectories.Push(directoryPath);
-
-                try
-                {
-                    var directoryInfo = new DirectoryInfo(directoryPath);
-                    if (!directoryInfo.Name.Contains(query, comparison))
-                    {
-                        continue;
-                    }
-
-                    results.Add(new FileItemViewModel(directoryInfo.FullName, directoryInfo.Name, directoryInfo.LastWriteTime));
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
-                catch (IOException)
-                {
-                }
-            }
-
-            IEnumerable<string> filePaths;
-            try
-            {
-                filePaths = Directory.EnumerateFiles(currentPath, "*", NonRecursiveEnumerationOptions)
-                    .OrderBy(path => path)
-                    .ToList();
-            }
-            catch (UnauthorizedAccessException)
-            {
-                continue;
-            }
-            catch (IOException)
-            {
-                continue;
-            }
-
-            foreach (var filePath in filePaths)
-            {
-                try
-                {
-                    var fileInfo = new FileInfo(filePath);
-                    if (!fileInfo.Name.Contains(query, comparison))
-                    {
-                        continue;
-                    }
-
-                    results.Add(new FileItemViewModel(fileInfo.FullName, fileInfo.Name, fileInfo.Length, fileInfo.LastWriteTime));
-                }
-                catch (UnauthorizedAccessException)
-                {
-                }
-                catch (IOException)
-                {
-                }
-            }
-        }
-
-        // キャッシュ検索と同じソート順序に統一
-        return results
-            .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-    }
-
     private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths, CancellationToken cancellationToken = default)
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -890,25 +796,12 @@ public class MainWindowViewModel : ObservableObject
 
     private static string NormalizePath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return string.Empty;
-        }
-
-        var fullPath = Path.GetFullPath(path);
-        var rootPath = Path.GetPathRoot(fullPath);
-
-        if (!string.IsNullOrEmpty(rootPath) && string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return fullPath;
-        }
-
-        return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathUtility.NormalizePath(path);
     }
 
     private static bool IsSamePath(string leftPath, string rightPath)
     {
-        return string.Equals(NormalizePath(leftPath), NormalizePath(rightPath), StringComparison.OrdinalIgnoreCase);
+        return PathUtility.IsSamePath(leftPath, rightPath);
     }
 
     private void NotifyNavigationStateChanged()
@@ -1010,19 +903,7 @@ public class MainWindowViewModel : ObservableObject
 
     private static bool IsAncestorOrSamePath(string ancestorPath, string targetPath)
     {
-        var normalizedAncestor = NormalizePath(ancestorPath);
-        var normalizedTarget = NormalizePath(targetPath);
-
-        if (string.Equals(normalizedAncestor, normalizedTarget, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var prefix = normalizedAncestor.EndsWith(Path.DirectorySeparatorChar)
-            ? normalizedAncestor
-            : normalizedAncestor + Path.DirectorySeparatorChar;
-
-        return normalizedTarget.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
+        return PathUtility.IsAncestorOrSamePath(ancestorPath, targetPath);
     }
 
     private static int NormalizeFullScanIntervalHours(int hours)

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using ParallelScope.Common;
 
 namespace ParallelScope;
 
@@ -161,15 +162,7 @@ public partial class SettingsWindow : Window
 
     private static string NormalizePath(string path)
     {
-        var fullPath = Path.GetFullPath(path);
-        var rootPath = Path.GetPathRoot(fullPath);
-
-        if (!string.IsNullOrEmpty(rootPath) && string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return fullPath;
-        }
-
-        return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return PathUtility.NormalizePath(path);
     }
 
     private static int NormalizeFullScanIntervalHours(int hours)
