@@ -213,15 +213,128 @@ public class MainWindowViewModel : ObservableObject
         return true;
     }
 
-    public Task<int> FullScanConfiguredRootsAsync()
+    public async Task<int> FullScanConfiguredRootsAsync(CancellationToken token)
     {
         var configuredRootPaths = RootFolders
-            .Select(x => x.Path)
-            .Where(path => !string.IsNullOrWhiteSpace(path) && Directory.Exists(path) && !IsExcludedPath(path))
+            .Select(x => NormalizePath(x.Path))
+            .Where(path =>
+                !string.IsNullOrWhiteSpace(path) &&
+                Directory.Exists(path) &&
+                !IsExcludedPath(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return Task.Run(() => ScanFolderSubtrees(configuredRootPaths));
+        return await ScanFolderSubtreesAsync(configuredRootPaths, token);
+    }
+
+    private async Task<int> ScanFolderSubtreesAsync(
+        IReadOnlyCollection<string> rootPaths,
+        CancellationToken token)
+    {
+        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var pendingDirectories = new Stack<string>(rootPaths.Reverse());
+        var batchEntries = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>();
+        var updatedFolderCount = 0;
+        const int BatchSize = 200;
+
+        while (pendingDirectories.Count > 0)
+        {
+            token.ThrowIfCancellationRequested();
+
+            var currentPath = pendingDirectories.Pop();
+            string normalizedPath;
+
+            try
+            {
+                normalizedPath = NormalizePath(currentPath);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!visitedDirectories.Add(normalizedPath) ||
+                IsExcludedPath(normalizedPath) ||
+                !Directory.Exists(normalizedPath))
+            {
+                continue;
+            }
+
+            List<CachedFileSystemEntry> entries;
+            try
+            {
+                // ファイルシステム読み取りは同期 API なので Task.Run でオフロード
+                entries = await Task.Run(
+                    () => ReadEntriesFromFileSystem(normalizedPath),
+                    token);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // 読み取り失敗はスキップして継続
+                continue;
+            }
+
+            batchEntries[normalizedPath] = entries;
+            updatedFolderCount++;
+
+            if (batchEntries.Count >= BatchSize)
+            {
+                try
+                {
+                    // DB 更新も重いなら Task.Run でオフロード
+                    await Task.Run(
+                        () => _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries),
+                        token);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // バッチ保存失敗時もスキャンは継続
+                }
+
+                batchEntries.Clear();
+            }
+
+            foreach (var folderEntry in entries
+                .Where(x => x.IsFolder && !IsExcludedPath(x.FullPath))
+                .OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+            {
+                pendingDirectories.Push(folderEntry.FullPath);
+            }
+
+            // UI フリーズ防止のため、一定間隔でスレッドを譲る
+            if ((updatedFolderCount % 50) == 0)
+            {
+                await Task.Yield();
+            }
+        }
+
+        if (batchEntries.Count > 0)
+        {
+            try
+            {
+                await Task.Run(
+                    () => _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries),
+                    token);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch
+            {
+                // 最後のバッチ保存失敗でも updatedFolderCount は返す
+            }
+        }
+
+        return updatedFolderCount;
     }
 
     public Task<int> ScanFolderSubtreeAsync(string folderPath)

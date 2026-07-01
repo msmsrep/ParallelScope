@@ -50,7 +50,7 @@ public partial class MainWindow : Window
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
     }
-
+    private bool _restartFullScanRequested;
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SettingsWindow(
@@ -72,7 +72,16 @@ public partial class MainWindow : Window
 
         if (dialog.ShouldRunFullScan)
         {
-            await RunFullScanFromSettingsAsync();
+            if (_isFullScanRunning)
+            {
+                // 今のフルスキャンをキャンセルして再実行する
+                _restartFullScanRequested = true;
+                _fullScanCts?.Cancel();
+            }
+            else
+            {
+                await RunFullScanFromSettingsAsync();
+            }
         }
     }
 
@@ -414,7 +423,7 @@ public partial class MainWindow : Window
     {
         return RunFullScanAsync(showCompletionMessage: false, useWaitCursor: false);
     }
-
+    private CancellationTokenSource? _fullScanCts;
     private async Task RunFullScanAsync(bool showCompletionMessage, bool useWaitCursor)
     {
         if (_isFullScanRunning)
@@ -423,12 +432,13 @@ public partial class MainWindow : Window
         }
 
         _isFullScanRunning = true;
+        _fullScanCts = new CancellationTokenSource();
+        var token = _fullScanCts.Token;
         SetRootScanningState(true);
 
         try
         {
-            // ここ
-            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync();
+            var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync(token);
 
             if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
             {
@@ -445,6 +455,13 @@ public partial class MainWindow : Window
                     MessageBoxImage.Information);
             }
         }
+        catch (OperationCanceledException)
+        {
+            if (showCompletionMessage)
+            {
+                MessageBox.Show("Full scan was canceled.", "Full Scan Canceled", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
         catch (Exception ex)
         {
             if (showCompletionMessage)
@@ -456,9 +473,22 @@ public partial class MainWindow : Window
         {
             SetRootScanningState(false);
             _isFullScanRunning = false;
+            _fullScanCts?.Dispose();
+            _fullScanCts = null;
+
+            // キャンセル後に再実行要求があれば、ここで新しいフルスキャンを開始
+            if (_restartFullScanRequested)
+            {
+                _restartFullScanRequested = false;
+                await RunFullScanAsync(showCompletionMessage, useWaitCursor);
+            }
         }
     }
-
+    // キャンセルボタンなどから呼ぶ
+    private void CancelFullScan()
+    {
+        _fullScanCts?.Cancel();
+    }
     private void SetRootScanningState(bool isScanning)
     {
         foreach (var rootFolder in _viewModel.RootFolders)
