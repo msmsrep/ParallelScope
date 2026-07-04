@@ -502,15 +502,17 @@ public class MainWindowViewModel : ObservableObject
 
     private async Task ApplyCachedFolderSizesInBackground(string folderPath, IReadOnlyCollection<CachedFileSystemEntry> entries, int navigationVersion)
     {
-        var folderPaths = entries
+        var folderEntries = entries
             .Where(x => x.IsFolder)
-            .Select(x => x.FullPath)
             .ToList();
 
-        if (folderPaths.Count == 0)
+        if (folderEntries.Count == 0)
         {
             return;
         }
+
+        // キャッシュから取得するフォルダパスのみ抽出
+        var folderPaths = folderEntries.Select(x => x.FullPath).ToList();
 
         Dictionary<string, long> cachedFolderSizes;
         try
@@ -522,11 +524,13 @@ public class MainWindowViewModel : ObservableObject
             return;
         }
 
+        // キャッシュが取得できなかったか、全フォルダがサイズ情報を持たない場合はスキップ
         if (cachedFolderSizes.Count == 0)
         {
             return;
         }
 
+        // ナビゲーションの確認: 別のフォルダに移動していないか
         if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
         {
             return;
@@ -539,9 +543,34 @@ public class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            var fileItems = entries.Select(entry => ToViewModel(entry, cachedFolderSizes)).ToList();
-            UpdateCurrentDirectoryItems(fileItems);
+            // バイト数で比較して、実際に変わったフォルダのみ更新（不要な再描画を完全に防止）
+            foreach (var folderEntry in folderEntries)
+            {
+                if (cachedFolderSizes.TryGetValue(folderEntry.FullPath, out var cachedSize))
+                {
+                    var currentItem = FileItems.FirstOrDefault(x => x.FullPath == folderEntry.FullPath);
+                    if (currentItem != null && currentItem.IsFolder && currentItem.CachedSizeBytes != cachedSize)
+                    {
+                        // バイト数が実際に変わった場合のみ更新
+                        currentItem.CachedSizeBytes = cachedSize;
+                        currentItem.SizeText = cachedSize > 0 ? FormatFileSize(cachedSize) : string.Empty;
+                    }
+                }
+            }
         }, null);
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len /= 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
     }
 
     private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
@@ -807,17 +836,86 @@ public class MainWindowViewModel : ObservableObject
 
     private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items)
     {
-        FileItems.Clear();
+        var newItems = items.ToList();
+        var currentItems = FileItems.ToList();
 
-        foreach (var item in items)
+        // 既存アイテムをパスでマップ
+        var currentItemMap = currentItems.ToDictionary(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+
+        // 削除するアイテムを特定（パスで比較）
+        var newItemPaths = new HashSet<string>(newItems.Select(x => x.FullPath), StringComparer.OrdinalIgnoreCase);
+        var itemsToRemove = currentItems
+            .Where(x => !newItemPaths.Contains(x.FullPath))
+            .ToList();
+
+        // 追加するアイテムと更新するアイテムを特定
+        var itemsToAdd = new List<FileItemViewModel>();
+        var itemsToUpdate = new List<(FileItemViewModel existing, FileItemViewModel newItem)>();
+
+        foreach (var newItem in newItems)
+        {
+            if (currentItemMap.TryGetValue(newItem.FullPath, out var existingItem))
+            {
+                itemsToUpdate.Add((existingItem, newItem));
+            }
+            else
+            {
+                itemsToAdd.Add(newItem);
+            }
+        }
+
+        // 削除
+        foreach (var item in itemsToRemove)
+        {
+            FileItems.Remove(item);
+        }
+
+        // 追加
+        foreach (var item in itemsToAdd)
         {
             FileItems.Add(item);
+        }
+
+        // 更新（既存アイテムのプロパティを新規アイテムの情報で更新）
+        foreach (var (existing, newItem) in itemsToUpdate)
+        {
+            existing.TypeText = newItem.TypeText;
+            existing.ModifiedTime = newItem.ModifiedTime;
+
+            // サイズ情報：新規アイテムが空で既存アイテムが有る場合は既存値を保持
+            if (!string.IsNullOrEmpty(newItem.SizeText))
+            {
+                existing.SizeText = newItem.SizeText;
+                existing.CachedSizeBytes = newItem.CachedSizeBytes;
+            }
+            // 新規アイテムが空で既存アイテムが有る場合は既存値を保持（キャッシュから取得したサイズ）
+            else if (string.IsNullOrEmpty(newItem.SizeText) && !string.IsNullOrEmpty(existing.SizeText) && existing.CachedSizeBytes > 0)
+            {
+                // 既存のサイズ情報を保持
+            }
         }
     }
 
     private void UpdateCurrentDirectoryItems(IEnumerable<FileItemViewModel> items)
     {
-        _currentDirectoryItems = items.ToList();
+        var newItems = items.ToList();
+
+        // 既存のアイテムからサイズ情報を引き継ぐ（ライブデータの再取得時にキャッシュサイズが失われるのを防止）
+        var currentItemMap = _currentDirectoryItems.ToDictionary(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+        foreach (var newItem in newItems)
+        {
+            if (currentItemMap.TryGetValue(newItem.FullPath, out var existingItem))
+            {
+                newItem.CachedSizeBytes = existingItem.CachedSizeBytes;
+                // SizeText も引き継ぐ（キャッシュサイズから計算された値）
+                if (!string.IsNullOrEmpty(existingItem.SizeText))
+                {
+                    newItem.SizeText = existingItem.SizeText;
+                }
+            }
+        }
+
+        _currentDirectoryItems = newItems;
 
         if (string.IsNullOrWhiteSpace(SearchQuery))
         {
@@ -903,15 +1001,26 @@ public class MainWindowViewModel : ObservableObject
             normalizedRootPaths = GetFallbackDriveRoots().ToList();
         }
 
-        RootFolders.Clear();
+        // 差分更新: 既存のルートフォルダをマップ化
+        var newRootPaths = new HashSet<string>(normalizedRootPaths, StringComparer.OrdinalIgnoreCase);
+
+        // 削除: 新しいリストに含まれないルートフォルダを削除
+        var rootsToRemove = RootFolders
+            .Where(x => !newRootPaths.Contains(x.Path) || IsExcludedPath(x.Path))
+            .ToList();
+        foreach (var root in rootsToRemove)
+        {
+            RootFolders.Remove(root);
+        }
+
+        // 追加: 新しいリストに含まれるがまだ存在しないルートフォルダを追加
+        var existingRootPaths = new HashSet<string>(RootFolders.Select(x => x.Path), StringComparer.OrdinalIgnoreCase);
         foreach (var rootPath in normalizedRootPaths)
         {
-            if (IsExcludedPath(rootPath))
+            if (!IsExcludedPath(rootPath) && !existingRootPaths.Contains(rootPath))
             {
-                continue;
+                RootFolders.Add(new FolderItemViewModel(rootPath, IsExcludedPath));
             }
-
-            RootFolders.Add(new FolderItemViewModel(rootPath, IsExcludedPath));
         }
 
         if (saveSettings)
