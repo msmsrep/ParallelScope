@@ -1,13 +1,56 @@
+using CommunityToolkit.Mvvm.ComponentModel;
+
 namespace ParallelScope.ViewModels;
 
-public class FileItemViewModel
+public class FileItemViewModel : ObservableObject
 {
-    public string FullPath { get; set; }
-    public string Name { get; set; }
-    public string SizeText { get; set; }
-    public string TypeText { get; set; }
-    public string ModifiedTime { get; set; }
-    public bool IsFolder { get; set; }
+    private string _fullPath;
+    private string _name;
+    private string _sizeText;
+    private string _typeText;
+    private string _modifiedTime;
+    private bool _isFolder;
+
+    public string FullPath
+    {
+        get => _fullPath;
+        set => SetProperty(ref _fullPath, value);
+    }
+
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    public string SizeText
+    {
+        get => _sizeText;
+        set => SetProperty(ref _sizeText, value);
+    }
+
+    public string TypeText
+    {
+        get => _typeText;
+        set => SetProperty(ref _typeText, value);
+    }
+
+    public string ModifiedTime
+    {
+        get => _modifiedTime;
+        set => SetProperty(ref _modifiedTime, value);
+    }
+
+    public bool IsFolder
+    {
+        get => _isFolder;
+        set => SetProperty(ref _isFolder, value);
+    }
+
+    /// <summary>
+    /// フォルダサイズのバイト数（再描画判定用）。SizeText の値が同じでもバイト数で正確に比較。
+    /// </summary>
+    public long CachedSizeBytes { get; set; }
 
     public FileItemViewModel(string fullPath, string name, long sizeBytes, DateTime modifiedTime)
     {
@@ -17,6 +60,7 @@ public class FileItemViewModel
         TypeText = "File";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = false;
+        CachedSizeBytes = sizeBytes;
     }
 
     public FileItemViewModel(string fullPath, string name, DateTime modifiedTime, long? cachedTotalSizeBytes = null)
@@ -27,6 +71,7 @@ public class FileItemViewModel
         TypeText = "Folder";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = true;
+        CachedSizeBytes = cachedTotalSizeBytes ?? 0;
     }
 
     private static string FormatFileSize(long bytes)
