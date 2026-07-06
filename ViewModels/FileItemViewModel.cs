@@ -4,11 +4,13 @@ namespace ParallelScope.ViewModels;
 
 public class FileItemViewModel : ObservableObject
 {
-    private string _fullPath;
-    private string _name;
-    private string _sizeText;
-    private string _typeText;
-    private string _modifiedTime;
+    private static readonly string[] SizeUnits = { "B", "KB", "MB", "GB", "TB" };
+
+    private string _fullPath = string.Empty;
+    private string _name = string.Empty;
+    private string _sizeText = string.Empty;
+    private string _typeText = string.Empty;
+    private string _modifiedTime = string.Empty;
     private bool _isFolder;
 
     public string FullPath
@@ -76,14 +78,15 @@ public class FileItemViewModel : ObservableObject
 
     private static string FormatFileSize(long bytes)
     {
-        string[] sizes = { "B", "KB", "MB", "GB", "TB" };
         double len = bytes;
         int order = 0;
-        while (len >= 1024 && order < sizes.Length - 1)
+        int maxOrder = SizeUnits.Length - 1;
+
+        while (len >= 1024 && order < maxOrder)
         {
             order++;
             len /= 1024;
         }
-        return $"{len:0.##} {sizes[order]}";
+        return $"{len:0.##} {SizeUnits[order]}";
     }
 }
