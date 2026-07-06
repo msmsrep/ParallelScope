@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -19,10 +21,17 @@ public class FolderItemViewModel : ObservableObject
     private bool _isScanning;
     private bool _isLoaded;
     private bool _hasSubFolders = true;
+    private ImageSource? _iconSource;
 
     public string DisplayName { get; set; }
 
     public string Path => _path;
+
+    public ImageSource? IconSource
+    {
+        get => _iconSource;
+        set => SetProperty(ref _iconSource, value);
+    }
 
     public bool IsScanning
     {
@@ -50,6 +59,7 @@ public class FolderItemViewModel : ObservableObject
         _path = path;
         _isExcludedPath = isExcludedPath;
         DisplayName = GetDisplayName(path);
+        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
 
         // 初期化時にサブフォルダの存在確認（展開ボタン表示用）
         CheckHasSubFolders();
