@@ -259,21 +259,44 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ターゲットパスの経路を事前計算
+        var targetPathComponents = GetPathComponents(targetPath);
+
         foreach (var root in _viewModel.RootFolders)
         {
-            if (!IsAncestorOrSamePath(root.Path, targetPath))
+            var rootPath = root.Path;
+            if (!IsAncestorOrSamePath(rootPath, targetPath))
             {
                 continue;
             }
 
-            if (ExpandAndSelect(FolderTreeView, root, targetPath))
+            var rootComponents = GetPathComponents(rootPath);
+            var remainingComponents = new List<string>();
+
+            // ルートより下の成分を抽出
+            for (int i = rootComponents.Count; i < targetPathComponents.Count; i++)
+            {
+                remainingComponents.Add(targetPathComponents[i]);
+            }
+
+            if (ExpandAndSelectByPath(FolderTreeView, root, remainingComponents, 0))
             {
                 return;
             }
         }
     }
 
-    private bool ExpandAndSelect(ItemsControl parentControl, FolderItemViewModel folderItem, string targetPath)
+    private List<string> GetPathComponents(string path)
+    {
+        var normalized = NormalizePath(path);
+        var components = normalized.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Where(c => !string.IsNullOrEmpty(c))
+            .ToList();
+        return components;
+    }
+
+    private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
+        List<string> pathComponents, int componentIndex)
     {
         parentControl.UpdateLayout();
         if (parentControl.ItemContainerGenerator.ContainerFromItem(folderItem) is not TreeViewItem treeViewItem)
@@ -281,30 +304,27 @@ public partial class MainWindow : Window
             return false;
         }
 
-        if (IsSamePath(folderItem.Path, targetPath))
+        // ターゲットに到達した
+        if (componentIndex >= pathComponents.Count)
         {
             treeViewItem.IsSelected = true;
             treeViewItem.BringIntoView();
             return true;
         }
 
-        if (!IsAncestorOrSamePath(folderItem.Path, targetPath))
-        {
-            return false;
-        }
-
-        // 遅延読み込みを実行
+        // 遅延読み込みを実行（次のディレクトリを探すために）
         folderItem.EnsureLoaded();
-
         treeViewItem.IsExpanded = true;
         treeViewItem.UpdateLayout();
 
-        foreach (var child in folderItem.SubFolders)
+        // 次のディレクトリ成分を探す
+        var nextComponent = pathComponents[componentIndex];
+        var matchingChild = folderItem.SubFolders.FirstOrDefault(child =>
+            string.Equals(child.DisplayName, nextComponent, StringComparison.OrdinalIgnoreCase));
+
+        if (matchingChild is not null)
         {
-            if (ExpandAndSelect(treeViewItem, child, targetPath))
-            {
-                return true;
-            }
+            return ExpandAndSelectByPath(treeViewItem, matchingChild, pathComponents, componentIndex + 1);
         }
 
         return false;
