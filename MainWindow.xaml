@@ -108,6 +108,7 @@
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
                         <StackPanel Orientation="Horizontal">
+                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
                             <TextBlock Style="{StaticResource ScanningIndicatorStyle}"/>
                             <TextBlock Text="{Binding DisplayName}"/>
                             </StackPanel>
@@ -152,7 +153,16 @@
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTemplateColumn Header="Name" Width="*">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="100"/>
                     <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="100"/>
                     <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedTime}" Width="150"/>

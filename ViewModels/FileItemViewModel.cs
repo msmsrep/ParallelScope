@@ -1,4 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Utilities;
+using System.Windows.Media;
 
 namespace ParallelScope.ViewModels;
 
@@ -12,6 +14,7 @@ public class FileItemViewModel : ObservableObject
     private string _typeText = string.Empty;
     private string _modifiedTime = string.Empty;
     private bool _isFolder;
+    private ImageSource? _iconSource;
 
     public string FullPath
     {
@@ -49,6 +52,12 @@ public class FileItemViewModel : ObservableObject
         set => SetProperty(ref _isFolder, value);
     }
 
+    public ImageSource? IconSource
+    {
+        get => _iconSource;
+        set => SetProperty(ref _iconSource, value);
+    }
+
     /// <summary>
     /// フォルダサイズのバイト数（再描画判定用）。SizeText の値が同じでもバイト数で正確に比較。
     /// </summary>
@@ -62,6 +71,7 @@ public class FileItemViewModel : ObservableObject
         TypeText = "File";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = false;
+        IconSource = WindowsShellIconProvider.GetFileSmallIcon(fullPath);
         CachedSizeBytes = sizeBytes;
     }
 
@@ -73,6 +83,7 @@ public class FileItemViewModel : ObservableObject
         TypeText = "Folder";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = true;
+        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
         CachedSizeBytes = cachedTotalSizeBytes ?? 0;
     }
 
