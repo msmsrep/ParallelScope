@@ -1019,7 +1019,10 @@ public class MainWindowViewModel : ObservableObject
         {
             if (!IsExcludedPath(rootPath) && !existingRootPaths.Contains(rootPath))
             {
-                RootFolders.Add(new FolderItemViewModel(rootPath, IsExcludedPath));
+                var newRootFolder = new FolderItemViewModel(rootPath, IsExcludedPath);
+                // ルートフォルダは初期化時に即座に読み込む（遅延展開ではなく）
+                newRootFolder.EnsureLoaded();
+                RootFolders.Add(newRootFolder);
             }
         }
 

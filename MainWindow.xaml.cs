@@ -93,6 +93,17 @@ public partial class MainWindow : Window
         }
     }
 
+    private void FolderTreeItem_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        // TreeViewItemが展開される時に、子フォルダを遅延読み込み
+        folderItem.EnsureLoaded();
+    }
+
     private void FolderTreeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var treeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
@@ -281,6 +292,9 @@ public partial class MainWindow : Window
         {
             return false;
         }
+
+        // 遅延読み込みを実行
+        folderItem.EnsureLoaded();
 
         treeViewItem.IsExpanded = true;
         treeViewItem.UpdateLayout();
