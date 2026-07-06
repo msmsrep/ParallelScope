@@ -33,6 +33,23 @@ public class MainWindowViewModel : ObservableObject
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
+    // バックグラウンド更新の連続実行抑制
+    private bool _isRefreshRunning;
+    private string? _pendingRefreshPath;
+    private int _pendingRefreshVersion;
+
+    // フォルダサイズキャッシュ適用の連続実行抑制
+    private bool _isFolderSizeApplyRunning;
+    private string? _pendingFolderSizePath;
+    private IReadOnlyCollection<CachedFileSystemEntry>? _pendingFolderSizeEntries;
+    private int _pendingFolderSizeVersion;
+
+    // 検索の連続実行抑制
+    private bool _isSearchRunning;
+    private string? _pendingSearchRootPath;
+    private string? _pendingSearchQuery;
+    private int _pendingSearchVersion;
+
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
         get => _rootFolders;
@@ -209,7 +226,8 @@ public class MainWindowViewModel : ObservableObject
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
         ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
-        _ = SearchInBackground(searchRootPath, normalizedQuery, searchVersion);
+        // 検索リクエストを統合するメソッドを呼ぶ
+        RequestSearch(searchRootPath, normalizedQuery, searchVersion);
         return true;
     }
 
@@ -402,7 +420,8 @@ public class MainWindowViewModel : ObservableObject
 
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
             LoadFromCache(folderPath, navigationVersion);
-            _ = RefreshFromFileSystemInBackground(folderPath, navigationVersion);
+            // 連続リクエストを統合するメソッドを呼ぶ
+            RequestRefreshFromFileSystem(folderPath, navigationVersion);
             return true;
         }
         catch
@@ -417,11 +436,76 @@ public class MainWindowViewModel : ObservableObject
         {
             var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
             UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
-            _ = ApplyCachedFolderSizesInBackground(folderPath, cachedEntries, navigationVersion);
+            // キャッシュサイズ適用をリクエスト（統合）
+            RequestApplyCachedFolderSizes(folderPath, cachedEntries, navigationVersion);
         }
         catch
         {
             UpdateCurrentDirectoryItems(Array.Empty<FileItemViewModel>());
+        }
+    }
+
+    // 検索のリクエストを統合（連続実行を抑制）
+    private void RequestSearch(string rootPath, string query, int searchVersion)
+    {
+        lock (this)
+        {
+            _pendingSearchRootPath = rootPath;
+            _pendingSearchQuery = query;
+            _pendingSearchVersion = searchVersion;
+
+            // 既に実行中の場合は、ペンディング状態で待つ
+            if (_isSearchRunning)
+            {
+                return;
+            }
+
+            _isSearchRunning = true;
+        }
+
+        // 実行中フラグをセットしたので、バックグラウンドタスクを開始
+        _ = ExecuteSearchCycle();
+    }
+
+    // 検索を順序立てて実行
+    private async Task ExecuteSearchCycle()
+    {
+        try
+        {
+            while (true)
+            {
+                string? rootPath;
+                string? query;
+                int version;
+
+                lock (this)
+                {
+                    if (_pendingSearchRootPath is null)
+                    {
+                        _isSearchRunning = false;
+                        return;
+                    }
+
+                    rootPath = _pendingSearchRootPath;
+                    query = _pendingSearchQuery;
+                    version = _pendingSearchVersion;
+                    _pendingSearchRootPath = null;
+                    _pendingSearchQuery = null;
+                }
+
+                // 実際の検索を実行
+                if (query is not null)
+                {
+                    await SearchInBackground(rootPath, query, version);
+                }
+            }
+        }
+        finally
+        {
+            lock (this)
+            {
+                _isSearchRunning = false;
+            }
         }
     }
 
@@ -461,6 +545,63 @@ public class MainWindowViewModel : ObservableObject
         }, null);
     }
 
+    // バックグラウンド更新のリクエストを統合（連続実行を抑制）
+    private void RequestRefreshFromFileSystem(string folderPath, int navigationVersion)
+    {
+        lock (this)
+        {
+            _pendingRefreshPath = folderPath;
+            _pendingRefreshVersion = navigationVersion;
+
+            // 既に実行中の場合は、ペンディング状態で待つ
+            if (_isRefreshRunning)
+            {
+                return;
+            }
+
+            _isRefreshRunning = true;
+        }
+
+        // 実行中フラグをセットしたので、バックグラウンドタスクを開始
+        _ = ExecuteRefreshCycle();
+    }
+
+    // バックグラウンド更新を順序立てて実行
+    private async Task ExecuteRefreshCycle()
+    {
+        try
+        {
+            while (true)
+            {
+                string? refreshPath;
+                int refreshVersion;
+
+                lock (this)
+                {
+                    if (_pendingRefreshPath is null)
+                    {
+                        _isRefreshRunning = false;
+                        return;
+                    }
+
+                    refreshPath = _pendingRefreshPath;
+                    refreshVersion = _pendingRefreshVersion;
+                    _pendingRefreshPath = null;
+                }
+
+                // 実際のバックグラウンド更新を実行
+                await RefreshFromFileSystemInBackground(refreshPath, refreshVersion);
+            }
+        }
+        finally
+        {
+            lock (this)
+            {
+                _isRefreshRunning = false;
+            }
+        }
+    }
+
     private async Task RefreshFromFileSystemInBackground(string folderPath, int navigationVersion)
     {
         List<CachedFileSystemEntry> liveEntries;
@@ -496,8 +637,73 @@ public class MainWindowViewModel : ObservableObject
             }
 
             UpdateCurrentDirectoryItems(liveEntries.Select(ToViewModel));
-            _ = ApplyCachedFolderSizesInBackground(folderPath, liveEntries, navigationVersion);
+            // キャッシュサイズ適用をリクエスト（統合）
+            RequestApplyCachedFolderSizes(folderPath, liveEntries, navigationVersion);
         }, null);
+    }
+
+    // フォルダサイズキャッシュ適用のリクエストを統合（連続実行を抑制）
+    private void RequestApplyCachedFolderSizes(string folderPath, IReadOnlyCollection<CachedFileSystemEntry> entries, int navigationVersion)
+    {
+        lock (this)
+        {
+            _pendingFolderSizePath = folderPath;
+            _pendingFolderSizeEntries = entries;
+            _pendingFolderSizeVersion = navigationVersion;
+
+            // 既に実行中の場合は、ペンディング状態で待つ
+            if (_isFolderSizeApplyRunning)
+            {
+                return;
+            }
+
+            _isFolderSizeApplyRunning = true;
+        }
+
+        // 実行中フラグをセットしたので、バックグラウンドタスクを開始
+        _ = ExecuteFolderSizeApplyCycle();
+    }
+
+    // フォルダサイズ適用を順序立てて実行
+    private async Task ExecuteFolderSizeApplyCycle()
+    {
+        try
+        {
+            while (true)
+            {
+                string? folderPath;
+                IReadOnlyCollection<CachedFileSystemEntry>? entries;
+                int version;
+
+                lock (this)
+                {
+                    if (_pendingFolderSizePath is null)
+                    {
+                        _isFolderSizeApplyRunning = false;
+                        return;
+                    }
+
+                    folderPath = _pendingFolderSizePath;
+                    entries = _pendingFolderSizeEntries;
+                    version = _pendingFolderSizeVersion;
+                    _pendingFolderSizePath = null;
+                    _pendingFolderSizeEntries = null;
+                }
+
+                // 実際のフォルダサイズ適用を実行
+                if (entries is not null)
+                {
+                    await ApplyCachedFolderSizesInBackground(folderPath, entries, version);
+                }
+            }
+        }
+        finally
+        {
+            lock (this)
+            {
+                _isFolderSizeApplyRunning = false;
+            }
+        }
     }
 
     private async Task ApplyCachedFolderSizesInBackground(string folderPath, IReadOnlyCollection<CachedFileSystemEntry> entries, int navigationVersion)
@@ -580,13 +786,12 @@ public class MainWindowViewModel : ObservableObject
 
         try
         {
+            // フォルダ処理を並列化
             var folders = dirInfo
                 .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
                 .Where(d => !IsExcludedPath(d.FullName))
-                .OrderBy(d => d.Name)
                 .ToList();
 
-            // フォルダ処理を並列化
             Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, d =>
             {
                 var entry = TryCreateFolderEntry(folderPath, d);
@@ -596,12 +801,11 @@ public class MainWindowViewModel : ObservableObject
                 }
             });
 
+            // ファイル処理を並列化
             var files = dirInfo
                 .EnumerateFiles("*", NonRecursiveEnumerationOptions)
-                .OrderBy(f => f.Name)
                 .ToList();
 
-            // ファイル処理を並列化
             Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, f =>
             {
                 var entry = TryCreateFileEntry(folderPath, f);
@@ -617,10 +821,17 @@ public class MainWindowViewModel : ObservableObject
         }
 
         // 結果をソートして返す
-        return entries
-            .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
-            .ToList();
+        var result = entries.ToList();
+        result.Sort((a, b) =>
+        {
+            // フォルダを先に配置
+            var folderCompare = b.IsFolder.CompareTo(a.IsFolder);
+            if (folderCompare != 0)
+                return folderCompare;
+            // 同じ種類ならば名前でソート
+            return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+        });
+        return result;
     }
 
     private List<FileItemViewModel> SearchEntriesFromFileSystem(string rootPath, string query)
@@ -628,12 +839,21 @@ public class MainWindowViewModel : ObservableObject
         var results = new List<FileItemViewModel>();
         var comparison = StringComparison.OrdinalIgnoreCase;
 
-        var pendingDirectories = new Stack<string>();
-        pendingDirectories.Push(rootPath);
+        var pendingDirectories = new Stack<(string path, int depth)>();
+        pendingDirectories.Push((rootPath, 0));
+
+        // 検索深度を制限（デフォルト10階層）
+        const int MaxSearchDepth = 10;
 
         while (pendingDirectories.Count > 0)
         {
-            var currentPath = pendingDirectories.Pop();
+            var (currentPath, currentDepth) = pendingDirectories.Pop();
+
+            // 深度制限に達した場合はスキップ
+            if (currentDepth >= MaxSearchDepth)
+            {
+                continue;
+            }
 
             IEnumerable<string> childDirectories;
             try
@@ -654,7 +874,7 @@ public class MainWindowViewModel : ObservableObject
 
             foreach (var directoryPath in childDirectories)
             {
-                pendingDirectories.Push(directoryPath);
+                pendingDirectories.Push((directoryPath, currentDepth + 1));
 
                 try
                 {
