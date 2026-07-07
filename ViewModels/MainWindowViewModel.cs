@@ -1308,12 +1308,10 @@ public class MainWindowViewModel : ObservableObject
 
     private static IEnumerable<string> GetFallbackDriveRoots()
     {
-        foreach (var drive in DriveInfo.GetDrives())
+        var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        if (!string.IsNullOrEmpty(desktopPath) && Directory.Exists(desktopPath))
         {
-            if (drive.IsReady)
-            {
-                yield return drive.RootDirectory.FullName;
-            }
+            yield return desktopPath;
         }
     }
 
