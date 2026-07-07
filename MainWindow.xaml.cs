@@ -279,15 +279,6 @@ public partial class MainWindow : Window
             tvi.BringIntoView();
         }
     }
-    private List<string> GetPathComponents(string path)
-    {
-        var normalized = NormalizePath(path);
-        var components = normalized.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-            .Where(c => !string.IsNullOrEmpty(c))
-            .ToList();
-        return components;
-    }
-
     private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
         List<string> pathComponents, int componentIndex)
     {
@@ -322,12 +313,6 @@ public partial class MainWindow : Window
 
         return false;
     }
-
-    private static bool IsSamePath(string leftPath, string rightPath)
-    {
-        return string.Equals(NormalizePath(leftPath), NormalizePath(rightPath), StringComparison.OrdinalIgnoreCase);
-    }
-
     private static bool IsAncestorOrSamePath(string ancestorPath, string targetPath)
     {
         var normalizedAncestor = NormalizePath(ancestorPath);
