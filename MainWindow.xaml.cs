@@ -18,7 +18,6 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
-
     public MainWindow()
     {
         InitializeComponent();
@@ -50,6 +49,15 @@ public partial class MainWindow : Window
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
     }
+    private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
+    private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is TreeViewItem tvi && tvi.DataContext is FolderItemViewModel vm)
+        {
+            _treeItemMap[vm.Path] = tvi;
+        }
+    }
+
     private bool _restartFullScanRequested;
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -250,42 +258,27 @@ public partial class MainWindow : Window
             MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
-
-    private void SyncTreeSelectionToCurrentPath()
+    private void ExpandParents(TreeViewItem item)
     {
-        var targetPath = _viewModel.CurrentPath;
-        if (string.IsNullOrWhiteSpace(targetPath))
+        DependencyObject parent = VisualTreeHelper.GetParent(item);
+
+        while (parent is TreeViewItem parentItem)
         {
-            return;
-        }
-
-        // ターゲットパスの経路を事前計算
-        var targetPathComponents = GetPathComponents(targetPath);
-
-        foreach (var root in _viewModel.RootFolders)
-        {
-            var rootPath = root.Path;
-            if (!IsAncestorOrSamePath(rootPath, targetPath))
-            {
-                continue;
-            }
-
-            var rootComponents = GetPathComponents(rootPath);
-            var remainingComponents = new List<string>();
-
-            // ルートより下の成分を抽出
-            for (int i = rootComponents.Count; i < targetPathComponents.Count; i++)
-            {
-                remainingComponents.Add(targetPathComponents[i]);
-            }
-
-            if (ExpandAndSelectByPath(FolderTreeView, root, remainingComponents, 0))
-            {
-                return;
-            }
+            parentItem.IsExpanded = true;
+            parent = VisualTreeHelper.GetParent(parentItem);
         }
     }
 
+    private void SyncTreeSelectionToCurrentPath()
+    {
+        var path = _viewModel.CurrentPath;
+        if (_treeItemMap.TryGetValue(path, out var tvi))
+        {
+            ExpandParents(tvi);
+            tvi.IsSelected = true;
+            tvi.BringIntoView();
+        }
+    }
     private List<string> GetPathComponents(string path)
     {
         var normalized = NormalizePath(path);
