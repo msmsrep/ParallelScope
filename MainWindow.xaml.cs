@@ -101,15 +101,15 @@ public partial class MainWindow : Window
         }
     }
 
-    private void FolderTreeItem_Expanded(object sender, RoutedEventArgs e)
+    private async void FolderTreeItem_Expanded(object sender, RoutedEventArgs e)
     {
         if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem })
         {
             return;
         }
 
-        // TreeViewItemが展開される時に、子フォルダを遅延読み込み
-        folderItem.EnsureLoaded();
+        // TreeViewItemが展開される時に、子フォルダを遅延読み込み（非同期）
+        await folderItem.EnsureLoadedAsync();
     }
 
     private void FolderTreeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
@@ -260,12 +260,26 @@ public partial class MainWindow : Window
     }
     private void ExpandParents(TreeViewItem item)
     {
+        // 展開するアイテムをすべて収集してからバッチで展開
+        var itemsToExpand = new List<TreeViewItem>();
         DependencyObject parent = VisualTreeHelper.GetParent(item);
 
         while (parent is TreeViewItem parentItem)
         {
-            parentItem.IsExpanded = true;
+            itemsToExpand.Add(parentItem);
             parent = VisualTreeHelper.GetParent(parentItem);
+        }
+
+        // バッチ展開（複数の IsExpanded 設定をまとめる）
+        foreach (var parentItem in itemsToExpand)
+        {
+            parentItem.IsExpanded = true;
+        }
+
+        // 最後に一度だけレイアウト更新
+        if (itemsToExpand.Count > 0)
+        {
+            item.UpdateLayout();
         }
     }
 
@@ -282,7 +296,12 @@ public partial class MainWindow : Window
     private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
         List<string> pathComponents, int componentIndex)
     {
-        parentControl.UpdateLayout();
+        // 初回呼び出しのみレイアウト更新を行う
+        if (componentIndex == 0)
+        {
+            parentControl.UpdateLayout();
+        }
+
         if (parentControl.ItemContainerGenerator.ContainerFromItem(folderItem) is not TreeViewItem treeViewItem)
         {
             return false;
@@ -293,13 +312,15 @@ public partial class MainWindow : Window
         {
             treeViewItem.IsSelected = true;
             treeViewItem.BringIntoView();
+            // 最終更新のみ一度実行
+            treeViewItem.UpdateLayout();
             return true;
         }
 
         // 遅延読み込みを実行（次のディレクトリを探すために）
         folderItem.EnsureLoaded();
         treeViewItem.IsExpanded = true;
-        treeViewItem.UpdateLayout();
+        // 中間のUpdateLayout()は削除（最後の更新のみで十分）
 
         // 次のディレクトリ成分を探す
         var nextComponent = pathComponents[componentIndex];
