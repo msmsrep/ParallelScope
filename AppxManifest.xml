@@ -7,7 +7,7 @@
     <Identity
         Name="msmsrep.ParallelScope"
         Publisher="CN=5E0CB4C9-E2E2-4B35-A7BB-09FE6EB44D12"
-        Version="1.2.4.0"
+        Version="1.2.5.0"
         ProcessorArchitecture="x64" />
 
     <Properties>
