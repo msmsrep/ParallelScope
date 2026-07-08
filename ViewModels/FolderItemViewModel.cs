@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Utilities;
@@ -61,11 +62,19 @@ public class FolderItemViewModel : ObservableObject
         DisplayName = GetDisplayName(path);
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
 
-        // 初期化時にサブフォルダの存在確認（展開ボタン表示用）
-        CheckHasSubFolders();
+        // 最初から展開ボタンを表示、ダミーアイテムを追加
+        // ファイルシステムアクセスはスキップして UIスレッドをブロックしない
+        if (!string.IsNullOrEmpty(path))
+        {
+            HasSubFolders = true;
+            _subFolders = new ObservableCollection<FolderItemViewModel>();
+            var dummy = new FolderItemViewModel(string.Empty, null);
+            dummy.DisplayName = "読み込み中...";
+            _subFolders.Add(dummy);
+        }
     }
 
-    // 遅延読み込み: TreeViewItemが展開される時に呼ぶ
+    // 遅延読み込み（同期版）: パス遡査などで即座に実行が必要な場合に使用
     public void EnsureLoaded()
     {
         if (_isLoaded)
@@ -77,34 +86,50 @@ public class FolderItemViewModel : ObservableObject
         LoadSubFolders();
     }
 
-    // サブフォルダの存在確認（ダミーではなく実際に読み込む）
-    private void CheckHasSubFolders()
+    // 遅延読み込み（非同期版）: UIスレッドブロックを避ける必要があるイベントで使用
+    public async Task EnsureLoadedAsync()
+    {
+        if (_isLoaded)
+        {
+            return;
+        }
+
+        _isLoaded = true;
+        // バックグラウンドスレッドで子フォルダリストを構築
+        var subDirs = await Task.Run(() => GetSubFoldersListInternal());
+
+        // UIスレッドに戻ってコレクションを更新
+        await Application.Current.Dispatcher.InvokeAsync(() =>
+        {
+            _subFolders?.Clear();
+            _subFolders ??= new ObservableCollection<FolderItemViewModel>();
+
+            foreach (var subDir in subDirs)
+            {
+                _subFolders.Add(subDir);
+            }
+
+            HasSubFolders = subDirs.Count > 0;
+        });
+    }
+
+    private List<FolderItemViewModel> GetSubFoldersListInternal()
     {
         try
         {
             var dirInfo = new DirectoryInfo(_path);
-            var subDirsExist = dirInfo
+            var subDirs = dirInfo
                 .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
-                .Any(d => _isExcludedPath?.Invoke(d.FullName) != true);
+                .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
+                .OrderBy(d => d.Name)
+                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath))
+                .ToList();
 
-            HasSubFolders = subDirsExist;
-
-            // サブフォルダがある場合、ダミーアイテムを追加して展開ボタンを表示させる
-            if (subDirsExist)
-            {
-                _subFolders ??= new ObservableCollection<FolderItemViewModel>();
-                if (_subFolders.Count == 0)
-                {
-                    // ダミーアイテムを追加（展開時に実際のアイテムに置き換える）
-                    var dummy = new FolderItemViewModel(string.Empty, null);
-                    dummy.DisplayName = "読み込み中...";
-                    _subFolders.Add(dummy);
-                }
-            }
+            return subDirs;
         }
         catch
         {
-            HasSubFolders = false;
+            return new List<FolderItemViewModel>();
         }
     }
 
