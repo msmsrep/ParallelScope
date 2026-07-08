@@ -249,110 +249,7 @@ public class MainWindowViewModel : ObservableObject
         IReadOnlyCollection<string> rootPaths,
         CancellationToken token)
     {
-        var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pendingDirectories = new Stack<string>(rootPaths.Reverse());
-        var batchEntries = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>();
-        var updatedFolderCount = 0;
-        const int BatchSize = 200;
-
-        while (pendingDirectories.Count > 0)
-        {
-            token.ThrowIfCancellationRequested();
-
-            var currentPath = pendingDirectories.Pop();
-            string normalizedPath;
-
-            try
-            {
-                normalizedPath = NormalizePath(currentPath);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (!visitedDirectories.Add(normalizedPath) ||
-                IsExcludedPath(normalizedPath) ||
-                !Directory.Exists(normalizedPath))
-            {
-                continue;
-            }
-
-            List<CachedFileSystemEntry> entries;
-            try
-            {
-                // ファイルシステム読み取りは同期 API なので Task.Run でオフロード
-                entries = await Task.Run(
-                    () => ReadEntriesFromFileSystem(normalizedPath),
-                    token);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // 読み取り失敗はスキップして継続
-                continue;
-            }
-
-            batchEntries[normalizedPath] = entries;
-            updatedFolderCount++;
-
-            if (batchEntries.Count >= BatchSize)
-            {
-                try
-                {
-                    // DB 更新も重いなら Task.Run でオフロード
-                    await Task.Run(
-                        () => _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries),
-                        token);
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch
-                {
-                    // バッチ保存失敗時もスキャンは継続
-                }
-
-                batchEntries.Clear();
-            }
-
-            foreach (var folderEntry in entries
-                .Where(x => x.IsFolder && !IsExcludedPath(x.FullPath))
-                .OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
-            {
-                pendingDirectories.Push(folderEntry.FullPath);
-            }
-
-            // UI フリーズ防止のため、一定間隔でスレッドを譲る
-            if ((updatedFolderCount % 50) == 0)
-            {
-                await Task.Yield();
-            }
-        }
-
-        if (batchEntries.Count > 0)
-        {
-            try
-            {
-                await Task.Run(
-                    () => _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries),
-                    token);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch
-            {
-                // 最後のバッチ保存失敗でも updatedFolderCount は返す
-            }
-        }
-
-        return updatedFolderCount;
+        return await Task.Run(() => ScanFolderSubtrees(rootPaths, token), token);
     }
 
     public Task<int> ScanFolderSubtreeAsync(string folderPath)
@@ -419,7 +316,7 @@ public class MainWindowViewModel : ObservableObject
             SearchQuery = string.Empty;
 
             var navigationVersion = Interlocked.Increment(ref _navigationVersion);
-            LoadFromCache(folderPath, navigationVersion);
+            _ = LoadFromCacheAsync(folderPath, navigationVersion);
             // 連続リクエストを統合するメソッドを呼ぶ
             RequestRefreshFromFileSystem(folderPath, navigationVersion);
             return true;
@@ -430,19 +327,56 @@ public class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void LoadFromCache(string folderPath, int navigationVersion)
+    private async Task LoadFromCacheAsync(string folderPath, int navigationVersion)
     {
+        List<CachedFileSystemEntry> cachedEntries;
+
         try
         {
-            var cachedEntries = _fileCacheRepository.GetEntriesByParentPath(folderPath);
-            UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
-            // キャッシュサイズ適用をリクエスト（統合）
-            RequestApplyCachedFolderSizes(folderPath, cachedEntries, navigationVersion);
+            cachedEntries = await Task.Run(() => _fileCacheRepository.GetEntriesByParentPath(folderPath));
         }
         catch
         {
-            UpdateCurrentDirectoryItems(Array.Empty<FileItemViewModel>());
+            return;
         }
+
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !IsSamePath(CurrentPath, folderPath))
+            {
+                return;
+            }
+
+            UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
+            // キャッシュサイズ適用をリクエスト（統合）
+            RequestApplyCachedFolderSizes(folderPath, cachedEntries, navigationVersion);
+        }, null);
+    }
+
+    // バックグラウンド更新のリクエストを統合（連続実行を抑制）
+    private void RequestRefreshFromFileSystem(string folderPath, int navigationVersion)
+    {
+        lock (this)
+        {
+            _pendingRefreshPath = folderPath;
+            _pendingRefreshVersion = navigationVersion;
+
+            // 既に実行中の場合は、ペンディング状態で待つ
+            if (_isRefreshRunning)
+            {
+                return;
+            }
+
+            _isRefreshRunning = true;
+        }
+
+        // 実行中フラグをセットしたので、バックグラウンドタスクを開始
+        _ = ExecuteRefreshCycle();
     }
 
     // 検索のリクエストを統合（連続実行を抑制）
@@ -543,27 +477,6 @@ public class MainWindowViewModel : ObservableObject
 
             ReplaceVisibleFileItems(cacheResults);
         }, null);
-    }
-
-    // バックグラウンド更新のリクエストを統合（連続実行を抑制）
-    private void RequestRefreshFromFileSystem(string folderPath, int navigationVersion)
-    {
-        lock (this)
-        {
-            _pendingRefreshPath = folderPath;
-            _pendingRefreshVersion = navigationVersion;
-
-            // 既に実行中の場合は、ペンディング状態で待つ
-            if (_isRefreshRunning)
-            {
-                return;
-            }
-
-            _isRefreshRunning = true;
-        }
-
-        // 実行中フラグをセットしたので、バックグラウンドタスクを開始
-        _ = ExecuteRefreshCycle();
     }
 
     // バックグラウンド更新を順序立てて実行
@@ -934,7 +847,7 @@ public class MainWindowViewModel : ObservableObject
         return results;
     }
 
-    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths)
+    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths, CancellationToken token = default)
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingDirectories = new Stack<string>(rootPaths.Reverse());
@@ -944,6 +857,8 @@ public class MainWindowViewModel : ObservableObject
 
         while (pendingDirectories.Count > 0)
         {
+            token.ThrowIfCancellationRequested();
+
             var currentPath = pendingDirectories.Pop();
             string normalizedPath;
 

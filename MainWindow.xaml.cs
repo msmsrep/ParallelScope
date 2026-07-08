@@ -285,12 +285,39 @@ public partial class MainWindow : Window
 
     private void SyncTreeSelectionToCurrentPath()
     {
-        var path = _viewModel.CurrentPath;
+        var path = NormalizePath(_viewModel.CurrentPath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
         if (_treeItemMap.TryGetValue(path, out var tvi))
         {
             ExpandParents(tvi);
             tvi.IsSelected = true;
             tvi.BringIntoView();
+            return;
+        }
+
+        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => IsAncestorOrSamePath(root.Path, path));
+        if (rootFolder is null)
+        {
+            return;
+        }
+
+        var normalizedRootPath = NormalizePath(rootFolder.Path);
+        var relativePath = path.StartsWith(normalizedRootPath, StringComparison.OrdinalIgnoreCase)
+            ? path[normalizedRootPath.Length..]
+            : string.Empty;
+
+        var pathComponents = relativePath
+            .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        ExpandAndSelectByPath(FolderTreeView, rootFolder, pathComponents, 0);
+        if (_treeItemMap.TryGetValue(path, out tvi))
+        {
+            ExpandParents(tvi);
         }
     }
     private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
