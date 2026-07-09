@@ -76,7 +76,11 @@ public partial class MainWindowViewModel : ObservableObject
             if (string.IsNullOrWhiteSpace(value))
             {
                 ClearSearch();
+                return;
             }
+
+            // 入力の都度、検索をリクエストする（インクリメンタルサーチ）
+            RequestSearch(value);
         }
     }
 
