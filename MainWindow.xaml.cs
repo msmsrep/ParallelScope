@@ -5,6 +5,7 @@ using System.IO;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
 namespace ParallelScope;
@@ -32,6 +33,7 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
+    // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         if (_hasStartedAutomaticFullScan)
@@ -44,12 +46,14 @@ public partial class MainWindow : Window
         ConfigureScheduledFullScanTimer();
     }
 
+    // ウィンドウクローズ時に定期スキャンタイマーを停止する
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
     }
     private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
+    // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
     private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
     {
         if (sender is TreeViewItem tvi && tvi.DataContext is FolderItemViewModel vm)
@@ -59,6 +63,7 @@ public partial class MainWindow : Window
     }
 
     private bool _restartFullScanRequested;
+    // 設定画面を開き、保存された場合は設定を適用してタイマー・ツリー選択を再構成する
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new SettingsWindow(
@@ -93,6 +98,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // ツリーで選択されたフォルダのファイル一覧を読み込む
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is FolderItemViewModel folderItem)
@@ -112,6 +118,7 @@ public partial class MainWindow : Window
         await folderItem.EnsureLoadedAsync();
     }
 
+    // 右クリックされたTreeViewItemを選択状態にしてからコンテキストメニューを表示する
     private void FolderTreeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var treeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
@@ -124,6 +131,7 @@ public partial class MainWindow : Window
         treeViewItem.Focus();
     }
 
+    // 選択中のフォルダに対する「配下を全てスキャン」メニューを動的に構築する
     private void FolderTreeItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem } treeViewItem)
@@ -152,6 +160,7 @@ public partial class MainWindow : Window
         treeViewItem.ContextMenu.Items.Add(menuItem);
     }
 
+    // 戻る履歴のフォルダへ移動し、ツリー選択を同期する
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.GoBack())
@@ -160,6 +169,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // 進む履歴のフォルダへ移動し、ツリー選択を同期する
     private void ForwardButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.GoForward())
@@ -168,6 +178,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // 親フォルダへ移動し、ツリー選択を同期する
     private void UpButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.GoUp())
@@ -176,6 +187,7 @@ public partial class MainWindow : Window
         }
     }
 
+    // Enterキーでアドレス欄のパスへ移動する
     private void AddressTextBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
@@ -187,6 +199,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // Enterキーで検索を実行する
     private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.Enter)
@@ -198,17 +211,20 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // 検索ボタンで検索を実行する
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
         ExecuteSearch();
     }
 
+    // 検索条件をクリアし、通常のフォルダ一覧表示に戻す
     private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.SearchQuery = string.Empty;
         _viewModel.ClearSearch();
     }
 
+    // コンテキストメニューから、選択フォルダ配下の個別スキャンを実行する
     private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { DataContext: FolderItemViewModel folderItem })
@@ -224,6 +240,7 @@ public partial class MainWindow : Window
         await RunFolderScanAsync(folderItem);
     }
 
+    // ダブルクリック時、フォルダなら中へ移動、ファイルなら関連付けアプリで開く
     private void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (sender is not DataGrid dataGrid)
@@ -258,6 +275,7 @@ public partial class MainWindow : Window
             MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+    // 指定アイテムの祖先TreeViewItemをすべて展開する
     private void ExpandParents(TreeViewItem item)
     {
         // 展開するアイテムをすべて収集してからバッチで展開
@@ -283,9 +301,10 @@ public partial class MainWindow : Window
         }
     }
 
+    // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
     private void SyncTreeSelectionToCurrentPath()
     {
-        var path = NormalizePath(_viewModel.CurrentPath);
+        var path = PathNormalizer.Normalize(_viewModel.CurrentPath);
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -299,13 +318,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => IsAncestorOrSamePath(root.Path, path));
+        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
         if (rootFolder is null)
         {
             return;
         }
 
-        var normalizedRootPath = NormalizePath(rootFolder.Path);
+        var normalizedRootPath = PathNormalizer.Normalize(rootFolder.Path);
         var relativePath = path.StartsWith(normalizedRootPath, StringComparison.OrdinalIgnoreCase)
             ? path[normalizedRootPath.Length..]
             : string.Empty;
@@ -320,6 +339,7 @@ public partial class MainWindow : Window
             ExpandParents(tvi);
         }
     }
+    // パス構成要素を1つずつ辿りながらツリーを再帰的に展開し、目的のノードを選択する
     private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
         List<string> pathComponents, int componentIndex)
     {
@@ -361,41 +381,7 @@ public partial class MainWindow : Window
 
         return false;
     }
-    private static bool IsAncestorOrSamePath(string ancestorPath, string targetPath)
-    {
-        var normalizedAncestor = NormalizePath(ancestorPath);
-        var normalizedTarget = NormalizePath(targetPath);
-
-        if (string.Equals(normalizedAncestor, normalizedTarget, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        var prefix = normalizedAncestor.EndsWith(Path.DirectorySeparatorChar)
-            ? normalizedAncestor
-            : normalizedAncestor + Path.DirectorySeparatorChar;
-
-        return normalizedTarget.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string NormalizePath(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-        {
-            return string.Empty;
-        }
-
-        var fullPath = Path.GetFullPath(path);
-        var rootPath = Path.GetPathRoot(fullPath);
-
-        if (!string.IsNullOrEmpty(rootPath) && string.Equals(fullPath, rootPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return fullPath;
-        }
-
-        return fullPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-    }
-
+    // 指定した要素の祖先から、型Tに一致する最初の要素を探す（コンテキストメニュー表示位置の特定などに使用）
     private static T? GetAncestor<T>(DependencyObject? current) where T : DependencyObject
     {
         while (current is not null)
@@ -411,6 +397,7 @@ public partial class MainWindow : Window
         return null;
     }
 
+    // アドレス欄のパスへ移動する。失敗した場合はエラーメッセージを表示する
     private void NavigateByAddressInput()
     {
         if (_viewModel.TryNavigateByAddressInput())
@@ -422,6 +409,7 @@ public partial class MainWindow : Window
         MessageBox.Show("Could not navigate to the specified folder. Please check the path.", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
+    // 現在フォルダを対象に検索を実行する。失敗した場合はエラーメッセージを表示する
     private void ExecuteSearch()
     {
         if (_viewModel.SearchCurrentPath())
@@ -432,11 +420,13 @@ public partial class MainWindow : Window
         MessageBox.Show("Please navigate to a searchable folder before running a search.", "Search Error", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
+    // 設定画面の「保存してフルスキャン」から呼ばれる、完了メッセージ付きのフルスキャン
     private async Task RunFullScanFromSettingsAsync()
     {
         await RunFullScanAsync(showCompletionMessage: true, useWaitCursor: true);
     }
 
+    // 選択フォルダ配下をスキャンし、現在表示中のフォルダに影響する場合は一覧を再読込する
     private async Task RunFolderScanAsync(FolderItemViewModel folderItem)
     {
         folderItem.IsScanning = true;
@@ -445,7 +435,7 @@ public partial class MainWindow : Window
         {
             var scannedFolderCount = await _viewModel.ScanFolderSubtreeAsync(folderItem.Path);
 
-            if (IsAncestorOrSamePath(folderItem.Path, _viewModel.CurrentPath))
+            if (PathNormalizer.IsAncestorOrSame(folderItem.Path, _viewModel.CurrentPath))
             {
                 _viewModel.LoadFiles(_viewModel.CurrentPath);
                 SyncTreeSelectionToCurrentPath();
@@ -467,11 +457,13 @@ public partial class MainWindow : Window
         }
     }
 
+    // 定期スキャンタイマー発火時に自動フルスキャンを実行する
     private async void ScheduledFullScanTimer_Tick(object? sender, EventArgs e)
     {
         await RunAutomaticFullScanAsync();
     }
 
+    // 設定されたフルスキャン間隔でタイマーを再構成する
     private void ConfigureScheduledFullScanTimer()
     {
         _scheduledFullScanTimer.Stop();
@@ -479,11 +471,13 @@ public partial class MainWindow : Window
         _scheduledFullScanTimer.Start();
     }
 
+    // 完了メッセージを表示しない、バックグラウンド用のフルスキャン
     private Task RunAutomaticFullScanAsync()
     {
         return RunFullScanAsync(showCompletionMessage: false, useWaitCursor: false);
     }
     private CancellationTokenSource? _fullScanCts;
+    // フルスキャン本体。多重実行を防止し、完了/キャンセル/失敗に応じてメッセージを出し分ける
     private async Task RunFullScanAsync(bool showCompletionMessage, bool useWaitCursor)
     {
         if (_isFullScanRunning)
@@ -549,6 +543,7 @@ public partial class MainWindow : Window
     {
         _fullScanCts?.Cancel();
     }
+    // 全ルートフォルダのスキャン中表示フラグを一括で切り替える
     private void SetRootScanningState(bool isScanning)
     {
         foreach (var rootFolder in _viewModel.RootFolders)
