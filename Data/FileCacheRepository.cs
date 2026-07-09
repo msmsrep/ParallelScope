@@ -92,6 +92,28 @@ public class FileCacheRepository
             .ToList();
     }
 
+    /// <summary>指定パス配下の全ファイル（フォルダを除く）をキャッシュから再帰的に取得する。</summary>
+    public List<CachedFileSystemEntry> GetFilesUnderPath(string rootPath)
+    {
+        using var db = CreateDbContext();
+
+        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
+        var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
+
+        return db.FileSystemEntries
+            .AsNoTracking()
+            .Where(x => !x.IsFolder && x.FullPath.StartsWith(rootWithSeparator))
+            .OrderBy(x => x.Name)
+            .Select(x => new CachedFileSystemEntry(
+                x.ParentPath,
+                x.FullPath,
+                x.Name,
+                x.IsFolder,
+                x.SizeBytes,
+                x.LastWriteTimeUtc))
+            .ToList();
+    }
+
     /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索する。</summary>
     public List<CachedFileSystemEntry> SearchEntriesUnderPath(string rootPath, string nameQuery)
     {

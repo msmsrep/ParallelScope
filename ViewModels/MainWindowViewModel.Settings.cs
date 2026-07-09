@@ -13,6 +13,8 @@ public partial class MainWindowViewModel
         var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
+        _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -83,12 +85,7 @@ public partial class MainWindowViewModel
 
         if (saveSettings)
         {
-            _appSettingsRepository.Save(new AppSettings
-            {
-                RootPaths = normalizedRootPaths,
-                ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
-                FullScanIntervalHours = _fullScanIntervalHours
-            });
+            SaveSettings(normalizedRootPaths);
         }
 
         var currentRoot = RootFolders.FirstOrDefault();
@@ -106,6 +103,18 @@ public partial class MainWindowViewModel
         {
             NavigateTo(currentRoot.Path, false);
         }
+    }
+
+    /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード）をsettings.jsonへ保存する。</summary>
+    private void SaveSettings(IEnumerable<string> rootPaths)
+    {
+        _appSettingsRepository.Save(new AppSettings
+        {
+            RootPaths = rootPaths.ToList(),
+            ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
+            FullScanIntervalHours = _fullScanIntervalHours,
+            IsFlatFileViewEnabled = _isFlatFileViewEnabled
+        });
     }
 
     private static IEnumerable<string> NormalizeRootPaths(IEnumerable<string> rootPaths)
