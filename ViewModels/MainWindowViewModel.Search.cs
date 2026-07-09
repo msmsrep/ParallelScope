@@ -7,28 +7,29 @@ namespace ParallelScope.ViewModels;
 /// <summary>現在フォルダ配下のキャッシュ検索に関する処理。</summary>
 public partial class MainWindowViewModel
 {
-    /// <summary>現在のフォルダを対象に SearchQuery で検索を実行する。</summary>
-    public bool SearchCurrentPath()
+    /// <summary>
+    /// 入力された検索語で検索をリクエストする（インクリメンタルサーチ）。
+    /// 表示中の一覧はすぐには消さず、結果が届いた時点で差分更新する（入力の都度ちらつかせないため）。
+    /// 現在フォルダが無効な場合は何もしない。
+    /// </summary>
+    private void RequestSearch(string query)
     {
         if (string.IsNullOrWhiteSpace(CurrentPath) || !Directory.Exists(CurrentPath))
         {
-            return false;
+            return;
         }
 
-        if (string.IsNullOrWhiteSpace(SearchQuery))
+        var normalizedQuery = query.Trim();
+        if (string.IsNullOrEmpty(normalizedQuery))
         {
-            ClearSearch();
-            return true;
+            return;
         }
 
-        var normalizedQuery = SearchQuery.Trim();
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
-        ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
         // 検索リクエストを統合するキューへ委譲
         _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion));
-        return true;
     }
 
     /// <summary>検索状態を解除し、現在フォルダの通常一覧表示に戻す。</summary>

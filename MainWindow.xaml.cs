@@ -209,24 +209,6 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // Enterキーで検索を実行する
-    private void SearchTextBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter)
-        {
-            return;
-        }
-
-        ExecuteSearch();
-        e.Handled = true;
-    }
-
-    // 検索ボタンで検索を実行する
-    private void SearchButton_Click(object sender, RoutedEventArgs e)
-    {
-        ExecuteSearch();
-    }
-
     // 検索条件をクリアし、通常のフォルダ一覧表示に戻す
     private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
     {
@@ -417,17 +399,6 @@ public partial class MainWindow : Window
         }
 
         MessageBox.Show("Could not navigate to the specified folder. Please check the path.", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
-    }
-
-    // 現在フォルダを対象に検索を実行する。失敗した場合はエラーメッセージを表示する
-    private void ExecuteSearch()
-    {
-        if (_viewModel.SearchCurrentPath())
-        {
-            return;
-        }
-
-        MessageBox.Show("Please navigate to a searchable folder before running a search.", "Search Error", MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // 設定画面の「保存してフルスキャン」から呼ばれる、完了メッセージ付きのフルスキャン

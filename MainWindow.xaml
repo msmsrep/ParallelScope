@@ -133,17 +133,14 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
                 <TextBox Grid.Column="0" Margin="0,0,8,0"
                          Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
-                         VerticalContentAlignment="Center"
-                         KeyDown="SearchTextBox_KeyDown"/>
-                <Button Grid.Column="1" Content="Search" Width="72" Margin="0,0,8,0"
-                        Click="SearchButton_Click"/>
-                <Button Grid.Column="2" Content="Clear" Width="72"
+                         VerticalContentAlignment="Center"/>
+                <Button Grid.Column="1" Content="Clear" Width="72"
                         Click="ClearSearchButton_Click"/>
             </Grid>
 
