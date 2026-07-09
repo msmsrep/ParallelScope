@@ -209,13 +209,6 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // 検索条件をクリアし、通常のフォルダ一覧表示に戻す
-    private void ClearSearchButton_Click(object sender, RoutedEventArgs e)
-    {
-        _viewModel.SearchQuery = string.Empty;
-        _viewModel.ClearSearch();
-    }
-
     // コンテキストメニューから、選択フォルダ配下の個別スキャンを実行する
     private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
     {
