@@ -23,6 +23,9 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
+        // AppxManifest.xmlのバージョンをタイトルに付与する（取得できない場合は元のタイトルのまま）
+        Title = BuildWindowTitleWithVersion(Title);
+
         _viewModel = new MainWindowViewModel();
         _scheduledFullScanTimer = new DispatcherTimer();
         _scheduledFullScanTimer.Tick += ScheduledFullScanTimer_Tick;
@@ -51,6 +54,13 @@ public partial class MainWindow : Window
     {
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
+    }
+
+    // "アプリ名" を "アプリ名 vX.Y.Z.W" に組み立てる。バージョンが取得できない場合は元のタイトルのまま返す
+    private static string BuildWindowTitleWithVersion(string baseTitle)
+    {
+        var version = AppVersionProvider.GetVersion();
+        return string.IsNullOrWhiteSpace(version) ? baseTitle : $"{baseTitle}  ver{version}";
     }
     private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
     // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
