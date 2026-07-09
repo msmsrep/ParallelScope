@@ -90,7 +90,8 @@ public partial class MainWindowViewModel
 
         _currentDirectoryItems = newItems;
 
-        if (string.IsNullOrWhiteSpace(SearchQuery))
+        // 検索中・フラット表示モード中は、直下一覧の更新で表示中の一覧を上書きしない
+        if (string.IsNullOrWhiteSpace(SearchQuery) && !IsFlatFileViewEnabled)
         {
             ReplaceVisibleFileItems(_currentDirectoryItems);
         }

@@ -124,6 +124,13 @@ public partial class MainWindowViewModel
             _ = LoadFromCacheAsync(folderPath, navigationVersion);
             // 連続リクエストを統合するキューへ委譲
             _refreshCoalescer.Request((folderPath, navigationVersion));
+
+            if (IsFlatFileViewEnabled)
+            {
+                // フラット表示モード中は、移動先フォルダの全ファイルを再取得する
+                RequestFlatFileView();
+            }
+
             return true;
         }
         catch

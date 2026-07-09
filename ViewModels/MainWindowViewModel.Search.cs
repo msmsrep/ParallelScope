@@ -32,10 +32,17 @@ public partial class MainWindowViewModel
         _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion));
     }
 
-    /// <summary>検索状態を解除し、現在フォルダの通常一覧表示に戻す。</summary>
+    /// <summary>検索状態を解除し、現在の表示モード（通常一覧 or フラット表示）に戻す。</summary>
     public void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
+
+        if (IsFlatFileViewEnabled)
+        {
+            RequestFlatFileView();
+            return;
+        }
+
         ReplaceVisibleFileItems(_currentDirectoryItems);
     }
 

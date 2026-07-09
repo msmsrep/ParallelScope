@@ -133,6 +133,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
                 <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
@@ -140,7 +141,10 @@
                          Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
                          VerticalContentAlignment="Center"/>
-                <Button Grid.Column="1" Content="Clear" Width="72"
+                <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
+                <ToggleButton Grid.Column="1" Content="All Files" Width="72" Margin="0,0,8,0"
+                              IsChecked="{Binding IsFlatFileViewEnabled}"/>
+                <Button Grid.Column="2" Content="Clear" Width="72"
                         Click="ClearSearchButton_Click"/>
             </Grid>
 

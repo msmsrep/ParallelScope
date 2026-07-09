@@ -7,4 +7,5 @@ public sealed class AppSettings
     public List<string> RootPaths { get; set; } = new();
     public List<string> ExcludedPaths { get; set; } = new();
     public int FullScanIntervalHours { get; set; } = DefaultFullScanIntervalHours;
+    public bool IsFlatFileViewEnabled { get; set; }
 }

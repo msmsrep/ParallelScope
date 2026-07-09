@@ -125,19 +125,27 @@ public partial class MainWindowViewModel
             }
 
             // バイト数で比較して、実際に変わったフォルダのみ更新（不要な再描画を完全に防止）
+            // フラット表示モード中は表示中の FileItems にフォルダ行が無いため、
+            // 直下一覧の基準データ（_currentDirectoryItems）側にも反映しておく
+            // （モード解除時に古いサイズが一瞬表示されるのを防ぐ）
             foreach (var folderEntry in folderEntries)
             {
                 if (cachedFolderSizes.TryGetValue(folderEntry.FullPath, out var cachedSize))
                 {
-                    var currentItem = FileItems.FirstOrDefault(x => x.FullPath == folderEntry.FullPath);
-                    if (currentItem != null && currentItem.IsFolder && currentItem.CachedSizeBytes != cachedSize)
-                    {
-                        // バイト数が実際に変わった場合のみ更新
-                        currentItem.CachedSizeBytes = cachedSize;
-                        currentItem.SizeText = cachedSize > 0 ? FileSizeFormatter.Format(cachedSize) : string.Empty;
-                    }
+                    ApplyFolderSizeIfChanged(FileItems.FirstOrDefault(x => x.FullPath == folderEntry.FullPath), cachedSize);
+                    ApplyFolderSizeIfChanged(_currentDirectoryItems.FirstOrDefault(x => x.FullPath == folderEntry.FullPath), cachedSize);
                 }
             }
         }, null);
+    }
+
+    private static void ApplyFolderSizeIfChanged(FileItemViewModel? item, long cachedSize)
+    {
+        if (item != null && item.IsFolder && item.CachedSizeBytes != cachedSize)
+        {
+            // バイト数が実際に変わった場合のみ更新
+            item.CachedSizeBytes = cachedSize;
+            item.SizeText = cachedSize > 0 ? FileSizeFormatter.Format(cachedSize) : string.Empty;
+        }
     }
 }

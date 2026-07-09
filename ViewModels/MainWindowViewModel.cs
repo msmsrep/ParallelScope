@@ -17,6 +17,7 @@ public partial class MainWindowViewModel : ObservableObject
     private string _currentPath = string.Empty;
     private string _addressInput = string.Empty;
     private string _searchQuery = string.Empty;
+    private bool _isFlatFileViewEnabled;
     private readonly Stack<string> _backHistory = new();
     private readonly Stack<string> _forwardHistory = new();
     private readonly FileCacheRepository _fileCacheRepository;
@@ -24,14 +25,16 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly SynchronizationContext _uiContext;
     private int _navigationVersion;
     private int _searchVersion;
+    private int _flatViewVersion;
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
-    // バックグラウンド更新・検索・フォルダサイズ適用について、連続リクエストを1本化するキュー
+    // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
     private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion)> _searchCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)> _folderSizeCoalescer;
+    private readonly SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)> _flatViewCoalescer;
 
     public ObservableCollection<FolderItemViewModel> RootFolders
     {
@@ -84,6 +87,36 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>trueの場合、現在フォルダ直下ではなく配下の全ファイルを再帰的に表示する。</summary>
+    public bool IsFlatFileViewEnabled
+    {
+        get => _isFlatFileViewEnabled;
+        set
+        {
+            if (!SetProperty(ref _isFlatFileViewEnabled, value))
+            {
+                return;
+            }
+
+            SaveSettings(RootFolders.Select(x => x.Path));
+
+            if (!string.IsNullOrWhiteSpace(SearchQuery))
+            {
+                // 検索結果表示中は表示を変えない（検索語をクリアした時点でモードに応じた一覧に切り替わる）
+                return;
+            }
+
+            if (value)
+            {
+                RequestFlatFileView();
+            }
+            else
+            {
+                ReplaceVisibleFileItems(_currentDirectoryItems);
+            }
+        }
+    }
+
     public bool CanGoBack => _backHistory.Count > 0;
 
     public bool CanGoForward => _forwardHistory.Count > 0;
@@ -104,6 +137,8 @@ public partial class MainWindowViewModel : ObservableObject
             request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion));
         _folderSizeCoalescer = new SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)>(
             request => ApplyCachedFolderSizesInBackground(request.FolderPath, request.Entries, request.NavigationVersion));
+        _flatViewCoalescer = new SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)>(
+            request => ApplyFlatFileView(request.FolderPath, request.FlatViewVersion));
 
         InitializeRootFolders();
     }
