@@ -67,6 +67,10 @@ public class FileCacheRepository
             PRAGMA cache_size = -64000;
             PRAGMA temp_store = MEMORY;
             PRAGMA query_only = FALSE;
+
+            -- All Files（配下再帰取得）の絞り込みを高速化
+            CREATE INDEX IF NOT EXISTS IX_FileSystemEntries_IsFolder_FullPath
+            ON FileSystemEntries(IsFolder, FullPath);
         ";
         cmd.ExecuteNonQuery();
         conn.Close();
@@ -95,23 +99,40 @@ public class FileCacheRepository
     /// <summary>指定パス配下の全ファイル（フォルダを除く）をキャッシュから再帰的に取得する。</summary>
     public List<CachedFileSystemEntry> GetFilesUnderPath(string rootPath)
     {
-        using var db = CreateDbContext();
-
         var normalizedRootPath = PathNormalizer.Normalize(rootPath);
         var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
 
-        return db.FileSystemEntries
-            .AsNoTracking()
-            .Where(x => !x.IsFolder && x.FullPath.StartsWith(rootWithSeparator))
-            .OrderBy(x => x.Name)
-            .Select(x => new CachedFileSystemEntry(
-                x.ParentPath,
-                x.FullPath,
-                x.Name,
-                x.IsFolder,
-                x.SizeBytes,
-                x.LastWriteTimeUtc))
-            .ToList();
+        using var db = CreateDbContext();
+        using var conn = db.Database.GetDbConnection();
+        conn.Open();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc
+            FROM FileSystemEntries
+            WHERE IsFolder = 0
+                            AND FullPath LIKE @rootPattern";
+
+        var rootPatternParam = cmd.CreateParameter();
+        rootPatternParam.ParameterName = "@rootPattern";
+        rootPatternParam.Value = rootWithSeparator + "%";
+        cmd.Parameters.Add(rootPatternParam);
+
+        var results = new List<CachedFileSystemEntry>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            results.Add(new CachedFileSystemEntry(
+                reader.GetString(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetBoolean(3),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                reader.GetDateTime(5)));
+        }
+
+        conn.Close();
+        return results;
     }
 
     /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索する。</summary>
