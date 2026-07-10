@@ -51,7 +51,7 @@ public partial class MainWindowViewModel
                 return;
             }
 
-            ReplaceVisibleFileItems(results);
+            ReplaceVisibleFileItems(results, forceBulkReplace: true);
         }, null);
     }
 

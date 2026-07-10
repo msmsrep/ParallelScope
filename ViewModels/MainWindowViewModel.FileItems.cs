@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
@@ -5,10 +6,22 @@ namespace ParallelScope.ViewModels;
 /// <summary>FileItems（画面表示用コレクション）の差分更新とキャッシュエントリ→ViewModel変換。</summary>
 public partial class MainWindowViewModel
 {
+    /// <summary>差分がこの件数を超えたらコレクションごと差し替える（All Filesモードの切り替え等で数万件の通知がUIスレッドを塞ぐのを防ぐ）。</summary>
+    private const int BulkReplaceThreshold = 200;
+
     /// <summary>表示中のFileItemsを、差分（追加/削除/更新）だけを適用する形で置き換える（不要な再描画を防止）。</summary>
-    private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items)
+    private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items, bool forceBulkReplace = false)
     {
         var newItems = items.ToList();
+
+        if (forceBulkReplace)
+        {
+            // モード切り替え時の大量データでは差分計算自体が高コストになるため、
+            // 一括差し替えでUIスレッドのブロック時間を短縮する。
+            FileItems = new ObservableCollection<FileItemViewModel>(newItems);
+            return;
+        }
+
         var currentItems = FileItems.ToList();
 
         // 既存アイテムをパスでマップ
@@ -36,6 +49,19 @@ public partial class MainWindowViewModel
             }
         }
 
+        ApplyItemUpdates(itemsToUpdate);
+
+        if (itemsToRemove.Count + itemsToAdd.Count > BulkReplaceThreshold)
+        {
+            // 1件ずつのAdd/RemoveはCollectionChanged通知が件数分発生し（Removeは1件ごとに線形探索も走る）、
+            // 大量差分ではUIスレッドが数秒単位でブロックされる。コレクション差し替えなら再バインド1回で済み、
+            // DataGridの行仮想化により生成されるのは可視行のみ。既存アイテムはサイズ表示等を保持するため
+            // インスタンスを再利用する。
+            FileItems = new ObservableCollection<FileItemViewModel>(
+                newItems.Select(x => currentItemMap.TryGetValue(x.FullPath, out var existing) ? existing : x));
+            return;
+        }
+
         // 削除
         foreach (var item in itemsToRemove)
         {
@@ -47,8 +73,11 @@ public partial class MainWindowViewModel
         {
             FileItems.Add(item);
         }
+    }
 
-        // 更新（既存アイテムのプロパティを新規アイテムの情報で更新）
+    /// <summary>既存アイテムのプロパティを新規アイテムの情報で更新する。</summary>
+    private static void ApplyItemUpdates(List<(FileItemViewModel existing, FileItemViewModel newItem)> itemsToUpdate)
+    {
         foreach (var (existing, newItem) in itemsToUpdate)
         {
             existing.TypeText = newItem.TypeText;

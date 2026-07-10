@@ -150,6 +150,9 @@
             <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="Name" Width="*">
