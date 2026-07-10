@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
+    private readonly string _kofiUrl = "https://ko-fi.com/msmsrep";
+    private readonly string _gitHubSponsorsUrl = "https://github.com/sponsors/msmsrep";
     public MainWindow()
     {
         InitializeComponent();
@@ -73,6 +75,39 @@ public partial class MainWindow : Window
     }
 
     private bool _restartFullScanRequested;
+
+    private void KofiMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _kofiUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Ko-fi", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void GitHubSponsorsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _gitHubSponsorsUrl,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "GitHub Sponsors", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // 設定画面を開き、保存された場合は設定を適用してタイマー・ツリー選択を再構成する
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {

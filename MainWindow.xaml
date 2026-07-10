@@ -53,8 +53,10 @@
             </Grid.ColumnDefinitions>
 
             <Menu Grid.Column="0" HorizontalAlignment="Left">
-                <MenuItem Header="Settings">
-                    <MenuItem Header="Open Settings" Click="OpenSettingsMenuItem_Click"/>
+                <MenuItem Header="Menu">
+                    <MenuItem Header="Settings" Click="OpenSettingsMenuItem_Click"/>
+                    <MenuItem Header="☕ Support | Buy a coffee for the developer" Click="KofiMenuItem_Click"/>
+                    <MenuItem Header="💜 Support | GitHub Sponsors" Click="GitHubSponsorsMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 
