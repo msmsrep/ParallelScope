@@ -80,14 +80,25 @@ public partial class MainWindowViewModel
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var updatedFolderCount = 0;
 
+        // 掃除の基準にできるのは完走したルートのみ。NAS等でスキャン途中にネットワークが切断されると
+        // 残りのフォルダが「未訪問」のまま終わるため、そのルートを掃除対象に含めると
+        // 一時的に見えないだけのフォルダのキャッシュを「削除された」と誤認して消してしまう
+        var completedRootPaths = new List<string>();
+
         foreach (var rootPath in rootPaths)
         {
-            updatedFolderCount += ScanSingleSubtree(rootPath, visitedDirectories, token);
+            var (updatedCount, completed) = ScanSingleSubtree(rootPath, visitedDirectories, token);
+            updatedFolderCount += updatedCount;
 
             if (token.IsCancellationRequested)
             {
                 // キャンセル時はスピナーに触れず即返す（呼び出し元のfinallyが一括で消す）
                 return updatedFolderCount;
+            }
+
+            if (completed)
+            {
+                completedRootPaths.Add(rootPath);
             }
 
             // 完了したルートから順にスキャン中表示を消す（全ルート完了まで待たせない）
@@ -100,7 +111,7 @@ public partial class MainWindowViewModel
         {
             try
             {
-                _fileCacheRepository.DeleteStaleEntries(rootPaths, allConfiguredRootPaths, visitedDirectories);
+                _fileCacheRepository.DeleteStaleEntries(completedRootPaths, allConfiguredRootPaths, visitedDirectories);
                 _fileCacheRepository.TruncateWal();
             }
             catch
@@ -112,13 +123,17 @@ public partial class MainWindowViewModel
         return updatedFolderCount;
     }
 
-    /// <summary>1ルート配下を深さ優先で走査し、100フォルダごとにバッチでキャッシュへ保存する。</summary>
-    private int ScanSingleSubtree(string rootPath, HashSet<string> visitedDirectories, CancellationToken token)
+    /// <summary>
+    /// 1ルート配下を深さ優先で走査し、100フォルダごとにバッチでキャッシュへ保存する。
+    /// Completed はルートを完走できたかどうか（ネットワーク切断等で打ち切った場合は false）。
+    /// </summary>
+    private (int UpdatedFolderCount, bool Completed) ScanSingleSubtree(string rootPath, HashSet<string> visitedDirectories, CancellationToken token)
     {
         var pendingDirectories = new Stack<string>();
         pendingDirectories.Push(rootPath);
         var batchEntries = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>();
         var updatedFolderCount = 0;
+        var completed = true;
         const int BatchSize = 100;
 
         while (pendingDirectories.Count > 0)
@@ -126,7 +141,7 @@ public partial class MainWindowViewModel
             if (token.IsCancellationRequested)
             {
                 // ここで例外を投げず早期リターンする（キャンセル通知は呼び出し元で行う）
-                return updatedFolderCount;
+                return (updatedFolderCount, false);
             }
 
             var currentPath = pendingDirectories.Pop();
@@ -141,8 +156,21 @@ public partial class MainWindowViewModel
                 continue;
             }
 
-            if (!visitedDirectories.Add(normalizedPath) || !Directory.Exists(normalizedPath) || IsExcludedPath(normalizedPath))
+            if (!visitedDirectories.Add(normalizedPath) || IsExcludedPath(normalizedPath))
             {
+                continue;
+            }
+
+            if (!Directory.Exists(normalizedPath))
+            {
+                // フォルダが見えないのは通常は削除だが、NAS等ではネットワーク切断でも同じ結果になる。
+                // ルートごと見えなくなっていれば切断とみなし、このルートを未完走として打ち切る
+                // （完走扱いにすると未訪問フォルダのキャッシュが残骸として削除されてしまう）
+                if (!Directory.Exists(rootPath))
+                {
+                    completed = false;
+                    break;
+                }
                 continue;
             }
 
@@ -179,7 +207,8 @@ public partial class MainWindowViewModel
             }
         }
 
-        // 残りのバッチを処理（このルートの完了通知より先にキャッシュへ反映しておく）
+        // 残りのバッチを処理（このルートの完了通知より先にキャッシュへ反映しておく）。
+        // 切断による打ち切り時も、切断前に列挙済みの内容は有効なので書き込む
         if (batchEntries.Count > 0)
         {
             try
@@ -192,7 +221,7 @@ public partial class MainWindowViewModel
             }
         }
 
-        return updatedFolderCount;
+        return (updatedFolderCount, completed);
     }
 
     /// <summary>ルート1件のスキャン完了をUIへ反映し、該当ルートのスキャン中表示を消す（バックグラウンドスレッドから呼ばれる）。</summary>
