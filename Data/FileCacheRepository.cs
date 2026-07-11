@@ -38,7 +38,10 @@ public class FileCacheRepository
     /// <summary>DbContext のオプション（SQLite接続文字列・クエリ分割設定）を構築する。</summary>
     private static DbContextOptions<ParallelScopeDbContext> BuildDbOptions(string dbPath)
     {
-        var connectionString = $"Data Source={dbPath};Cache=Shared;";
+        // Cache=Shared は接続間でテーブルロックを共有するため、WALの「書き込み中でも読み取り可能」
+        // という利点が失われ、フルスキャンの書き込み中に一覧表示の読み取りがブロックされる。
+        // 既定のプライベートキャッシュ + WAL で読み書きを並行させる。
+        var connectionString = $"Data Source={dbPath};";
 
         return new DbContextOptionsBuilder<ParallelScopeDbContext>()
             .UseSqlite(connectionString, options =>
