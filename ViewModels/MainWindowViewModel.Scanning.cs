@@ -67,7 +67,10 @@ public partial class MainWindowViewModel
         return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }, null));
     }
 
-    /// <summary>深さ優先でフォルダツリーを走査し、100フォルダごとにバッチでキャッシュへ保存する。</summary>
+    /// <summary>
+    /// 深さ優先でフォルダツリーを走査し、100フォルダごとにバッチでキャッシュへ保存する。
+    /// キャッシュと内容が同一のフォルダは書き換えられないため、戻り値は「実際に書き換えたフォルダ数」。
+    /// </summary>
     private int ScanFolderSubtrees(
         IReadOnlyCollection<string> rootPaths,
         IReadOnlyCollection<string>? allConfiguredRootPaths,
@@ -115,14 +118,14 @@ public partial class MainWindowViewModel
             }
 
             batchEntries[normalizedPath] = entries;
-            updatedFolderCount++;
 
             // バッチが一定サイズに達したら、まとめてデータベース更新
+            // （キャッシュと同一内容の親パスは書き換えられず、実際に書き換えた件数が返る）
             if (batchEntries.Count >= BatchSize)
             {
                 try
                 {
-                    _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                    updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
                 }
                 catch
                 {
@@ -142,7 +145,7 @@ public partial class MainWindowViewModel
         {
             try
             {
-                _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
             }
             catch
             {
