@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using System.IO;
 using System.Threading;
 using ParallelScope.Data;
@@ -18,10 +17,12 @@ public partial class MainWindowViewModel
 
     // 全コアを使うとバックグラウンドのフルスキャン中にスレッドプールが飽和し、
     // UIの応答（ツリー選択時のキャッシュ読み込み等のTask.Run）が待たされる。
-    // 列挙はほぼI/Oバウンドなので半分に絞っても速度への影響は小さい。
-    private static readonly ParallelOptions EntryEnumerationParallelOptions = new()
+    // 列挙はほぼI/Oバウンド（特にNASではラウンドトリップのレイテンシが支配的）なので、
+    // ディレクトリ単位で並列化しつつ同時実行数は絞る。下限2はコア数の少ないマシンでも
+    // レイテンシの重なり合わせが効くようにするため。
+    private static readonly ParallelOptions DirectoryEnumerationParallelOptions = new()
     {
-        MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2)
+        MaxDegreeOfParallelism = Math.Max(2, Environment.ProcessorCount / 2)
     };
 
     /// <summary>設定済みの全ルートフォルダをフルスキャンし、キャッシュを更新する。</summary>
@@ -128,7 +129,10 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
-    /// 1ルート配下を深さ優先で走査し、100フォルダごとにバッチでキャッシュへ保存する。
+    /// 1ルート配下を走査し、100フォルダごとにバッチでキャッシュへ保存する。
+    /// ディレクトリの列挙はウェーブ（複数ディレクトリの束）単位で並列化する。NASでは1ディレクトリの列挙が
+    /// ラウンドトリップ数回分のレイテンシになるため、直列だとフォルダ数分の往復時間が積み上がる。
+    /// バッチ書き込み・訪問済み管理・失敗分類はウェーブ間の逐次部分で行い、共有状態の競合を避ける。
     /// Completed はルートを完走できたかどうか（ネットワーク切断等で打ち切った場合は false）。
     /// </summary>
     private (int UpdatedFolderCount, bool Completed) ScanSingleSubtree(string rootPath, HashSet<string> visitedDirectories, CancellationToken token)
@@ -140,6 +144,11 @@ public partial class MainWindowViewModel
         var completed = true;
         const int BatchSize = 100;
 
+        // ウェーブは並列度より大きめに取り、列挙の速いディレクトリと遅いディレクトリの偏りを均す
+        var waveCapacity = DirectoryEnumerationParallelOptions.MaxDegreeOfParallelism * 4;
+        var wave = new List<string>(waveCapacity);
+        var waveEntries = new List<CachedFileSystemEntry>?[waveCapacity];
+
         while (pendingDirectories.Count > 0)
         {
             if (token.IsCancellationRequested)
@@ -148,83 +157,116 @@ public partial class MainWindowViewModel
                 return (updatedFolderCount, false);
             }
 
-            var currentPath = pendingDirectories.Pop();
-            string normalizedPath;
-
-            try
+            // 未訪問かつ除外されていないディレクトリをウェーブ分まとめて取り出す
+            wave.Clear();
+            while (wave.Count < waveCapacity && pendingDirectories.Count > 0)
             {
-                normalizedPath = PathNormalizer.Normalize(currentPath);
-            }
-            catch
-            {
-                continue;
-            }
+                var currentPath = pendingDirectories.Pop();
+                string normalizedPath;
 
-            if (!visitedDirectories.Add(normalizedPath) || IsExcludedPath(normalizedPath))
-            {
-                continue;
-            }
-
-            if (!Directory.Exists(normalizedPath))
-            {
-                // フォルダが見えないのは通常は削除だが、NAS等ではネットワーク切断でも同じ結果になる。
-                // ルートごと見えなくなっていれば切断とみなし、このルートを未完走として打ち切る
-                // （完走扱いにすると未訪問フォルダのキャッシュが残骸として削除されてしまう）
-                if (!Directory.Exists(rootPath))
-                {
-                    completed = false;
-                    break;
-                }
-                continue;
-            }
-
-            List<CachedFileSystemEntry> entries;
-            try
-            {
-                entries = ReadEntriesFromFileSystem(normalizedPath);
-            }
-            catch
-            {
-                // 列挙に失敗したフォルダはキャッシュを書き換えず（空と区別がつかないため）、失敗原因で扱いを分ける
-                if (Directory.Exists(normalizedPath))
-                {
-                    // フォルダは見えるのに列挙できない（一時的なI/Oエラー等）。配下が未訪問のまま残り
-                    // 掃除で誤削除されるのを防ぐため、このルートは未完走扱いにする（走査自体は継続）
-                    completed = false;
-                    continue;
-                }
-
-                if (!Directory.Exists(rootPath))
-                {
-                    // ルートごと見えない＝ネットワーク切断とみなし、このルートを未完走として打ち切る
-                    completed = false;
-                    break;
-                }
-
-                // 列挙開始直前に削除されたフォルダ。未訪問の配下は残骸として通常の掃除に任せる
-                continue;
-            }
-
-            batchEntries[normalizedPath] = entries;
-
-            // バッチが一定サイズに達したら、まとめてデータベース更新
-            // （キャッシュと同一内容の親パスは書き換えられず、実際に書き換えた件数が返る）
-            if (batchEntries.Count >= BatchSize)
-            {
                 try
                 {
-                    updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                    normalizedPath = PathNormalizer.Normalize(currentPath);
                 }
                 catch
                 {
-                    // バッチ保存失敗時はスキャンを継続する
+                    continue;
                 }
-                batchEntries.Clear();
+
+                if (!visitedDirectories.Add(normalizedPath) || IsExcludedPath(normalizedPath))
+                {
+                    continue;
+                }
+
+                wave.Add(normalizedPath);
             }
 
-            foreach (var folderEntry in entries.Where(x => x.IsFolder && !IsExcludedPath(x.FullPath)).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+            if (wave.Count == 0)
             {
-                pendingDirectories.Push(folderEntry.FullPath);
+                continue;
+            }
+
+            // ウェーブ内のディレクトリを並列に列挙する。列挙失敗は null として記録し、
+            // 失敗原因の分類（切断か削除か）は Directory.Exists を伴うため逐次側で行う
+            Parallel.For(0, wave.Count, DirectoryEnumerationParallelOptions, i =>
+            {
+                if (token.IsCancellationRequested)
+                {
+                    waveEntries[i] = null;
+                    return;
+                }
+
+                try
+                {
+                    waveEntries[i] = ReadEntriesFromFileSystem(wave[i]);
+                }
+                catch
+                {
+                    waveEntries[i] = null;
+                }
+            });
+
+            if (token.IsCancellationRequested)
+            {
+                return (updatedFolderCount, false);
+            }
+
+            var abortScan = false;
+            for (var i = 0; i < wave.Count; i++)
+            {
+                var normalizedPath = wave[i];
+                var entries = waveEntries[i];
+
+                if (entries is null)
+                {
+                    // 列挙に失敗したフォルダはキャッシュを書き換えず（空と区別がつかないため）、失敗原因で扱いを分ける
+                    if (Directory.Exists(normalizedPath))
+                    {
+                        // フォルダは見えるのに列挙できない（一時的なI/Oエラー等）。配下が未訪問のまま残り
+                        // 掃除で誤削除されるのを防ぐため、このルートは未完走扱いにする（走査自体は継続）
+                        completed = false;
+                        continue;
+                    }
+
+                    if (!Directory.Exists(rootPath))
+                    {
+                        // ルートごと見えない＝ネットワーク切断とみなし、このルートを未完走として打ち切る
+                        // （完走扱いにすると未訪問フォルダのキャッシュが残骸として削除されてしまう）
+                        completed = false;
+                        abortScan = true;
+                        break;
+                    }
+
+                    // 列挙開始直前に削除されたフォルダ。未訪問の配下は残骸として通常の掃除に任せる
+                    continue;
+                }
+
+                batchEntries[normalizedPath] = entries;
+
+                // バッチが一定サイズに達したら、まとめてデータベース更新
+                // （キャッシュと同一内容の親パスは書き換えられず、実際に書き換えた件数が返る）
+                if (batchEntries.Count >= BatchSize)
+                {
+                    try
+                    {
+                        updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                    }
+                    catch
+                    {
+                        // バッチ保存失敗時はスキャンを継続する
+                    }
+                    batchEntries.Clear();
+                }
+
+                foreach (var folderEntry in entries.Where(x => x.IsFolder && !IsExcludedPath(x.FullPath)).OrderByDescending(x => x.FullPath, StringComparer.OrdinalIgnoreCase))
+                {
+                    pendingDirectories.Push(folderEntry.FullPath);
+                }
+            }
+
+            if (abortScan)
+            {
+                break;
             }
         }
 
@@ -259,7 +301,9 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
-    /// 1フォルダ直下のファイル/フォルダを並列列挙し、種別→名前の順でソートして返す。
+    /// 1フォルダ直下のファイル/フォルダを列挙し、種別→名前の順でソートして返す。
+    /// 列挙で得た DirectoryInfo/FileInfo はメタデータ（サイズ・更新日時）が設定済みで返されるため、
+    /// ここでの変換は追加のI/Oを伴わない。並列化はディレクトリ単位（ScanSingleSubtree側）で行う。
     /// 列挙自体の失敗（ネットワーク切断・フォルダ消失等）は例外として呼び出し元へ伝える。
     /// ここで握りつぶして空リストを返すと「本当に空のフォルダ」と区別できず、
     /// NASの瞬断などで既存キャッシュが空で上書きされてしまう。
@@ -267,40 +311,32 @@ public partial class MainWindowViewModel
     private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
-        var entries = new ConcurrentBag<CachedFileSystemEntry>();
+        var entries = new List<CachedFileSystemEntry>();
 
-        // フォルダ処理を並列化
-        var folders = dirInfo
-            .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
-            .Where(d => !IsExcludedPath(d.FullName))
-            .ToList();
-
-        Parallel.ForEach(folders, EntryEnumerationParallelOptions, d =>
+        foreach (var d in dirInfo.EnumerateDirectories("*", NonRecursiveEnumerationOptions))
         {
+            if (IsExcludedPath(d.FullName))
+            {
+                continue;
+            }
+
             var entry = TryCreateFolderEntry(folderPath, d);
             if (entry is not null)
             {
                 entries.Add(entry);
             }
-        });
+        }
 
-        // ファイル処理を並列化
-        var files = dirInfo
-            .EnumerateFiles("*", NonRecursiveEnumerationOptions)
-            .ToList();
-
-        Parallel.ForEach(files, EntryEnumerationParallelOptions, f =>
+        foreach (var f in dirInfo.EnumerateFiles("*", NonRecursiveEnumerationOptions))
         {
             var entry = TryCreateFileEntry(folderPath, f);
             if (entry is not null)
             {
                 entries.Add(entry);
             }
-        });
+        }
 
-        // 結果をソートして返す
-        var result = entries.ToList();
-        result.Sort((a, b) =>
+        entries.Sort((a, b) =>
         {
             // フォルダを先に配置
             var folderCompare = b.IsFolder.CompareTo(a.IsFolder);
@@ -309,7 +345,7 @@ public partial class MainWindowViewModel
             // 同じ種類ならば名前でソート
             return string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
         });
-        return result;
+        return entries;
     }
 
     private static CachedFileSystemEntry? TryCreateFolderEntry(string parentPath, DirectoryInfo directory)

@@ -146,6 +146,36 @@ public partial class MainWindowViewModel
         }
     }
 
+    /// <summary>
+    /// 現在表示中のフォルダの一覧を再読み込みする（スキャン完了後にキャッシュの最新内容を反映するため）。
+    /// NavigateTo は同一パスへの移動を早期returnで無視するため、再読み込みには使えない。
+    /// ナビゲーションではないので履歴・検索状態には触れず、アクティブな表示モードに応じて再取得する。
+    /// </summary>
+    public void RefreshCurrentFolder()
+    {
+        var folderPath = CurrentPath;
+        if (string.IsNullOrWhiteSpace(folderPath))
+        {
+            return;
+        }
+
+        var navigationVersion = Interlocked.Increment(ref _navigationVersion);
+        _ = LoadFromCacheAsync(folderPath, navigationVersion);
+        _refreshCoalescer.Request((folderPath, navigationVersion));
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            // 検索中は検索結果を最新キャッシュで取り直す（直下一覧は上の再取得が裏で更新する）
+            RequestSearch(SearchQuery);
+            return;
+        }
+
+        if (IsFlatFileViewEnabled)
+        {
+            RequestFlatFileView();
+        }
+    }
+
     private static string? GetParentPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
