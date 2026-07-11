@@ -27,23 +27,27 @@ public partial class MainWindowViewModel
     /// <summary>設定済みの全ルートフォルダをフルスキャンし、キャッシュを更新する。</summary>
     public async Task<int> FullScanConfiguredRootsAsync(CancellationToken token)
     {
-        var configuredRootPaths = RootFolders
+        var allConfiguredRootPaths = RootFolders
             .Select(x => PathNormalizer.Normalize(x.Path))
-            .Where(path =>
-                !string.IsNullOrWhiteSpace(path) &&
-                Directory.Exists(path) &&
-                !IsExcludedPath(path))
+            .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        return await ScanFolderSubtreesAsync(configuredRootPaths, token);
+        // スキャン対象は実在する（かつ除外されていない）ルートのみ。
+        // 掃除の基準には全ルートを渡し、切断中のドライブ等のキャッシュを誤削除しないようにする
+        var scannableRootPaths = allConfiguredRootPaths
+            .Where(path => Directory.Exists(path) && !IsExcludedPath(path))
+            .ToList();
+
+        return await ScanFolderSubtreesAsync(scannableRootPaths, allConfiguredRootPaths, token);
     }
 
     private async Task<int> ScanFolderSubtreesAsync(
         IReadOnlyCollection<string> rootPaths,
+        IReadOnlyCollection<string>? allConfiguredRootPaths,
         CancellationToken token)
     {
-        var updatedFolderCount = await Task.Run(() => ScanFolderSubtrees(rootPaths, token), token);
+        var updatedFolderCount = await Task.Run(() => ScanFolderSubtrees(rootPaths, allConfiguredRootPaths, token), token);
 
         // キャンセル検知はバックグラウンドスレッド内で例外を投げず、呼び出し元に戻ってから行う
         // （Task.Run内で例外を投げると、デバッガが「ユーザーコードで未処理」として誤検知することがあるため）
@@ -59,11 +63,15 @@ public partial class MainWindowViewModel
             return Task.FromResult(0);
         }
 
-        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }));
+        // ルート外の掃除はフルスキャン時のみ行うため、ここでは null を渡す
+        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }, null));
     }
 
     /// <summary>深さ優先でフォルダツリーを走査し、100フォルダごとにバッチでキャッシュへ保存する。</summary>
-    private int ScanFolderSubtrees(IReadOnlyCollection<string> rootPaths, CancellationToken token = default)
+    private int ScanFolderSubtrees(
+        IReadOnlyCollection<string> rootPaths,
+        IReadOnlyCollection<string>? allConfiguredRootPaths,
+        CancellationToken token = default)
     {
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var pendingDirectories = new Stack<string>(rootPaths.Reverse());
@@ -139,6 +147,21 @@ public partial class MainWindowViewModel
             catch
             {
                 // バッチ保存失敗時でもスキャン結果は返す
+            }
+        }
+
+        // 完走時のみ残骸を掃除する（途中キャンセルだと「未訪問＝削除された」と区別できないため）。
+        // 削除済みフォルダ配下の孤児行を消し、その後フルスキャンで肥大化したWALを切り詰める
+        if (!token.IsCancellationRequested)
+        {
+            try
+            {
+                _fileCacheRepository.DeleteStaleEntries(rootPaths, allConfiguredRootPaths, visitedDirectories);
+                _fileCacheRepository.TruncateWal();
+            }
+            catch
+            {
+                // 掃除失敗はスキャン結果へ影響させない
             }
         }
 
