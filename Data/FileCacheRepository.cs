@@ -70,6 +70,8 @@ public class FileCacheRepository
             PRAGMA cache_size = -64000;
             PRAGMA temp_store = MEMORY;
             PRAGMA query_only = FALSE;
+            -- チェックポイント時にWALファイルをこのサイズまで切り詰める（フルスキャンでの肥大対策）
+            PRAGMA journal_size_limit = 67108864;
 
             -- All Files（配下再帰取得）の絞り込みを高速化
             CREATE INDEX IF NOT EXISTS IX_FileSystemEntries_IsFolder_FullPath
@@ -238,14 +240,104 @@ public class FileCacheRepository
         }
     }
 
-    private static void DeleteEntriesForParentPaths(ParallelScopeDbContext db, IReadOnlyList<string> normalizedParentPaths)
+    private static int DeleteEntriesForParentPaths(ParallelScopeDbContext db, IReadOnlyList<string> normalizedParentPaths)
     {
         var deleteParams = string.Join(",", normalizedParentPaths.Select((_, i) => $"@p{i}"));
         var deleteSql = $"DELETE FROM FileSystemEntries WHERE ParentPath IN ({deleteParams})";
 
-        db.Database.ExecuteSqlRaw(
+        return db.Database.ExecuteSqlRaw(
             deleteSql,
             normalizedParentPaths.Select((p, i) => new Microsoft.Data.Sqlite.SqliteParameter($"@p{i}", p)).ToArray());
+    }
+
+    /// <summary>
+    /// スキャン完走後に、もう不要になった行を削除する。
+    /// ・スキャン済みルート配下なのに今回訪問しなかった親パスの行（ディスクから削除された/除外されたフォルダの残骸）
+    /// ・configuredRootPaths が指定された場合、どのルート配下でもない行（設定からルートを外した後の残骸）
+    /// </summary>
+    /// <param name="scannedRootPaths">今回実際にスキャンしたルートパス。</param>
+    /// <param name="configuredRootPaths">設定済みの全ルート（オフライン等でスキャンできなかったものも含む）。nullならルート外の削除は行わない（フォルダ単位スキャン用）。</param>
+    /// <param name="visitedParentPaths">スキャンで実際に訪問した正規化済みフォルダパスの集合。</param>
+    public int DeleteStaleEntries(
+        IReadOnlyCollection<string> scannedRootPaths,
+        IReadOnlyCollection<string>? configuredRootPaths,
+        IReadOnlyCollection<string> visitedParentPaths)
+    {
+        var visitedSet = visitedParentPaths as ISet<string>
+            ?? new HashSet<string>(visitedParentPaths, StringComparer.OrdinalIgnoreCase);
+
+        var normalizedScannedRoots = scannedRootPaths
+            .Select(PathNormalizer.Normalize)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        var normalizedConfiguredRoots = configuredRootPaths?
+            .Select(PathNormalizer.Normalize)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
+
+        List<string> allParentPaths;
+        using (var db = CreateDbContext())
+        {
+            allParentPaths = db.FileSystemEntries
+                .AsNoTracking()
+                .Select(x => x.ParentPath)
+                .Distinct()
+                .ToList();
+        }
+
+        var staleParentPaths = allParentPaths
+            .Where(parentPath =>
+            {
+                if (visitedSet.Contains(parentPath))
+                {
+                    return false;
+                }
+
+                if (normalizedScannedRoots.Any(root => PathNormalizer.IsAncestorOrSame(root, parentPath)))
+                {
+                    return true;
+                }
+
+                // スキャンできなかったルート（切断中のドライブ等）の配下は消さず、どのルート配下でもない行のみ消す
+                return normalizedConfiguredRoots is not null &&
+                       !normalizedConfiguredRoots.Any(root => PathNormalizer.IsAncestorOrSame(root, parentPath));
+            })
+            .ToList();
+
+        if (staleParentPaths.Count == 0)
+        {
+            return 0;
+        }
+
+        // 対象はディスク上に存在しないフォルダなので、ライブ更新（ReplaceEntriesByParentPath）と
+        // 競合する余地がなく、親パス単位のロックは取らずにバッチ削除する
+        var deletedRowCount = 0;
+        using (var db = CreateDbContext())
+        {
+            for (int i = 0; i < staleParentPaths.Count; i += BulkInsertBatchSize)
+            {
+                var batch = staleParentPaths.Skip(i).Take(BulkInsertBatchSize).ToList();
+                deletedRowCount += DeleteEntriesForParentPaths(db, batch);
+            }
+        }
+
+        return deletedRowCount;
+    }
+
+    /// <summary>
+    /// WALをチェックポイントしてファイルを切り詰める。フルスキャンは全行を書き直すためWALが
+    /// 数百MB規模まで肥大化することがあり、スキャン完了後に呼んで解消する（読み取り中などで
+    /// 切り詰められない場合は何もしない、ベストエフォート動作）。
+    /// </summary>
+    public void TruncateWal()
+    {
+        using var db = CreateDbContext();
+        var conn = db.Database.GetDbConnection();
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+        cmd.ExecuteNonQuery();
     }
 
     private static List<(string ParentPath, CachedFileSystemEntry Entry)> BuildNormalizedEntryList(
