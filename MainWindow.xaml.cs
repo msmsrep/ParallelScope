@@ -446,7 +446,8 @@ public partial class MainWindow : Window
 
             if (PathNormalizer.IsAncestorOrSame(folderItem.Path, _viewModel.CurrentPath))
             {
-                _viewModel.LoadFiles(_viewModel.CurrentPath);
+                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
+                _viewModel.RefreshCurrentFolder();
                 SyncTreeSelectionToCurrentPath();
             }
 
@@ -505,7 +506,8 @@ public partial class MainWindow : Window
 
             if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
             {
-                _viewModel.LoadFiles(_viewModel.CurrentPath);
+                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
+                _viewModel.RefreshCurrentFolder();
                 SyncTreeSelectionToCurrentPath();
             }
 
