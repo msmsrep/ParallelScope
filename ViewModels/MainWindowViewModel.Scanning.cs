@@ -16,6 +16,14 @@ public partial class MainWindowViewModel
         AttributesToSkip = FileAttributes.ReparsePoint
     };
 
+    // 全コアを使うとバックグラウンドのフルスキャン中にスレッドプールが飽和し、
+    // UIの応答（ツリー選択時のキャッシュ読み込み等のTask.Run）が待たされる。
+    // 列挙はほぼI/Oバウンドなので半分に絞っても速度への影響は小さい。
+    private static readonly ParallelOptions EntryEnumerationParallelOptions = new()
+    {
+        MaxDegreeOfParallelism = Math.Max(1, Environment.ProcessorCount / 2)
+    };
+
     /// <summary>設定済みの全ルートフォルダをフルスキャンし、キャッシュを更新する。</summary>
     public async Task<int> FullScanConfiguredRootsAsync(CancellationToken token)
     {
@@ -151,7 +159,7 @@ public partial class MainWindowViewModel
                 .Where(d => !IsExcludedPath(d.FullName))
                 .ToList();
 
-            Parallel.ForEach(folders, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, d =>
+            Parallel.ForEach(folders, EntryEnumerationParallelOptions, d =>
             {
                 var entry = TryCreateFolderEntry(folderPath, d);
                 if (entry is not null)
@@ -165,7 +173,7 @@ public partial class MainWindowViewModel
                 .EnumerateFiles("*", NonRecursiveEnumerationOptions)
                 .ToList();
 
-            Parallel.ForEach(files, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, f =>
+            Parallel.ForEach(files, EntryEnumerationParallelOptions, f =>
             {
                 var entry = TryCreateFileEntry(folderPath, f);
                 if (entry is not null)
