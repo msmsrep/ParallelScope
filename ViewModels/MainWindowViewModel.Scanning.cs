@@ -68,7 +68,7 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
-    /// 深さ優先でフォルダツリーを走査し、100フォルダごとにバッチでキャッシュへ保存する。
+    /// 各ルートを順番に走査してキャッシュを更新する。1ルート完了するたびにツリーのスキャン中表示を消す。
     /// キャッシュと内容が同一のフォルダは書き換えられないため、戻り値は「実際に書き換えたフォルダ数」。
     /// </summary>
     private int ScanFolderSubtrees(
@@ -76,8 +76,47 @@ public partial class MainWindowViewModel
         IReadOnlyCollection<string>? allConfiguredRootPaths,
         CancellationToken token = default)
     {
+        // 訪問済みセットはルート間で共有し、重なり合うルート（例: C:\ とその配下のフォルダ）の二重スキャンを防ぐ
         var visitedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var pendingDirectories = new Stack<string>(rootPaths.Reverse());
+        var updatedFolderCount = 0;
+
+        foreach (var rootPath in rootPaths)
+        {
+            updatedFolderCount += ScanSingleSubtree(rootPath, visitedDirectories, token);
+
+            if (token.IsCancellationRequested)
+            {
+                // キャンセル時はスピナーに触れず即返す（呼び出し元のfinallyが一括で消す）
+                return updatedFolderCount;
+            }
+
+            // 完了したルートから順にスキャン中表示を消す（全ルート完了まで待たせない）
+            NotifyRootScanCompleted(rootPath);
+        }
+
+        // 完走時のみ残骸を掃除する（途中キャンセルだと「未訪問＝削除された」と区別できないため）。
+        // 削除済みフォルダ配下の孤児行を消し、その後フルスキャンで肥大化したWALを切り詰める
+        if (!token.IsCancellationRequested)
+        {
+            try
+            {
+                _fileCacheRepository.DeleteStaleEntries(rootPaths, allConfiguredRootPaths, visitedDirectories);
+                _fileCacheRepository.TruncateWal();
+            }
+            catch
+            {
+                // 掃除失敗はスキャン結果へ影響させない
+            }
+        }
+
+        return updatedFolderCount;
+    }
+
+    /// <summary>1ルート配下を深さ優先で走査し、100フォルダごとにバッチでキャッシュへ保存する。</summary>
+    private int ScanSingleSubtree(string rootPath, HashSet<string> visitedDirectories, CancellationToken token)
+    {
+        var pendingDirectories = new Stack<string>();
+        pendingDirectories.Push(rootPath);
         var batchEntries = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>();
         var updatedFolderCount = 0;
         const int BatchSize = 100;
@@ -140,7 +179,7 @@ public partial class MainWindowViewModel
             }
         }
 
-        // 残りのバッチを処理
+        // 残りのバッチを処理（このルートの完了通知より先にキャッシュへ反映しておく）
         if (batchEntries.Count > 0)
         {
             try
@@ -153,22 +192,20 @@ public partial class MainWindowViewModel
             }
         }
 
-        // 完走時のみ残骸を掃除する（途中キャンセルだと「未訪問＝削除された」と区別できないため）。
-        // 削除済みフォルダ配下の孤児行を消し、その後フルスキャンで肥大化したWALを切り詰める
-        if (!token.IsCancellationRequested)
-        {
-            try
-            {
-                _fileCacheRepository.DeleteStaleEntries(rootPaths, allConfiguredRootPaths, visitedDirectories);
-                _fileCacheRepository.TruncateWal();
-            }
-            catch
-            {
-                // 掃除失敗はスキャン結果へ影響させない
-            }
-        }
-
         return updatedFolderCount;
+    }
+
+    /// <summary>ルート1件のスキャン完了をUIへ反映し、該当ルートのスキャン中表示を消す（バックグラウンドスレッドから呼ばれる）。</summary>
+    private void NotifyRootScanCompleted(string rootPath)
+    {
+        _uiContext.Post(_ =>
+        {
+            var rootFolder = RootFolders.FirstOrDefault(x => PathNormalizer.AreSame(x.Path, rootPath));
+            if (rootFolder is not null)
+            {
+                rootFolder.IsScanning = false;
+            }
+        }, null);
     }
 
     /// <summary>1フォルダ直下のファイル/フォルダを並列列挙し、種別→名前の順でソートして返す。</summary>
