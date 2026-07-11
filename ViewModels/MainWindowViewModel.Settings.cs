@@ -77,8 +77,10 @@ public partial class MainWindowViewModel
             if (!IsExcludedPath(rootPath) && !existingRootPaths.Contains(rootPath))
             {
                 var newRootFolder = new FolderItemViewModel(rootPath, IsExcludedPath);
-                // ルートフォルダは初期化時に即座に読み込む（遅延展開ではなく）
-                newRootFolder.EnsureLoaded();
+                // ルートフォルダは追加時に即座に読み込みを開始する（遅延展開ではなく）。
+                // ただし同期版だと切断中のNASルートでUIスレッドがSMBタイムアウトまでブロックするため、
+                // 非同期版で開始だけして先へ進む（読み込み完了までツリーにはダミーの子が表示される）
+                _ = newRootFolder.EnsureLoadedAsync();
                 RootFolders.Add(newRootFolder);
             }
         }
@@ -138,7 +140,10 @@ public partial class MainWindowViewModel
                 continue;
             }
 
-            if (string.IsNullOrEmpty(normalized) || !Directory.Exists(normalized))
+            // ここで存在確認はしない。切断中のNASルートを弾くと RootFolders から消え、
+            // 次の設定保存（SaveSettings(RootFolders...)）で settings.json からも恒久的に失われてしまう。
+            // 実在しないルートはスキャン対象の選別（FullScanConfiguredRootsAsync）側で除外される
+            if (string.IsNullOrEmpty(normalized))
             {
                 continue;
             }
@@ -180,7 +185,9 @@ public partial class MainWindowViewModel
                 continue;
             }
 
-            if (string.IsNullOrEmpty(normalized) || !Directory.Exists(normalized))
+            // 除外パスは「パスに対する述語」であり実在は要件でない。存在確認で弾くと、
+            // 切断中のNAS配下の除外設定が次の設定保存で恒久的に失われてしまうため確認しない
+            if (string.IsNullOrEmpty(normalized))
             {
                 continue;
             }

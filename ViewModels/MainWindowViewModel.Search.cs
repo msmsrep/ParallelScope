@@ -1,4 +1,3 @@
-using System.IO;
 using System.Threading;
 using ParallelScope.Utilities;
 
@@ -14,7 +13,9 @@ public partial class MainWindowViewModel
     /// </summary>
     private void RequestSearch(string query)
     {
-        if (string.IsNullOrWhiteSpace(CurrentPath) || !Directory.Exists(CurrentPath))
+        // 検索はキャッシュDBのみで完結するため、ライブのファイルシステム確認はしない
+        // （切断中のNASへの Directory.Exists は、1キー入力ごとにUIスレッドを数秒〜数十秒ブロックしうる）
+        if (string.IsNullOrWhiteSpace(CurrentPath))
         {
             return;
         }

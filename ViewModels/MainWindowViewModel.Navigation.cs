@@ -80,7 +80,7 @@ public partial class MainWindowViewModel
         }
 
         var normalizedTargetPath = PathNormalizer.Normalize(folderPath);
-        if (string.IsNullOrEmpty(normalizedTargetPath) || !Directory.Exists(normalizedTargetPath))
+        if (string.IsNullOrEmpty(normalizedTargetPath))
         {
             return false;
         }
@@ -95,13 +95,17 @@ public partial class MainWindowViewModel
             return true;
         }
 
-        if (addToHistory && !string.IsNullOrEmpty(CurrentPath))
+        // 移動先の存在確認は LoadFilesInternal に一本化されている（切断中のNASでは確認自体が
+        // ブロックしうるため、二重に確認すると待ち時間が倍になる）。履歴は移動成功時のみ積む
+        var previousPath = CurrentPath;
+        var success = LoadFilesInternal(normalizedTargetPath);
+
+        if (success && addToHistory && !string.IsNullOrEmpty(previousPath))
         {
-            _backHistory.Push(CurrentPath);
+            _backHistory.Push(previousPath);
             _forwardHistory.Clear();
         }
 
-        var success = LoadFilesInternal(normalizedTargetPath);
         NotifyNavigationStateChanged();
         return success;
     }
@@ -109,7 +113,10 @@ public partial class MainWindowViewModel
     /// <summary>現在地・アドレス表示・検索状態を更新し、キャッシュ読込とバックグラウンド更新を開始する。</summary>
     private bool LoadFilesInternal(string folderPath)
     {
-        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
+        // 切断中のNASでもUIを固めないよう、存在確認はタイムアウト付きで行う。
+        // タイムアウト時は存在する扱いで進み、キャッシュからの表示（LoadFromCacheAsync）に任せる。
+        // 実際に読めない場合はバックグラウンド更新が何もせず終わるだけで、キャッシュ由来の一覧は閲覧できる
+        if (string.IsNullOrWhiteSpace(folderPath) || !DirectoryAvailabilityChecker.ExistsOrTimedOut(folderPath))
         {
             return false;
         }
@@ -141,11 +148,14 @@ public partial class MainWindowViewModel
 
     private static string? GetParentPath(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+        if (string.IsNullOrWhiteSpace(path))
         {
             return null;
         }
 
+        // Directory.GetParent はファイルシステムへアクセスしない純粋なパス操作。
+        // ここで存在確認をすると、CanGoUp のバインディング評価（UIスレッド）が
+        // 切断中のNASでブロックするため行わない（移動先の検証は移動時に行われる）
         return Directory.GetParent(path)?.FullName;
     }
 
