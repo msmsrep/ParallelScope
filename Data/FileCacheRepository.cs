@@ -177,12 +177,16 @@ public class FileCacheRepository
         }
     }
 
-    /// <summary>複数の親パスについて、まとめてキャッシュを置き換える（フルスキャン時に使用）。</summary>
-    public void BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
+    /// <summary>
+    /// 複数の親パスについて、まとめてキャッシュを置き換える（フルスキャン時に使用）。
+    /// キャッシュと内容が同一の親パスは書き換えをスキップし、実際に書き換えた親パス数を返す
+    /// （フルスキャンの大部分は無変化なので、これで書き込み量を大幅に減らせる）。
+    /// </summary>
+    public int BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
     {
         if (entriesByParentPath.Count == 0)
         {
-            return;
+            return 0;
         }
 
         var lockObjects = AcquireOrderedParentPathLocks(entriesByParentPath.Keys);
@@ -190,13 +194,33 @@ public class FileCacheRepository
         try
         {
             using var db = CreateDbContext();
-            var normalizedParentPaths = entriesByParentPath.Keys.Select(PathNormalizer.Normalize).ToList();
+
+            var entriesByNormalizedParent = entriesByParentPath.ToDictionary(
+                kv => PathNormalizer.Normalize(kv.Key),
+                kv => kv.Value,
+                StringComparer.OrdinalIgnoreCase);
+
+            List<string> changedParentPaths;
+            try
+            {
+                changedParentPaths = SelectChangedParentPaths(db, entriesByNormalizedParent);
+            }
+            catch
+            {
+                // 差分判定に失敗した場合は従来通り全て書き換える（書き漏らしの方が害が大きい）
+                changedParentPaths = entriesByNormalizedParent.Keys.ToList();
+            }
+
+            if (changedParentPaths.Count == 0)
+            {
+                return 0;
+            }
 
             using var transaction = db.Database.BeginTransaction();
             try
             {
-                DeleteEntriesForParentPaths(db, normalizedParentPaths);
-                InsertEntriesInBulk(db, BuildNormalizedEntryList(entriesByParentPath));
+                DeleteEntriesForParentPaths(db, changedParentPaths);
+                InsertEntriesInBulk(db, BuildEntryList(changedParentPaths, entriesByNormalizedParent));
                 transaction.Commit();
             }
             catch
@@ -204,11 +228,71 @@ public class FileCacheRepository
                 transaction.Rollback();
                 throw;
             }
+
+            return changedParentPaths.Count;
         }
         finally
         {
             ReleaseLocks(lockObjects);
         }
+    }
+
+    /// <summary>バッチ内の各親パスについて、キャッシュ済みエントリと内容が異なるものだけを抽出する。</summary>
+    private static List<string> SelectChangedParentPaths(
+        ParallelScopeDbContext db,
+        IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByNormalizedParent)
+    {
+        var parentPaths = entriesByNormalizedParent.Keys.ToList();
+
+        var cachedByParent = db.FileSystemEntries
+            .AsNoTracking()
+            .Where(x => parentPaths.Contains(x.ParentPath))
+            .Select(x => new CachedFileSystemEntry(
+                x.ParentPath,
+                x.FullPath,
+                x.Name,
+                x.IsFolder,
+                x.SizeBytes,
+                x.LastWriteTimeUtc))
+            .ToList()
+            .GroupBy(x => x.ParentPath, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => (IReadOnlyCollection<CachedFileSystemEntry>)g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        var changedParentPaths = new List<string>();
+        foreach (var (parentPath, liveEntries) in entriesByNormalizedParent)
+        {
+            cachedByParent.TryGetValue(parentPath, out var cachedEntries);
+            if (!AreEntriesEquivalent(parentPath, cachedEntries ?? Array.Empty<CachedFileSystemEntry>(), liveEntries))
+            {
+                changedParentPaths.Add(parentPath);
+            }
+        }
+
+        return changedParentPaths;
+    }
+
+    private static bool AreEntriesEquivalent(
+        string normalizedParentPath,
+        IReadOnlyCollection<CachedFileSystemEntry> cachedEntries,
+        IReadOnlyCollection<CachedFileSystemEntry> liveEntries)
+    {
+        if (cachedEntries.Count != liveEntries.Count)
+        {
+            return false;
+        }
+
+        // FullPathはUNIQUE制約により重複しないため、集合比較で多重集合比較と等価になる
+        var cachedSet = cachedEntries.Select(x => NormalizeForComparison(normalizedParentPath, x)).ToHashSet();
+        return liveEntries.All(x => cachedSet.Contains(NormalizeForComparison(normalizedParentPath, x)));
+    }
+
+    /// <summary>
+    /// レコードの値等価比較のための正規化。SizeBytes は書き込み経路によって NULL/0 の揺れがある
+    /// （バルクINSERTは0、EF経由はNULLを書く）ため0に寄せ、ParentPath は表記揺れを正規化済みの値に寄せる。
+    /// </summary>
+    private static CachedFileSystemEntry NormalizeForComparison(string normalizedParentPath, CachedFileSystemEntry entry)
+    {
+        return entry with { ParentPath = normalizedParentPath, SizeBytes = entry.SizeBytes ?? 0L };
     }
 
     /// <summary>デッドロック回避のため、対象パスを正規化・ソートした順にロックを取得する。</summary>
@@ -340,17 +424,17 @@ public class FileCacheRepository
         cmd.ExecuteNonQuery();
     }
 
-    private static List<(string ParentPath, CachedFileSystemEntry Entry)> BuildNormalizedEntryList(
-        IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
+    private static List<(string ParentPath, CachedFileSystemEntry Entry)> BuildEntryList(
+        IReadOnlyCollection<string> normalizedParentPaths,
+        IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByNormalizedParent)
     {
         var allEntries = new List<(string ParentPath, CachedFileSystemEntry Entry)>();
 
-        foreach (var (parentPath, entries) in entriesByParentPath)
+        foreach (var parentPath in normalizedParentPaths)
         {
-            var normalizedParentPath = PathNormalizer.Normalize(parentPath);
-            foreach (var entry in entries)
+            foreach (var entry in entriesByNormalizedParent[parentPath])
             {
-                allEntries.Add((normalizedParentPath, entry));
+                allEntries.Add((parentPath, entry));
             }
         }
 
