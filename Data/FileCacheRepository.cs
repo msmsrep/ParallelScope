@@ -509,11 +509,11 @@ public class FileCacheRepository
     /// <summary>parentPath 直下の各フォルダについて、配下ファイルの合計サイズをキャッシュから集計する。</summary>
     public Dictionary<string, long> GetCachedFolderTotalSizes(string parentPath, IEnumerable<string> folderPaths)
     {
-        using var db = CreateDbContext();
+        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
 
         if (string.IsNullOrWhiteSpace(parentPath))
         {
-            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            return result;
         }
 
         var normalizedParentPath = PathNormalizer.Normalize(parentPath);
@@ -522,20 +522,56 @@ public class FileCacheRepository
         var folderNameToPath = BuildFolderNameLookup(folderPaths, parentWithSeparator);
         if (folderNameToPath.Count == 0)
         {
-            return new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            return result;
         }
 
-        var cachedFiles = db.FileSystemEntries
-            .AsNoTracking()
-            .Where(x => !x.IsFolder && x.FullPath.StartsWith(parentWithSeparator))
-            .Select(x => new
-            {
-                x.FullPath,
-                SizeBytes = x.SizeBytes ?? 0L
-            })
-            .ToList();
+        // 配下の全ファイル行をC#へ読み出すと、親がルート級の場合は数十万行のマテリアライズが
+        // フォルダ移動のたびに発生するため、直下フォルダ名（親プレフィックス直後のセグメント）
+        // 単位の合計をSQL側で集計し、転送するのは直下フォルダ数分の行だけにする。
+        // プレフィックス長はUTF-16とコードポイントの数え方の差を避けるためSQL側の length() で求める
+        using var db = CreateDbContext();
+        var conn = db.Database.GetDbConnection();
+        conn.Open();
 
-        return AggregateFileSizesByFolder(cachedFiles.Select(f => (f.FullPath, f.SizeBytes)), parentWithSeparator, folderNameToPath);
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT substr(FullPath, length(@prefix) + 1, instr(substr(FullPath, length(@prefix) + 1), @sep) - 1) AS FirstSegment,
+                   SUM(COALESCE(SizeBytes, 0)) AS TotalSize
+            FROM FileSystemEntries
+            WHERE IsFolder = 0
+              AND FullPath LIKE @prefixPattern ESCAPE '~'
+              AND instr(substr(FullPath, length(@prefix) + 1), @sep) > 0 -- 親直下のファイルは子フォルダ合計に含めない
+            GROUP BY FirstSegment COLLATE NOCASE";
+
+        AddParameter(cmd, "@prefix", parentWithSeparator);
+        AddParameter(cmd, "@prefixPattern", EscapeLikePattern(parentWithSeparator) + "%");
+        AddParameter(cmd, "@sep", Path.DirectorySeparatorChar.ToString());
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            var firstSegment = reader.GetString(0);
+            if (folderNameToPath.TryGetValue(firstSegment, out var folderFullPath))
+            {
+                result[folderFullPath] = reader.GetInt64(1);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>LIKE のワイルドカード（% _）とエスケープ文字（~）を無効化する。パス区切りの \ と衝突しないよう ~ をエスケープ文字に使う。</summary>
+    private static string EscapeLikePattern(string value)
+    {
+        return value.Replace("~", "~~").Replace("%", "~%").Replace("_", "~_");
+    }
+
+    private static void AddParameter(System.Data.Common.DbCommand cmd, string name, object value)
+    {
+        var parameter = cmd.CreateParameter();
+        parameter.ParameterName = name;
+        parameter.Value = value;
+        cmd.Parameters.Add(parameter);
     }
 
     /// <summary>直下フォルダ名 → 正規化済みフルパス のルックアップを構築する。</summary>
@@ -581,47 +617,6 @@ public class FileCacheRepository
         }
 
         return folderNameToPath;
-    }
-
-    /// <summary>ファイル一覧を、直下フォルダ単位のサイズ合計に集計する（親直下のファイルは対象外）。</summary>
-    private static Dictionary<string, long> AggregateFileSizesByFolder(
-        IEnumerable<(string FullPath, long SizeBytes)> files,
-        string parentWithSeparator,
-        IReadOnlyDictionary<string, string> folderNameToPath)
-    {
-        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var (fullPath, sizeBytes) in files)
-        {
-            if (fullPath.Length <= parentWithSeparator.Length)
-            {
-                continue;
-            }
-
-            var relative = fullPath.Substring(parentWithSeparator.Length);
-            if (string.IsNullOrWhiteSpace(relative))
-            {
-                continue;
-            }
-
-            var separatorIndex = relative.IndexOfAny(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar });
-            if (separatorIndex <= 0)
-            {
-                // 親フォルダ直下のファイルは子フォルダ合計に含めない
-                continue;
-            }
-
-            var firstSegment = relative[..separatorIndex];
-            if (!folderNameToPath.TryGetValue(firstSegment, out var folderFullPath))
-            {
-                continue;
-            }
-
-            result.TryGetValue(folderFullPath, out var currentSize);
-            result[folderFullPath] = currentSize + sizeBytes;
-        }
-
-        return result;
     }
 
     private ParallelScopeDbContext CreateDbContext()
