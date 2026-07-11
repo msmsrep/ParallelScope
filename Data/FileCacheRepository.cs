@@ -1,5 +1,4 @@
 using System.IO;
-using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
 using ParallelScope.Utilities;
@@ -22,7 +21,17 @@ public class FileCacheRepository
 {
     private const int BulkInsertBatchSize = 1000;
 
-    private static readonly ConcurrentDictionary<string, object> ParentPathLocks = new(StringComparer.OrdinalIgnoreCase);
+    // 親パス単位の排他制御用ロック。パスごとに辞書へ実体を貯めるとフォルダ数分（数十万件）
+    // 無限に増え続けるため、ハッシュで固定本数のストライプへ割り当てる
+    // （別パスが同じストライプに衝突しても余分な待ちが起きるだけで、正しさには影響しない）
+    private const int ParentPathLockStripeCount = 128;
+    private static readonly object[] ParentPathLockStripes =
+        Enumerable.Range(0, ParentPathLockStripeCount).Select(_ => new object()).ToArray();
+
+    private static int GetLockStripeIndex(string normalizedParentPath)
+    {
+        return (StringComparer.OrdinalIgnoreCase.GetHashCode(normalizedParentPath) & int.MaxValue) % ParentPathLockStripeCount;
+    }
 
     private readonly DbContextOptions<ParallelScopeDbContext> _dbOptions;
 
@@ -148,11 +157,13 @@ public class FileCacheRepository
         var normalizedRootPath = PathNormalizer.Normalize(rootPath);
         var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
 
-        var lowerQuery = nameQuery.ToLowerInvariant();
+        // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
+        // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
+        var namePattern = "%" + EscapeLikePattern(nameQuery) + "%";
 
         return db.FileSystemEntries
             .AsNoTracking()
-            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && x.Name.ToLower().Contains(lowerQuery))
+            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && EF.Functions.Like(x.Name, namePattern, "~"))
             .OrderByDescending(x => x.IsFolder)
             .ThenBy(x => x.Name)
             .Select(x => new CachedFileSystemEntry(
@@ -169,7 +180,7 @@ public class FileCacheRepository
     public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
         var normalizedParentPath = PathNormalizer.Normalize(parentPath);
-        var lockObject = ParentPathLocks.GetOrAdd(normalizedParentPath, _ => new object());
+        var lockObject = ParentPathLockStripes[GetLockStripeIndex(normalizedParentPath)];
 
         lock (lockObject)
         {
@@ -295,16 +306,14 @@ public class FileCacheRepository
         return entry with { ParentPath = normalizedParentPath, SizeBytes = entry.SizeBytes ?? 0L };
     }
 
-    /// <summary>デッドロック回避のため、対象パスを正規化・ソートした順にロックを取得する。</summary>
+    /// <summary>デッドロック回避のため、対象パスのストライプ番号を昇順に並べ、重複を除いてロックを取得する。</summary>
     private static List<object> AcquireOrderedParentPathLocks(IEnumerable<string> parentPaths)
     {
-        var normalizedPathsToLock = parentPaths
-            .Select(PathNormalizer.Normalize)
-            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        var lockObjects = normalizedPathsToLock
-            .Select(path => ParentPathLocks.GetOrAdd(path, _ => new object()))
+        var lockObjects = parentPaths
+            .Select(path => GetLockStripeIndex(PathNormalizer.Normalize(path)))
+            .Distinct()
+            .OrderBy(index => index)
+            .Select(index => ParentPathLockStripes[index])
             .ToList();
 
         foreach (var lockObj in lockObjects)
