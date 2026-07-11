@@ -1,4 +1,3 @@
-using System.IO;
 using System.Threading;
 using ParallelScope.Utilities;
 
@@ -10,7 +9,9 @@ public partial class MainWindowViewModel
     /// <summary>現在フォルダ配下の全ファイルをキャッシュから再帰的に取得するようリクエストする。</summary>
     private void RequestFlatFileView()
     {
-        if (string.IsNullOrWhiteSpace(CurrentPath) || !Directory.Exists(CurrentPath))
+        // フラット表示はキャッシュDBのみで完結するため、ライブのファイルシステム確認はしない
+        // （切断中のNASへの Directory.Exists はUIスレッドを数秒〜数十秒ブロックしうる）
+        if (string.IsNullOrWhiteSpace(CurrentPath))
         {
             return;
         }

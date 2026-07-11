@@ -49,7 +49,8 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        if (!Directory.Exists(normalized))
+        // 応答の遅いNASパスでも設定画面を固めない（タイムアウト時は存在する扱いで受け付ける）
+        if (!DirectoryAvailabilityChecker.ExistsOrTimedOut(normalized))
         {
             MessageBox.Show("The specified folder does not exist.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
@@ -96,7 +97,8 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        if (!Directory.Exists(normalized))
+        // 応答の遅いNASパスでも設定画面を固めない（タイムアウト時は存在する扱いで受け付ける）
+        if (!DirectoryAvailabilityChecker.ExistsOrTimedOut(normalized))
         {
             MessageBox.Show("The specified folder does not exist.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;

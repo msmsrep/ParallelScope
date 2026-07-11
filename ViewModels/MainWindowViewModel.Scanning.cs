@@ -34,10 +34,13 @@ public partial class MainWindowViewModel
             .ToList();
 
         // スキャン対象は実在する（かつ除外されていない）ルートのみ。
-        // 掃除の基準には全ルートを渡し、切断中のドライブ等のキャッシュを誤削除しないようにする
-        var scannableRootPaths = allConfiguredRootPaths
-            .Where(path => Directory.Exists(path) && !IsExcludedPath(path))
-            .ToList();
+        // 掃除の基準には全ルートを渡し、切断中のドライブ等のキャッシュを誤削除しないようにする。
+        // 切断中のNASルートへの Directory.Exists はUIスレッドを長時間ブロックしうるため、選別はバックグラウンドで行う
+        var scannableRootPaths = await Task.Run(
+            () => allConfiguredRootPaths
+                .Where(path => Directory.Exists(path) && !IsExcludedPath(path))
+                .ToList(),
+            token);
 
         return await ScanFolderSubtreesAsync(scannableRootPaths, allConfiguredRootPaths, token);
     }
@@ -58,13 +61,14 @@ public partial class MainWindowViewModel
     /// <summary>指定フォルダ配下をスキャンし、キャッシュを更新する（右クリックメニューからの単一フォルダスキャン用）。</summary>
     public Task<int> ScanFolderSubtreeAsync(string folderPath)
     {
-        if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath) || IsExcludedPath(folderPath))
+        if (string.IsNullOrWhiteSpace(folderPath) || IsExcludedPath(folderPath))
         {
             return Task.FromResult(0);
         }
 
+        // Directory.Exists は切断中のNASで長時間ブロックしうるため、呼び出し元（UIスレッド）ではなくバックグラウンドで確認する。
         // ルート外の掃除はフルスキャン時のみ行うため、ここでは null を渡す
-        return Task.Run(() => ScanFolderSubtrees(new[] { folderPath }, null));
+        return Task.Run(() => Directory.Exists(folderPath) ? ScanFolderSubtrees(new[] { folderPath }, null) : 0);
     }
 
     /// <summary>
