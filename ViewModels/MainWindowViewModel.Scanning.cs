@@ -181,6 +181,23 @@ public partial class MainWindowViewModel
             }
             catch
             {
+                // 列挙に失敗したフォルダはキャッシュを書き換えず（空と区別がつかないため）、失敗原因で扱いを分ける
+                if (Directory.Exists(normalizedPath))
+                {
+                    // フォルダは見えるのに列挙できない（一時的なI/Oエラー等）。配下が未訪問のまま残り
+                    // 掃除で誤削除されるのを防ぐため、このルートは未完走扱いにする（走査自体は継続）
+                    completed = false;
+                    continue;
+                }
+
+                if (!Directory.Exists(rootPath))
+                {
+                    // ルートごと見えない＝ネットワーク切断とみなし、このルートを未完走として打ち切る
+                    completed = false;
+                    break;
+                }
+
+                // 列挙開始直前に削除されたフォルダ。未訪問の配下は残骸として通常の掃除に任せる
                 continue;
             }
 
@@ -237,47 +254,45 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>1フォルダ直下のファイル/フォルダを並列列挙し、種別→名前の順でソートして返す。</summary>
+    /// <summary>
+    /// 1フォルダ直下のファイル/フォルダを並列列挙し、種別→名前の順でソートして返す。
+    /// 列挙自体の失敗（ネットワーク切断・フォルダ消失等）は例外として呼び出し元へ伝える。
+    /// ここで握りつぶして空リストを返すと「本当に空のフォルダ」と区別できず、
+    /// NASの瞬断などで既存キャッシュが空で上書きされてしまう。
+    /// </summary>
     private List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath)
     {
         var dirInfo = new DirectoryInfo(folderPath);
         var entries = new ConcurrentBag<CachedFileSystemEntry>();
 
-        try
+        // フォルダ処理を並列化
+        var folders = dirInfo
+            .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+            .Where(d => !IsExcludedPath(d.FullName))
+            .ToList();
+
+        Parallel.ForEach(folders, EntryEnumerationParallelOptions, d =>
         {
-            // フォルダ処理を並列化
-            var folders = dirInfo
-                .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
-                .Where(d => !IsExcludedPath(d.FullName))
-                .ToList();
-
-            Parallel.ForEach(folders, EntryEnumerationParallelOptions, d =>
+            var entry = TryCreateFolderEntry(folderPath, d);
+            if (entry is not null)
             {
-                var entry = TryCreateFolderEntry(folderPath, d);
-                if (entry is not null)
-                {
-                    entries.Add(entry);
-                }
-            });
+                entries.Add(entry);
+            }
+        });
 
-            // ファイル処理を並列化
-            var files = dirInfo
-                .EnumerateFiles("*", NonRecursiveEnumerationOptions)
-                .ToList();
+        // ファイル処理を並列化
+        var files = dirInfo
+            .EnumerateFiles("*", NonRecursiveEnumerationOptions)
+            .ToList();
 
-            Parallel.ForEach(files, EntryEnumerationParallelOptions, f =>
-            {
-                var entry = TryCreateFileEntry(folderPath, f);
-                if (entry is not null)
-                {
-                    entries.Add(entry);
-                }
-            });
-        }
-        catch
+        Parallel.ForEach(files, EntryEnumerationParallelOptions, f =>
         {
-            // 例外時は空のリストを返す
-        }
+            var entry = TryCreateFileEntry(folderPath, f);
+            if (entry is not null)
+            {
+                entries.Add(entry);
+            }
+        });
 
         // 結果をソートして返す
         var result = entries.ToList();

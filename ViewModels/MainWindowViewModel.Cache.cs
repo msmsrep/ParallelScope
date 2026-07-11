@@ -54,6 +54,8 @@ public partial class MainWindowViewModel
         }
         catch
         {
+            // 列挙失敗（NASの瞬断等）時はキャッシュ由来の表示を維持し、キャッシュも書き換えない
+            // （ここで続行すると空一覧の表示とキャッシュの空上書きにつながる）
             return;
         }
 
