@@ -14,7 +14,11 @@ public partial class MainWindowViewModel
 
         try
         {
-            cachedEntries = await Task.Run(() => _fileCacheRepository.GetEntriesByParentPath(folderPath));
+            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
+            cachedEntries = await Task.Run(() =>
+                _fileCacheRepository.GetEntriesByParentPath(folderPath)
+                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
+                    .ToList());
         }
         catch
         {

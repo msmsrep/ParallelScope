@@ -206,6 +206,12 @@ public partial class MainWindowViewModel
             return false;
         }
 
+        return IsExcludedNormalizedPath(normalizedPath);
+    }
+
+    /// <summary>正規化済みパス用の除外判定。DBキャッシュ由来のパスは保存時に正規化済みのため、大量の結果行に対して再正規化のコストをかけずに使える。</summary>
+    private bool IsExcludedNormalizedPath(string normalizedPath)
+    {
         foreach (var excludedPath in _excludedPaths)
         {
             if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase))

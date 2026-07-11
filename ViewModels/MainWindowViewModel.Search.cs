@@ -53,8 +53,10 @@ public partial class MainWindowViewModel
 
         try
         {
+            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cacheResults = await Task.Run(() =>
                 _fileCacheRepository.SearchEntriesUnderPath(rootPath, query)
+                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
                     .Select(ToViewModel)
                     .ToList());
         }
