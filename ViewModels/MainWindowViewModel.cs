@@ -32,7 +32,7 @@ public partial class MainWindowViewModel : ObservableObject
 
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
-    private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion)> _searchCoalescer;
+    private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)> _folderSizeCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)> _flatViewCoalescer;
 
@@ -102,7 +102,8 @@ public partial class MainWindowViewModel : ObservableObject
 
             if (!string.IsNullOrWhiteSpace(SearchQuery))
             {
-                // 検索結果表示中は表示を変えない（検索語をクリアした時点でモードに応じた一覧に切り替わる）
+                // 検索結果はモードによってフォルダの表示有無が変わるため、同じ検索語で再検索して反映する
+                RequestSearch(SearchQuery);
                 return;
             }
 
@@ -133,8 +134,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(
             request => RefreshFromFileSystemInBackground(request.FolderPath, request.NavigationVersion));
-        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion)>(
-            request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion));
+        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)>(
+            request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion, request.FilesOnly));
         _folderSizeCoalescer = new SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)>(
             request => ApplyCachedFolderSizesInBackground(request.FolderPath, request.Entries, request.NavigationVersion));
         _flatViewCoalescer = new SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)>(
