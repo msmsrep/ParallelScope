@@ -29,8 +29,12 @@ public partial class MainWindowViewModel
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
+        // All Filesモード中の検索はファイルのみを対象にする（フォルダは表示しない）。
+        // 結果反映までにモードが切り替わっても古い結果を出さないよう、リクエスト時点の値を固定して渡す
+        var filesOnly = IsFlatFileViewEnabled;
+
         // 検索リクエストを統合するキューへ委譲
-        _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion));
+        _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion, filesOnly));
     }
 
     /// <summary>検索状態を解除し、現在の表示モード（通常一覧 or フラット表示）に戻す。SearchQueryが空になった際に呼ばれる。</summary>
@@ -48,7 +52,7 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
-    private async Task SearchInBackground(string rootPath, string query, int searchVersion)
+    private async Task SearchInBackground(string rootPath, string query, int searchVersion, bool filesOnly)
     {
         List<FileItemViewModel> cacheResults;
 
@@ -57,6 +61,7 @@ public partial class MainWindowViewModel
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cacheResults = await Task.Run(() =>
                 _fileCacheRepository.SearchEntriesUnderPath(rootPath, query)
+                    .Where(x => !(filesOnly && x.IsFolder))
                     .Where(x => !IsExcludedNormalizedPath(x.FullPath))
                     .Select(ToViewModel)
                     .ToList());
