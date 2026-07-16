@@ -295,6 +295,113 @@ public partial class MainWindow : Window
             MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+    // 右クリックされた行を選択状態にしてからコンテキストメニューを表示する
+    private void FileListDataGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            return;
+        }
+
+        row.IsSelected = true;
+        row.Focus();
+    }
+
+    // 行以外（空白部分・列ヘッダー）ではコンテキストメニューを表示しない
+    private void FileListDataGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null || row.Item is not FileItemViewModel)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private FileItemViewModel? GetSelectedFileItem()
+    {
+        return FileListDataGrid.SelectedItem as FileItemViewModel;
+    }
+
+    // 選択中のファイル/フォルダを、エクスプローラーに貼り付け可能な形式でクリップボードへコピーする
+    private void CopyFileMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() =>
+        {
+            var files = new System.Collections.Specialized.StringCollection { item.FullPath };
+            Clipboard.SetFileDropList(files);
+        });
+    }
+
+    private void CopyFileNameMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() => Clipboard.SetText(item.Name));
+    }
+
+    private void CopyFullPathMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() => Clipboard.SetText(item.FullPath));
+    }
+
+    // 選択中のアイテムの親フォルダをWindowsのエクスプローラーで開き、アイテムを選択状態にする
+    private void OpenParentFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        try
+        {
+            // /select は対象の親フォルダを開いて対象を選択する。パスが存在しない場合でも
+            // explorer.exe は既定フォルダを開くだけでエラーにならないため、事前に存在確認する
+            if (!File.Exists(item.FullPath) && !Directory.Exists(item.FullPath))
+            {
+                MessageBox.Show("The item no longer exists.", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{item.FullPath}\"",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open the parent folder: {ex.Message}", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // クリップボードは他プロセスがロックしていると失敗（COMException）することがあるため、エラー表示に集約する
+    private void TrySetClipboard(Action setAction)
+    {
+        try
+        {
+            setAction();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not copy to the clipboard: {ex.Message}", "Copy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // 指定アイテムの祖先TreeViewItemをすべて展開する
     private void ExpandParents(TreeViewItem item)
     {

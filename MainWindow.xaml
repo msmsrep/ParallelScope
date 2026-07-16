@@ -147,13 +147,24 @@
                               IsChecked="{Binding IsFlatFileViewEnabled}"/>
             </Grid>
 
-            <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
+            <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                       ScrollViewer.CanContentScroll="True"
-                      MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
+                      MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
+                      PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
+                      ContextMenuOpening="FileListDataGrid_ContextMenuOpening">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy File" Click="CopyFileMenuItem_Click"/>
+                        <MenuItem Header="Copy File Name" Click="CopyFileNameMenuItem_Click"/>
+                        <MenuItem Header="Copy Full Path" Click="CopyFullPathMenuItem_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Open Parent Folder" Click="OpenParentFolderMenuItem_Click"/>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="Name" Width="*">
                         <DataGridTemplateColumn.CellTemplate>
