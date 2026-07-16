@@ -77,6 +77,32 @@ public partial class SettingsWindow : Window
         _rootPaths.Remove(selectedPath);
     }
 
+    // 選択中のルートパスを1つ上へ移動する
+    private void MoveRootPathUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRootPath(-1);
+    }
+
+    // 選択中のルートパスを1つ下へ移動する
+    private void MoveRootPathDownButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedRootPath(1);
+    }
+
+    private void MoveSelectedRootPath(int offset)
+    {
+        var index = RootPathsListBox.SelectedIndex;
+        var newIndex = index + offset;
+        if (index < 0 || newIndex < 0 || newIndex >= _rootPaths.Count)
+        {
+            return;
+        }
+
+        _rootPaths.Move(index, newIndex);
+        RootPathsListBox.SelectedIndex = newIndex;
+        RootPathsListBox.ScrollIntoView(RootPathsListBox.SelectedItem);
+    }
+
     // 入力欄の除外パスを検証・正規化して一覧へ追加する
     private void AddExcludedPathButton_Click(object sender, RoutedEventArgs e)
     {

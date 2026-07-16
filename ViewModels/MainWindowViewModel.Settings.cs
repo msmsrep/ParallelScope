@@ -85,6 +85,35 @@ public partial class MainWindowViewModel
             }
         }
 
+        // 並び替え: 既存項目の削除・追加だけでは順序変更が反映されないため、設定の順序に合わせて移動する。
+        // 再生成せずMoveで並び替えることで、読み込み済みのサブフォルダツリーを保持する
+        var orderedIndex = 0;
+        foreach (var rootPath in normalizedRootPaths)
+        {
+            var currentIndex = -1;
+            for (var i = 0; i < RootFolders.Count; i++)
+            {
+                if (string.Equals(RootFolders[i].Path, rootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            if (currentIndex < 0)
+            {
+                // 除外パス等でRootFoldersに存在しないルートは順序合わせの対象外
+                continue;
+            }
+
+            if (currentIndex != orderedIndex)
+            {
+                RootFolders.Move(currentIndex, orderedIndex);
+            }
+
+            orderedIndex++;
+        }
+
         if (saveSettings)
         {
             SaveSettings(normalizedRootPaths);
