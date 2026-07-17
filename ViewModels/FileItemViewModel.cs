@@ -4,10 +4,9 @@ using System.Windows.Media;
 
 namespace ParallelScope.ViewModels;
 
+/// <summary>ファイル一覧グリッドに表示する1行分（ファイルまたはフォルダ）を表すViewModel。</summary>
 public class FileItemViewModel : ObservableObject
 {
-    private static readonly string[] SizeUnits = { "B", "KB", "MB", "GB", "TB" };
-
     private string _fullPath = string.Empty;
     private string _name = string.Empty;
     private string _sizeText = string.Empty;
@@ -15,6 +14,7 @@ public class FileItemViewModel : ObservableObject
     private string _modifiedTime = string.Empty;
     private bool _isFolder;
     private ImageSource? _iconSource;
+    private bool _iconInitialized;
 
     public string FullPath
     {
@@ -54,8 +54,25 @@ public class FileItemViewModel : ObservableObject
 
     public ImageSource? IconSource
     {
-        get => _iconSource;
-        set => SetProperty(ref _iconSource, value);
+        get
+        {
+            if (!_iconInitialized)
+            {
+                // 一覧生成時に全件分のアイコンを先読みすると表示開始が遅くなるため、
+                // 表示時（バインディング評価時）に必要な分だけ解決する。
+                _iconSource = IsFolder
+                    ? WindowsShellIconProvider.GetFolderSmallIcon()
+                    : WindowsShellIconProvider.GetFileSmallIcon(FullPath);
+                _iconInitialized = true;
+            }
+
+            return _iconSource;
+        }
+        set
+        {
+            _iconInitialized = true;
+            SetProperty(ref _iconSource, value);
+        }
     }
 
     /// <summary>
@@ -63,41 +80,27 @@ public class FileItemViewModel : ObservableObject
     /// </summary>
     public long CachedSizeBytes { get; set; }
 
+    /// <summary>ファイル用コンストラクタ。</summary>
     public FileItemViewModel(string fullPath, string name, long sizeBytes, DateTime modifiedTime)
     {
         FullPath = fullPath;
         Name = name;
-        SizeText = FormatFileSize(sizeBytes);
+        SizeText = FileSizeFormatter.Format(sizeBytes);
         TypeText = "File";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = false;
-        IconSource = WindowsShellIconProvider.GetFileSmallIcon(fullPath);
         CachedSizeBytes = sizeBytes;
     }
 
+    /// <summary>フォルダ用コンストラクタ。cachedTotalSizeBytes が無い場合はサイズ未取得として空表示にする。</summary>
     public FileItemViewModel(string fullPath, string name, DateTime modifiedTime, long? cachedTotalSizeBytes = null)
     {
         FullPath = fullPath;
         Name = name;
-        SizeText = cachedTotalSizeBytes.HasValue ? FormatFileSize(cachedTotalSizeBytes.Value) : string.Empty;
+        SizeText = cachedTotalSizeBytes.HasValue ? FileSizeFormatter.Format(cachedTotalSizeBytes.Value) : string.Empty;
         TypeText = "Folder";
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
         IsFolder = true;
-        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
         CachedSizeBytes = cachedTotalSizeBytes ?? 0;
-    }
-
-    private static string FormatFileSize(long bytes)
-    {
-        double len = bytes;
-        int order = 0;
-        int maxOrder = SizeUnits.Length - 1;
-
-        while (len >= 1024 && order < maxOrder)
-        {
-            order++;
-            len /= 1024;
-        }
-        return $"{len:0.##} {SizeUnits[order]}";
     }
 }

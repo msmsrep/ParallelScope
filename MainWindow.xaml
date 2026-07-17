@@ -9,6 +9,7 @@
         Icon="Assets/logo.ico"
         FontFamily="Segoe UI Variable Text">
     <Window.Resources>
+
         <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
             <Setter Property="Text" Value="⟳"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
@@ -16,28 +17,21 @@
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Visibility" Value="Collapsed"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Setter Property="RenderTransform">
-                <Setter.Value>
-                    <RotateTransform Angle="0"/>
-                </Setter.Value>
-            </Setter>
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsScanning}" Value="True">
                     <Setter Property="Visibility" Value="Visible"/>
                     <DataTrigger.EnterActions>
-                        <BeginStoryboard x:Name="SpinStoryboard">
+                        <BeginStoryboard>
                             <Storyboard RepeatBehavior="Forever">
                                 <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                                 From="0" To="360" Duration="0:0:0.8"/>
+                                From="0" To="360" Duration="0:0:0.8"/>
                             </Storyboard>
                         </BeginStoryboard>
                     </DataTrigger.EnterActions>
-                    <DataTrigger.ExitActions>
-                        <StopStoryboard BeginStoryboardName="SpinStoryboard"/>
-                    </DataTrigger.ExitActions>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+
     </Window.Resources>
     <Grid Margin="5">
         <Grid.RowDefinitions>
@@ -59,8 +53,10 @@
             </Grid.ColumnDefinitions>
 
             <Menu Grid.Column="0" HorizontalAlignment="Left">
-                <MenuItem Header="Settings">
-                    <MenuItem Header="Open Settings" Click="OpenSettingsMenuItem_Click"/>
+                <MenuItem Header="Menu">
+                    <MenuItem Header="⚙  Settings" Click="OpenSettingsMenuItem_Click"/>
+                    <MenuItem Header="☕ Support | Buy a coffee for the developer" Click="KofiMenuItem_Click"/>
+                    <MenuItem Header="💜 Support | GitHub Sponsors" Click="GitHubSponsorsMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 
@@ -102,6 +98,7 @@
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
+                        <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
                     </Style>
                 </TreeView.ItemContainerStyle>
@@ -109,7 +106,11 @@
                     <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
                         <StackPanel Orientation="Horizontal">
                             <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
-                            <TextBlock Style="{StaticResource ScanningIndicatorStyle}"/>
+                            <TextBlock Style="{StaticResource ScanningIndicatorStyle}">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform Angle="0"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
                             <TextBlock Text="{Binding DisplayName}"/>
                             </StackPanel>
                     </HierarchicalDataTemplate>
@@ -134,23 +135,24 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
+                <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
                 <TextBox Grid.Column="0" Margin="0,0,8,0"
                          Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
-                         VerticalContentAlignment="Center"
-                         KeyDown="SearchTextBox_KeyDown"/>
-                <Button Grid.Column="1" Content="Search" Width="72" Margin="0,0,8,0"
-                        Click="SearchButton_Click"/>
-                <Button Grid.Column="2" Content="Clear" Width="72"
-                        Click="ClearSearchButton_Click"/>
+                         VerticalContentAlignment="Center"/>
+                <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
+                <ToggleButton Grid.Column="1" Content="All Files" Width="72"
+                              IsChecked="{Binding IsFlatFileViewEnabled}"/>
             </Grid>
 
             <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
+                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
+                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                      ScrollViewer.CanContentScroll="True"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
                 <DataGrid.Columns>
                     <DataGridTemplateColumn Header="Name" Width="*">

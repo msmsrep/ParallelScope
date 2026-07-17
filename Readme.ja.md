@@ -88,6 +88,15 @@ dotnet ef database update
 - `Data/`: 設定/キャッシュ/DbContext
 - `Migrations/`: EF Core マイグレーション
 
+## 開発を支援する
+
+本アプリ（ParallelScope）は個人で開発・運営しています。継続的なアップデートや機能改善のため、任意の開発支援を受け付けています。  
+ご協力いただける場合は、以下のリンクから支援していただけると大変励みになります。  
+（本サポートは対価のない任意の寄付であり、特典の提供はございません。）  
+
+- Ko‑fi: <https://ko-fi.com/msmsrep>  
+- GitHub Sponsors: <https://github.com/sponsors/msmsrep>
+
 ## プライバシーポリシー
 
 最終更新日：2026年6月14日

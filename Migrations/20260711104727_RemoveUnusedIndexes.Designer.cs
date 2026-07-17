@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using ParallelScope.Data;
 
@@ -10,9 +11,11 @@ using ParallelScope.Data;
 namespace ParallelScope.Migrations
 {
     [DbContext(typeof(ParallelScopeDbContext))]
-    partial class ParallelScopeDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260711104727_RemoveUnusedIndexes")]
+    partial class RemoveUnusedIndexes
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.9");

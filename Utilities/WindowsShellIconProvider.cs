@@ -8,6 +8,7 @@ using System.Windows.Media.Imaging;
 
 namespace ParallelScope.Utilities;
 
+/// <summary>Windowsシェル(SHGetFileInfo)からファイル/フォルダの小アイコンを取得し、拡張子単位でキャッシュするプロバイダ。</summary>
 public static class WindowsShellIconProvider
 {
     private const uint FileAttributeDirectory = 0x10;
@@ -19,11 +20,13 @@ public static class WindowsShellIconProvider
 
     private static readonly ConcurrentDictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>フォルダ用の小アイコンを取得する（結果はキャッシュされる）。</summary>
     public static ImageSource? GetFolderSmallIcon()
     {
         return IconCache.GetOrAdd("__folder__", _ => GetSmallIconInternal("folder", true));
     }
 
+    /// <summary>ファイルの拡張子に対応する小アイコンを取得する（拡張子単位でキャッシュされる）。</summary>
     public static ImageSource? GetFileSmallIcon(string fullPath)
     {
         if (string.IsNullOrWhiteSpace(fullPath))
@@ -39,6 +42,7 @@ public static class WindowsShellIconProvider
         return IconCache.GetOrAdd(cacheKey, _ => GetSmallIconInternal(fullPath, false));
     }
 
+    /// <summary>SHGetFileInfo を呼び出してHICONを取得し、ImageSourceに変換する（取得後はHICONを破棄する）。</summary>
     private static ImageSource? GetSmallIconInternal(string pathOrExtension, bool isFolder)
     {
         var attributes = isFolder ? FileAttributeDirectory : FileAttributeNormal;

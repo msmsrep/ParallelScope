@@ -24,14 +24,15 @@ public class ParallelScopeDbContext : DbContext
             entity.Property(x => x.FullPath).IsRequired();
             entity.Property(x => x.Name).IsRequired();
 
-            // インデックス最適化
+            // 一覧表示・親パス単位の置き換え/削除・孤児掃除で使用
             entity.HasIndex(x => x.ParentPath);
-            entity.HasIndex(x => new { x.ParentPath, x.Name });
+            // クエリでは未使用だが、キャッシュ置き換えロジックの不具合で重複行が
+            // 蓄積するのを防ぐ整合性制約として維持する
             entity.HasIndex(x => x.FullPath).IsUnique();
-
-            // 検索用インデックス（大文字小文字を区別しないスキャン用）
-            entity.HasIndex(x => x.Name);
-            entity.HasIndex(x => new { x.IsFolder, x.Name });
+            // かつて存在した (ParentPath,Name)・Name・(IsFolder,Name) は、どのクエリの
+            // 実行計画にも使われずパス文字列の重複保存でDBを肥大化させていたため削除した。
+            // All Files・検索用の (IsFolder, FullPath) は FileCacheRepository の
+            // PRAGMA 適用時に生SQLで作成している
         });
     }
 }
