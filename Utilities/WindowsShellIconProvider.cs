@@ -17,8 +17,10 @@ public static class WindowsShellIconProvider
     private const uint ShgfiIcon = 0x000000100;
     private const uint ShgfiSmallIcon = 0x000000001;
     private const uint ShgfiUseFileAttributes = 0x000000010;
+    private const uint ShgfiTypeName = 0x000000400;
 
     private static readonly ConcurrentDictionary<string, ImageSource?> IconCache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> TypeNameCache = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>フォルダ用の小アイコンを取得する（結果はキャッシュされる）。</summary>
     public static ImageSource? GetFolderSmallIcon()
@@ -40,6 +42,48 @@ public static class WindowsShellIconProvider
             : extension;
 
         return IconCache.GetOrAdd(cacheKey, _ => GetSmallIconInternal(fullPath, false));
+    }
+
+    /// <summary>フォルダのシェル上の種類名（例: "ファイル フォルダー"）を取得する（結果はキャッシュされる）。</summary>
+    public static string GetFolderTypeName()
+    {
+        return TypeNameCache.GetOrAdd("__folder__", _ => GetTypeNameInternal("folder", true) ?? "Folder");
+    }
+
+    /// <summary>
+    /// ファイルのシェル上の種類名（例: "PNG ファイル"）を取得する（拡張子単位でキャッシュされる）。
+    /// USEFILEATTRIBUTES指定のため実ファイルへのディスクアクセスは発生しない。
+    /// </summary>
+    public static string GetFileTypeName(string fullPath)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath))
+        {
+            return "File";
+        }
+
+        var extension = Path.GetExtension(fullPath);
+        var cacheKey = string.IsNullOrWhiteSpace(extension)
+            ? "__file_no_ext__"
+            : extension;
+
+        return TypeNameCache.GetOrAdd(cacheKey, key =>
+            GetTypeNameInternal(key == "__file_no_ext__" ? "file" : key, false) ?? "File");
+    }
+
+    /// <summary>SHGetFileInfo から szTypeName を取得する。取得できない場合は null を返す。</summary>
+    private static string? GetTypeNameInternal(string pathOrExtension, bool isFolder)
+    {
+        var attributes = isFolder ? FileAttributeDirectory : FileAttributeNormal;
+        var flags = ShgfiTypeName | ShgfiUseFileAttributes;
+
+        var info = new Shfileinfo();
+        var result = SHGetFileInfo(pathOrExtension, attributes, ref info, (uint)Marshal.SizeOf<Shfileinfo>(), flags);
+        if (result == IntPtr.Zero || string.IsNullOrWhiteSpace(info.szTypeName))
+        {
+            return null;
+        }
+
+        return info.szTypeName;
     }
 
     /// <summary>SHGetFileInfo を呼び出してHICONを取得し、ImageSourceに変換する（取得後はHICONを破棄する）。</summary>

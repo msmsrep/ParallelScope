@@ -11,7 +11,9 @@ public sealed record CachedFileSystemEntry(
     string Name,
     bool IsFolder,
     long? SizeBytes,
-    DateTime LastWriteTimeUtc);
+    DateTime LastWriteTimeUtc,
+    DateTime? CreationTimeUtc,
+    int? Attributes);
 
 /// <summary>
 /// ファイルシステムのスキャン結果を SQLite にキャッシュするリポジトリ。
@@ -106,7 +108,9 @@ public class FileCacheRepository
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList();
     }
 
@@ -122,7 +126,7 @@ public class FileCacheRepository
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
             WHERE IsFolder = 0
                             AND FullPath LIKE @rootPattern";
@@ -142,7 +146,9 @@ public class FileCacheRepository
                 reader.GetString(2),
                 reader.GetBoolean(3),
                 reader.IsDBNull(4) ? null : reader.GetInt64(4),
-                reader.GetDateTime(5)));
+                reader.GetDateTime(5),
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7)));
         }
 
         conn.Close();
@@ -212,7 +218,9 @@ public class FileCacheRepository
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList();
     }
 
@@ -304,7 +312,9 @@ public class FileCacheRepository
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList()
             .GroupBy(x => x.ParentPath, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => (IReadOnlyCollection<CachedFileSystemEntry>)g.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -505,7 +515,7 @@ public class FileCacheRepository
     private static (string Sql, object[] Parameters) BuildBulkInsertCommand(List<(string ParentPath, CachedFileSystemEntry Entry)> batch)
     {
         var sb = new StringBuilder(
-            "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc) VALUES ");
+            "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes) VALUES ");
 
         var parameters = new List<object>();
         for (int j = 0; j < batch.Count; j++)
@@ -516,8 +526,8 @@ public class FileCacheRepository
                 sb.Append(",");
             }
 
-            int pIdx = j * 6;
-            sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5})");
+            int pIdx = j * 8;
+            sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5},@p{pIdx + 6},@p{pIdx + 7})");
 
             parameters.Add(parentPath);
             parameters.Add(entry.FullPath);
@@ -525,6 +535,9 @@ public class FileCacheRepository
             parameters.Add(entry.IsFolder);
             parameters.Add(entry.SizeBytes ?? 0L);
             parameters.Add(entry.LastWriteTimeUtc);
+            // EF書き込み経路（ReplaceEntriesByParentPathInternal）とNULL表現を揃え、差分判定の誤検知を防ぐ
+            parameters.Add((object?)entry.CreationTimeUtc ?? DBNull.Value);
+            parameters.Add((object?)entry.Attributes ?? DBNull.Value);
         }
 
         return (sb.ToString(), parameters.ToArray());
@@ -546,7 +559,9 @@ public class FileCacheRepository
                 Name = x.Name,
                 IsFolder = x.IsFolder,
                 SizeBytes = x.SizeBytes,
-                LastWriteTimeUtc = x.LastWriteTimeUtc
+                LastWriteTimeUtc = x.LastWriteTimeUtc,
+                CreationTimeUtc = x.CreationTimeUtc,
+                Attributes = x.Attributes
             });
 
             db.FileSystemEntries.AddRange(entities);

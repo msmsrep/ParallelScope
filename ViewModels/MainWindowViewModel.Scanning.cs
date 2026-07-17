@@ -352,13 +352,16 @@ public partial class MainWindowViewModel
     {
         try
         {
+            // 作成日時・属性は列挙時に取得済みのデータ（WIN32_FIND_DATA）から読むだけで、追加のI/Oは発生しない
             return new CachedFileSystemEntry(
                 parentPath,
                 directory.FullName,
                 directory.Name,
                 true,
                 null,
-                directory.LastWriteTimeUtc);
+                directory.LastWriteTimeUtc,
+                directory.CreationTimeUtc,
+                (int)directory.Attributes);
         }
         catch (UnauthorizedAccessException)
         {
@@ -374,13 +377,16 @@ public partial class MainWindowViewModel
     {
         try
         {
+            // 作成日時・属性は列挙時に取得済みのデータ（WIN32_FIND_DATA）から読むだけで、追加のI/Oは発生しない
             return new CachedFileSystemEntry(
                 parentPath,
                 file.FullName,
                 file.Name,
                 false,
                 file.Length,
-                file.LastWriteTimeUtc);
+                file.LastWriteTimeUtc,
+                file.CreationTimeUtc,
+                (int)file.Attributes);
         }
         catch (UnauthorizedAccessException)
         {

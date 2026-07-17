@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.IO;
 using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
@@ -82,6 +83,14 @@ public partial class MainWindowViewModel
         {
             existing.TypeText = newItem.TypeText;
             existing.ModifiedTime = newItem.ModifiedTime;
+            existing.AttributesText = newItem.AttributesText;
+
+            // 作成日時: 古いキャッシュ行には値が無い（空）ため、空で既存の値を上書きしない
+            // （ライブ更新で一度表示された値がキャッシュ再読込で消えるのを防ぐ。作成日時は変化しない値なので保持で問題ない）
+            if (!string.IsNullOrEmpty(newItem.CreatedTime))
+            {
+                existing.CreatedTime = newItem.CreatedTime;
+            }
 
             // サイズ情報：新規アイテムが空で既存アイテムが有る場合は既存値を保持
             if (!string.IsNullOrEmpty(newItem.SizeText))
@@ -131,11 +140,37 @@ public partial class MainWindowViewModel
     {
         var modifiedLocalTime = DateTime.SpecifyKind(entry.LastWriteTimeUtc, DateTimeKind.Utc).ToLocalTime();
 
-        if (entry.IsFolder)
+        var item = entry.IsFolder
+            ? new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime)
+            : new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
+
+        // 作成日時・属性は列追加前のキャッシュ行には無い（null）ため、次のスキャンで埋まるまで空表示になる
+        if (entry.CreationTimeUtc is { } creationUtc)
         {
-            return new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime);
+            item.CreatedTime = DateTime.SpecifyKind(creationUtc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
         }
 
-        return new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
+        item.AttributesText = FormatAttributes(entry.Attributes);
+        return item;
+    }
+
+    /// <summary>ファイル属性をエクスプローラー風の文字列（R/H/S/A）へ変換する。未取得（null）や該当なしは空。</summary>
+    private static string FormatAttributes(int? attributes)
+    {
+        if (attributes is null)
+        {
+            return string.Empty;
+        }
+
+        var value = (FileAttributes)attributes.Value;
+        Span<char> letters = stackalloc char[4];
+        var count = 0;
+
+        if (value.HasFlag(FileAttributes.ReadOnly)) letters[count++] = 'R';
+        if (value.HasFlag(FileAttributes.Hidden)) letters[count++] = 'H';
+        if (value.HasFlag(FileAttributes.System)) letters[count++] = 'S';
+        if (value.HasFlag(FileAttributes.Archive)) letters[count++] = 'A';
+
+        return count == 0 ? string.Empty : new string(letters[..count]);
     }
 }

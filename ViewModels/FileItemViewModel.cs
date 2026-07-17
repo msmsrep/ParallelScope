@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Utilities;
+using System.IO;
 using System.Windows.Media;
 
 namespace ParallelScope.ViewModels;
@@ -12,6 +13,9 @@ public class FileItemViewModel : ObservableObject
     private string _sizeText = string.Empty;
     private string _typeText = string.Empty;
     private string _modifiedTime = string.Empty;
+    private string _location = string.Empty;
+    private string _createdTime = string.Empty;
+    private string _attributesText = string.Empty;
     private bool _isFolder;
     private ImageSource? _iconSource;
     private bool _iconInitialized;
@@ -44,6 +48,27 @@ public class FileItemViewModel : ObservableObject
     {
         get => _modifiedTime;
         set => SetProperty(ref _modifiedTime, value);
+    }
+
+    /// <summary>場所（親フォルダのパス）。検索結果・All Files表示でどこのファイルかを示す。</summary>
+    public string Location
+    {
+        get => _location;
+        set => SetProperty(ref _location, value);
+    }
+
+    /// <summary>作成日時の表示文字列。キャッシュに値が無い間（次のスキャンまで）は空。</summary>
+    public string CreatedTime
+    {
+        get => _createdTime;
+        set => SetProperty(ref _createdTime, value);
+    }
+
+    /// <summary>ファイル属性のエクスプローラー風表記（R=読み取り専用 H=隠し S=システム A=アーカイブ）。</summary>
+    public string AttributesText
+    {
+        get => _attributesText;
+        set => SetProperty(ref _attributesText, value);
     }
 
     public bool IsFolder
@@ -86,8 +111,10 @@ public class FileItemViewModel : ObservableObject
         FullPath = fullPath;
         Name = name;
         SizeText = FileSizeFormatter.Format(sizeBytes);
-        TypeText = "File";
+        // 種類名は拡張子単位でキャッシュされるため、2回目以降は辞書引きのみで実質コストゼロ
+        TypeText = WindowsShellIconProvider.GetFileTypeName(fullPath);
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
+        Location = GetLocation(fullPath);
         IsFolder = false;
         CachedSizeBytes = sizeBytes;
     }
@@ -98,9 +125,23 @@ public class FileItemViewModel : ObservableObject
         FullPath = fullPath;
         Name = name;
         SizeText = cachedTotalSizeBytes.HasValue ? FileSizeFormatter.Format(cachedTotalSizeBytes.Value) : string.Empty;
-        TypeText = "Folder";
+        TypeText = WindowsShellIconProvider.GetFolderTypeName();
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
+        Location = GetLocation(fullPath);
         IsFolder = true;
         CachedSizeBytes = cachedTotalSizeBytes ?? 0;
+    }
+
+    /// <summary>親フォルダのパスを求める（純粋な文字列操作でファイルシステムへはアクセスしない）。</summary>
+    private static string GetLocation(string fullPath)
+    {
+        try
+        {
+            return Path.GetDirectoryName(fullPath) ?? string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 }

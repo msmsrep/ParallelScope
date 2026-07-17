@@ -9,4 +9,8 @@ public class FileSystemEntryEntity
     public bool IsFolder { get; set; }
     public long? SizeBytes { get; set; }
     public DateTime LastWriteTimeUtc { get; set; }
+
+    // 既存キャッシュ行には値が無い（次のスキャンで埋まる）ため、どちらもnull許容にする
+    public DateTime? CreationTimeUtc { get; set; }
+    public int? Attributes { get; set; }
 }
