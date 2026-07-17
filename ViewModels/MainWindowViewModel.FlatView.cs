@@ -1,4 +1,5 @@
 using System.Threading;
+using ParallelScope.Data;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
@@ -32,7 +33,7 @@ public partial class MainWindowViewModel
         {
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             results = await Task.Run(() =>
-                _fileCacheRepository.GetFilesUnderPath(folderPath)
+                GetFlatViewFiles(folderPath)
                     .Where(x => !IsExcludedNormalizedPath(x.FullPath))
                     .Select(ToViewModel)
                     .ToList());
@@ -56,6 +57,21 @@ public partial class MainWindowViewModel
 
             ReplaceVisibleFileItems(results, forceBulkReplace: true);
         }, null);
+    }
+
+    /// <summary>起点が仮想「Roots」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを取得する。</summary>
+    private List<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
+    {
+        if (!AllRootsVirtualFolder.Matches(folderPath))
+        {
+            return _fileCacheRepository.GetFilesUnderPath(folderPath);
+        }
+
+        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合に同一エントリが重複するため、FullPathで除去する
+        return _rootPathsSnapshot
+            .SelectMany(root => _fileCacheRepository.GetFilesUnderPath(root))
+            .DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>取得結果が届いた時点でもまだ表示すべき状態か（フォルダ移動・モード解除・検索開始が起きていないか）を確認する。</summary>

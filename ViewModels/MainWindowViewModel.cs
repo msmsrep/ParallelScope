@@ -30,6 +30,10 @@ public partial class MainWindowViewModel : ObservableObject
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
+    // バックグラウンド処理（横断検索・フラット表示・Roots一覧）から参照するルートパスの不変スナップショット。
+    // RootFolders（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
+    private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
+
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
     private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
@@ -41,6 +45,12 @@ public partial class MainWindowViewModel : ObservableObject
         get => _rootFolders;
         set => SetProperty(ref _rootFolders, value);
     }
+
+    /// <summary>
+    /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Roots」ノード1件のみを含み、
+    /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
+    /// </summary>
+    public ObservableCollection<FolderItemViewModel> TreeRoots { get; }
 
     public ObservableCollection<FileItemViewModel> FileItems
     {
@@ -127,6 +137,10 @@ public partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel()
     {
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
+        TreeRoots = new ObservableCollection<FolderItemViewModel>
+        {
+            FolderItemViewModel.CreateAllRootsNode(_rootFolders)
+        };
         _fileItems = new ObservableCollection<FileItemViewModel>();
         _fileCacheRepository = new FileCacheRepository();
         _appSettingsRepository = new AppSettingsRepository();

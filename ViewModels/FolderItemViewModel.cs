@@ -23,6 +23,7 @@ public class FolderItemViewModel : ObservableObject
     private bool _isScanning;
     private bool _isLoaded;
     private bool _hasSubFolders = true;
+    private bool _isExpanded;
     private ImageSource? _iconSource;
 
     public string DisplayName { get; set; }
@@ -45,6 +46,13 @@ public class FolderItemViewModel : ObservableObject
     {
         get => _hasSubFolders;
         set => SetProperty(ref _hasSubFolders, value);
+    }
+
+    /// <summary>ツリー上の展開状態。仮想「Roots」ノードを既定で展開表示するために持つ。</summary>
+    public bool IsExpanded
+    {
+        get => _isExpanded;
+        set => SetProperty(ref _isExpanded, value);
     }
 
     public ObservableCollection<FolderItemViewModel> SubFolders
@@ -73,6 +81,27 @@ public class FolderItemViewModel : ObservableObject
             dummy.DisplayName = "読み込み中...";
             _subFolders.Add(dummy);
         }
+    }
+
+    /// <summary>全ルートフォルダを子として表示する、ツリー最上位の仮想「Roots」ノードを生成する。</summary>
+    public static FolderItemViewModel CreateAllRootsNode(ObservableCollection<FolderItemViewModel> rootFolders)
+    {
+        return new FolderItemViewModel(rootFolders);
+    }
+
+    /// <summary>
+    /// 仮想「Roots」ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体）を共有するため、
+    /// ルート設定の差分更新がそのままツリーへ反映される。実パスを持たないため遅延読み込みは行わない。
+    /// </summary>
+    private FolderItemViewModel(ObservableCollection<FolderItemViewModel> subFolders)
+    {
+        _path = AllRootsVirtualFolder.Path;
+        _isExcludedPath = null;
+        DisplayName = AllRootsVirtualFolder.DisplayName;
+        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
+        _subFolders = subFolders;
+        _isLoaded = true;
+        _isExpanded = true;
     }
 
     /// <summary>遅延読み込み（同期版）: パス遡査などで即座に実行が必要な場合に使用。</summary>

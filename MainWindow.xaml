@@ -91,12 +91,14 @@
             
             <TextBlock Grid.Row="0" Text="Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
             
+            <!-- 最上位は仮想「Roots」ノードのみで、各ルートはその子として表示される -->
             <TreeView Grid.Row="1" Name="FolderTreeView"
-                      ItemsSource="{Binding RootFolders}" 
+                      ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>

@@ -184,6 +184,13 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 仮想「Roots」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
+        if (AllRootsVirtualFolder.Matches(folderItem.Path))
+        {
+            e.Handled = true;
+            return;
+        }
+
         var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
         if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
         {
@@ -460,7 +467,15 @@ public partial class MainWindow : Window
             .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
             .ToList();
 
-        ExpandAndSelectByPath(FolderTreeView, rootFolder, pathComponents, 0);
+        // ルートは仮想「Roots」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromIndex(0) is not TreeViewItem allRootsItem)
+        {
+            return;
+        }
+
+        allRootsItem.IsExpanded = true;
+
+        ExpandAndSelectByPath(allRootsItem, rootFolder, pathComponents, 0);
         if (_treeItemMap.TryGetValue(path, out tvi))
         {
             ExpandParents(tvi);

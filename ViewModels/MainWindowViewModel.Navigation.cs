@@ -113,6 +113,26 @@ public partial class MainWindowViewModel
     /// <summary>現在地・アドレス表示・検索状態を更新し、キャッシュ読込とバックグラウンド更新を開始する。</summary>
     private bool LoadFilesInternal(string folderPath)
     {
+        // 仮想「Roots」ノード: 実パスではないため存在確認・ライブFS更新は行わず、
+        // 各ルートをフォルダ行として一覧表示する（サイズはキャッシュから集計）
+        if (AllRootsVirtualFolder.Matches(folderPath))
+        {
+            CurrentPath = AllRootsVirtualFolder.Path;
+            AddressInput = AllRootsVirtualFolder.Path;
+            SearchQuery = string.Empty;
+
+            var allRootsNavigationVersion = Interlocked.Increment(ref _navigationVersion);
+            _ = LoadAllRootsListingAsync(allRootsNavigationVersion);
+
+            if (IsFlatFileViewEnabled)
+            {
+                // フラット表示モード中は全ルート横断の全ファイルを再取得する
+                RequestFlatFileView();
+            }
+
+            return true;
+        }
+
         // 切断中のNASでもUIを固めないよう、存在確認はタイムアウト付きで行う。
         // タイムアウト時は存在する扱いで進み、キャッシュからの表示（LoadFromCacheAsync）に任せる。
         // 実際に読めない場合はバックグラウンド更新が何もせず終わるだけで、キャッシュ由来の一覧は閲覧できる
@@ -160,8 +180,17 @@ public partial class MainWindowViewModel
         }
 
         var navigationVersion = Interlocked.Increment(ref _navigationVersion);
-        _ = LoadFromCacheAsync(folderPath, navigationVersion);
-        _refreshCoalescer.Request((folderPath, navigationVersion));
+
+        if (AllRootsVirtualFolder.Matches(folderPath))
+        {
+            // 仮想ノードにはキャッシュ行もライブFSも無いため、ルート一覧の再構築のみ行う
+            _ = LoadAllRootsListingAsync(navigationVersion);
+        }
+        else
+        {
+            _ = LoadFromCacheAsync(folderPath, navigationVersion);
+            _refreshCoalescer.Request((folderPath, navigationVersion));
+        }
 
         if (!string.IsNullOrWhiteSpace(SearchQuery))
         {
@@ -179,6 +208,12 @@ public partial class MainWindowViewModel
     private static string? GetParentPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        // 仮想「Roots」はツリーの最上位なので親は無い（Directory.GetParent に仮想パスを渡さない）
+        if (AllRootsVirtualFolder.Matches(path))
         {
             return null;
         }

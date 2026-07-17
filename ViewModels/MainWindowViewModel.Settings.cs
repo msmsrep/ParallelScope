@@ -114,6 +114,8 @@ public partial class MainWindowViewModel
             orderedIndex++;
         }
 
+        _rootPathsSnapshot = RootFolders.Select(x => x.Path).ToList();
+
         if (saveSettings)
         {
             SaveSettings(normalizedRootPaths);
@@ -126,6 +128,13 @@ public partial class MainWindowViewModel
             AddressInput = string.Empty;
             _currentDirectoryItems.Clear();
             ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
+            return;
+        }
+
+        if (AllRootsVirtualFolder.Matches(CurrentPath))
+        {
+            // 仮想「Roots」を表示中はナビゲーションせず、変更後のルート構成で一覧を取り直す
+            RefreshCurrentFolder();
             return;
         }
 

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
@@ -40,6 +41,55 @@ public partial class MainWindowViewModel
             UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
             // キャッシュサイズ適用をリクエスト（統合）
             _folderSizeCoalescer.Request((folderPath, cachedEntries, navigationVersion));
+        }, null);
+    }
+
+    /// <summary>仮想「Roots」表示用に、各ルートをフォルダ行として一覧化する（合計サイズはキャッシュから集計）。</summary>
+    private async Task LoadAllRootsListingAsync(int navigationVersion)
+    {
+        var rootPaths = _rootPathsSnapshot;
+
+        List<FileItemViewModel> rootItems;
+        try
+        {
+            rootItems = await Task.Run(() =>
+            {
+                var cachedTotalSizes = _fileCacheRepository.GetCachedTotalSizesUnderPaths(rootPaths);
+                return rootPaths
+                    .Select(rootPath =>
+                    {
+                        long? totalSize = cachedTotalSizes.TryGetValue(rootPath, out var size) && size > 0 ? size : null;
+                        var name = Path.GetFileName(rootPath);
+                        var item = new FileItemViewModel(
+                            rootPath,
+                            string.IsNullOrWhiteSpace(name) ? rootPath : name,
+                            DateTime.MinValue,
+                            totalSize);
+                        // ルート自身の更新日時はライブFSアクセスなしでは取得できない（切断中のNASでブロックしうる）ため表示しない
+                        item.ModifiedTime = string.Empty;
+                        return item;
+                    })
+                    .ToList();
+            });
+        }
+        catch
+        {
+            return;
+        }
+
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !AllRootsVirtualFolder.Matches(CurrentPath))
+        {
+            return;
+        }
+
+        _uiContext.Post(_ =>
+        {
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !AllRootsVirtualFolder.Matches(CurrentPath))
+            {
+                return;
+            }
+
+            UpdateCurrentDirectoryItems(rootItems);
         }, null);
     }
 

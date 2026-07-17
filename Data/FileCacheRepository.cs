@@ -149,6 +149,46 @@ public class FileCacheRepository
         return results;
     }
 
+    /// <summary>各ルートパス配下のファイル合計サイズをキャッシュから集計する（仮想「Roots」の一覧表示用）。</summary>
+    public Dictionary<string, long> GetCachedTotalSizesUnderPaths(IEnumerable<string> rootPaths)
+    {
+        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        using var db = CreateDbContext();
+        using var conn = db.Database.GetDbConnection();
+        conn.Open();
+
+        foreach (var rootPath in rootPaths)
+        {
+            var normalizedRootPath = PathNormalizer.Normalize(rootPath);
+            if (string.IsNullOrEmpty(normalizedRootPath))
+            {
+                continue;
+            }
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(SizeBytes), 0)
+                FROM FileSystemEntries
+                WHERE IsFolder = 0
+                    AND FullPath LIKE @rootPattern";
+
+            var rootPatternParam = cmd.CreateParameter();
+            rootPatternParam.ParameterName = "@rootPattern";
+            rootPatternParam.Value = PathNormalizer.WithTrailingSeparator(normalizedRootPath) + "%";
+            cmd.Parameters.Add(rootPatternParam);
+
+            var total = Convert.ToInt64(cmd.ExecuteScalar());
+            if (total > 0)
+            {
+                result[normalizedRootPath] = total;
+            }
+        }
+
+        conn.Close();
+        return result;
+    }
+
     /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索する。</summary>
     public List<CachedFileSystemEntry> SearchEntriesUnderPath(string rootPath, string nameQuery)
     {
