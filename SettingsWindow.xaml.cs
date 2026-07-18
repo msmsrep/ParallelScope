@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using ParallelScope.Utilities;
 
 namespace ParallelScope;
@@ -9,6 +10,7 @@ public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<string> _rootPaths;
     private readonly ObservableCollection<string> _excludedPaths;
+    private readonly Dictionary<string, CheckBox> _columnCheckBoxes;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -16,8 +18,18 @@ public partial class SettingsWindow : Window
     public int ResultFullScanIntervalHours => _fullScanIntervalHours;
     public bool ShouldRunFullScan { get; private set; }
 
+    /// <summary>チェックされた表示列のキー一覧（画面上の列順）。</summary>
+    public IReadOnlyList<string> ResultVisibleColumns =>
+        FileListColumns.OptionalColumns
+            .Where(column => _columnCheckBoxes[column].IsChecked == true)
+            .ToList();
+
     // 現在の設定値でダイアログの初期状態を構築する
-    public SettingsWindow(IEnumerable<string> currentRootPaths, IEnumerable<string> currentExcludedPaths, int currentFullScanIntervalHours)
+    public SettingsWindow(
+        IEnumerable<string> currentRootPaths,
+        IEnumerable<string> currentExcludedPaths,
+        int currentFullScanIntervalHours,
+        IEnumerable<string> currentVisibleColumns)
     {
         InitializeComponent();
 
@@ -27,6 +39,37 @@ public partial class SettingsWindow : Window
         RootPathsListBox.ItemsSource = _rootPaths;
         ExcludedPathsListBox.ItemsSource = _excludedPaths;
         FullScanIntervalHoursTextBox.Text = _fullScanIntervalHours.ToString();
+
+        _columnCheckBoxes = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase)
+        {
+            [FileListColumns.Location] = LocationColumnCheckBox,
+            [FileListColumns.Type] = TypeColumnCheckBox,
+            [FileListColumns.Size] = SizeColumnCheckBox,
+            [FileListColumns.Modified] = ModifiedColumnCheckBox,
+            [FileListColumns.Created] = CreatedColumnCheckBox,
+            [FileListColumns.Attributes] = AttributesColumnCheckBox
+        };
+
+        var visibleColumnSet = currentVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var (column, checkBox) in _columnCheckBoxes)
+        {
+            checkBox.IsChecked = visibleColumnSet.Contains(column);
+        }
+    }
+
+    // 左メニューの選択に応じて右側の設定ページを切り替える
+    private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null)
+        {
+            return;
+        }
+
+        var showColumns = SettingsMenuListBox.SelectedIndex == 1;
+        RootSettingsPanel.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
+        ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
+        SaveAndFullScanButton.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
     }
 
     // 入力欄のルートパスを検証・正規化して一覧へ追加する

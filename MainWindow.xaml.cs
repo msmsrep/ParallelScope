@@ -35,7 +35,26 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
 
+        ApplyFileListColumnVisibility();
         SyncTreeSelectionToCurrentPath();
+    }
+
+    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
+    private void ApplyFileListColumnVisibility()
+    {
+        var visibleColumns = _viewModel.GetVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        SetColumnVisibility(LocationColumn, visibleColumns.Contains(FileListColumns.Location));
+        SetColumnVisibility(TypeColumn, visibleColumns.Contains(FileListColumns.Type));
+        SetColumnVisibility(SizeColumn, visibleColumns.Contains(FileListColumns.Size));
+        SetColumnVisibility(ModifiedColumn, visibleColumns.Contains(FileListColumns.Modified));
+        SetColumnVisibility(CreatedColumn, visibleColumns.Contains(FileListColumns.Created));
+        SetColumnVisibility(AttributesColumn, visibleColumns.Contains(FileListColumns.Attributes));
+    }
+
+    private static void SetColumnVisibility(DataGridColumn column, bool isVisible)
+    {
+        column.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
@@ -114,7 +133,8 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
-            _viewModel.GetFullScanIntervalHours())
+            _viewModel.GetFullScanIntervalHours(),
+            _viewModel.GetVisibleColumns())
         {
             Owner = this
         };
@@ -124,7 +144,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours);
+        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours, dialog.ResultVisibleColumns);
+        ApplyFileListColumnVisibility();
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 

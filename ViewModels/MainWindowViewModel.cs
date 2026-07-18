@@ -34,6 +34,9 @@ public partial class MainWindowViewModel : ObservableObject
     // RootFolders（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
+    // ファイル一覧に表示する列キー（FileListColumns参照。Name列は常時表示のため含まない）
+    private HashSet<string> _visibleColumns = FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
     private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
