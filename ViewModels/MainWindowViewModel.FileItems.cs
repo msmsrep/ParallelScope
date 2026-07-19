@@ -10,6 +10,31 @@ public partial class MainWindowViewModel
     /// <summary>差分がこの件数を超えたらコレクションごと差し替える（All Filesモードの切り替え等で数万件の通知がUIスレッドを塞ぐのを防ぐ）。</summary>
     private const int BulkReplaceThreshold = 200;
 
+    /// <summary>
+    /// アイテムの同一性判定キー。FullPath は保持せず Location + Name から都度生成するため、
+    /// FullPath 文字列をキーにすると差分計算のたびに全件分のパス文字列生成が走る。
+    /// 構成要素のペアをそのままキーにすれば追加の文字列生成なしで同じ判定になる。
+    /// </summary>
+    private static (string Location, string Name) PathKeyOf(FileItemViewModel item) => (item.Location, item.Name);
+
+    private sealed class PathKeyComparer : IEqualityComparer<(string Location, string Name)>
+    {
+        public static readonly PathKeyComparer Instance = new();
+
+        public bool Equals((string Location, string Name) x, (string Location, string Name) y)
+        {
+            return string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Location, y.Location, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public int GetHashCode((string Location, string Name) key)
+        {
+            return HashCode.Combine(
+                StringComparer.OrdinalIgnoreCase.GetHashCode(key.Location),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(key.Name));
+        }
+    }
+
     /// <summary>表示中のFileItemsを、差分（追加/削除/更新）だけを適用する形で置き換える（不要な再描画を防止）。</summary>
     private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items, bool forceBulkReplace = false)
     {
@@ -26,12 +51,12 @@ public partial class MainWindowViewModel
         var currentItems = FileItems.ToList();
 
         // 既存アイテムをパスでマップ
-        var currentItemMap = currentItems.ToDictionary(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+        var currentItemMap = currentItems.ToDictionary(PathKeyOf, PathKeyComparer.Instance);
 
         // 削除するアイテムを特定（パスで比較）
-        var newItemPaths = new HashSet<string>(newItems.Select(x => x.FullPath), StringComparer.OrdinalIgnoreCase);
+        var newItemPaths = newItems.Select(PathKeyOf).ToHashSet(PathKeyComparer.Instance);
         var itemsToRemove = currentItems
-            .Where(x => !newItemPaths.Contains(x.FullPath))
+            .Where(x => !newItemPaths.Contains(PathKeyOf(x)))
             .ToList();
 
         // 追加するアイテムと更新するアイテムを特定
@@ -40,7 +65,7 @@ public partial class MainWindowViewModel
 
         foreach (var newItem in newItems)
         {
-            if (currentItemMap.TryGetValue(newItem.FullPath, out var existingItem))
+            if (currentItemMap.TryGetValue(PathKeyOf(newItem), out var existingItem))
             {
                 itemsToUpdate.Add((existingItem, newItem));
             }
@@ -59,7 +84,7 @@ public partial class MainWindowViewModel
             // DataGridの行仮想化により生成されるのは可視行のみ。既存アイテムはサイズ表示等を保持するため
             // インスタンスを再利用する。
             FileItems = new ObservableCollection<FileItemViewModel>(
-                newItems.Select(x => currentItemMap.TryGetValue(x.FullPath, out var existing) ? existing : x));
+                newItems.Select(x => currentItemMap.TryGetValue(PathKeyOf(x), out var existing) ? existing : x));
             return;
         }
 
@@ -82,26 +107,21 @@ public partial class MainWindowViewModel
         foreach (var (existing, newItem) in itemsToUpdate)
         {
             existing.TypeText = newItem.TypeText;
-            existing.ModifiedTime = newItem.ModifiedTime;
+            existing.ModifiedAt = newItem.ModifiedAt;
             existing.AttributesText = newItem.AttributesText;
 
-            // 作成日時: 古いキャッシュ行には値が無い（空）ため、空で既存の値を上書きしない
+            // 作成日時: 古いキャッシュ行には値が無い（null）ため、nullで既存の値を上書きしない
             // （ライブ更新で一度表示された値がキャッシュ再読込で消えるのを防ぐ。作成日時は変化しない値なので保持で問題ない）
-            if (!string.IsNullOrEmpty(newItem.CreatedTime))
+            if (newItem.CreatedAt is { } createdAt)
             {
-                existing.CreatedTime = newItem.CreatedTime;
+                existing.CreatedAt = createdAt;
             }
 
-            // サイズ情報：新規アイテムが空で既存アイテムが有る場合は既存値を保持
-            if (!string.IsNullOrEmpty(newItem.SizeText))
+            // サイズ: 新規アイテムが未取得（null。フォルダのキャッシュ集計が無い場合等）なら、
+            // キャッシュ集計由来の既存値を保持する
+            if (newItem.SizeBytes is { } sizeBytes)
             {
-                existing.SizeText = newItem.SizeText;
-                existing.CachedSizeBytes = newItem.CachedSizeBytes;
-            }
-            // 新規アイテムが空で既存アイテムが有る場合は既存値を保持（キャッシュから取得したサイズ）
-            else if (string.IsNullOrEmpty(newItem.SizeText) && !string.IsNullOrEmpty(existing.SizeText) && existing.CachedSizeBytes > 0)
-            {
-                // 既存のサイズ情報を保持
+                existing.SizeBytes = sizeBytes;
             }
         }
     }
@@ -111,18 +131,16 @@ public partial class MainWindowViewModel
     {
         var newItems = items.ToList();
 
-        // 既存のアイテムからサイズ情報を引き継ぐ（ライブデータの再取得時にキャッシュサイズが失われるのを防止）
-        var currentItemMap = _currentDirectoryItems.ToDictionary(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+        // 既存のアイテムからフォルダ合計サイズを引き継ぐ（キャッシュ集計でしか得られない値のため、
+        // ライブデータの再取得時に失われるのを防止）。ファイルはライブ列挙の最新サイズをそのまま使う
+        var currentItemMap = _currentDirectoryItems.ToDictionary(PathKeyOf, PathKeyComparer.Instance);
         foreach (var newItem in newItems)
         {
-            if (currentItemMap.TryGetValue(newItem.FullPath, out var existingItem))
+            if (newItem.SizeBytes is null
+                && currentItemMap.TryGetValue(PathKeyOf(newItem), out var existingItem)
+                && existingItem.SizeBytes is { } existingSize)
             {
-                newItem.CachedSizeBytes = existingItem.CachedSizeBytes;
-                // SizeText も引き継ぐ（キャッシュサイズから計算された値）
-                if (!string.IsNullOrEmpty(existingItem.SizeText))
-                {
-                    newItem.SizeText = existingItem.SizeText;
-                }
+                newItem.SizeBytes = existingSize;
             }
         }
 
@@ -149,7 +167,7 @@ public partial class MainWindowViewModel
         // 作成日時・属性は列追加前のキャッシュ行には無い（null）ため、次のスキャンで埋まるまで空表示になる
         if (entry.CreationTimeUtc is { } creationUtc)
         {
-            item.CreatedTime = DateTime.SpecifyKind(creationUtc, DateTimeKind.Utc).ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss");
+            item.CreatedAt = DateTime.SpecifyKind(creationUtc, DateTimeKind.Utc).ToLocalTime();
         }
 
         item.AttributesText = FormatAttributes(entry.Attributes);

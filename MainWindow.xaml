@@ -154,7 +154,8 @@
                       ScrollViewer.CanContentScroll="True"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
                       PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
-                      ContextMenuOpening="FileListDataGrid_ContextMenuOpening">
+                      ContextMenuOpening="FileListDataGrid_ContextMenuOpening"
+                      Sorting="FileListDataGrid_Sorting">
                 <DataGrid.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy File" Click="CopyFileMenuItem_Click"/>

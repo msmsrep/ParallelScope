@@ -1,7 +1,9 @@
-﻿using System.Windows;
+﻿using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -354,6 +356,59 @@ public partial class MainWindow : Window
 
         row.IsSelected = true;
         row.Focus();
+    }
+
+    // Size/Modified/Created 列のヘッダークリック時のソートを、生値（バイト数・日時）比較の
+    // カスタムソートに差し替える。これらの列の表示文字列は保持されず表示時に生成されるため、
+    // 既定の（表示プロパティ経由の）ソートだと比較のたびに全行分の文字列生成が走ってしまう。
+    // 生値比較は文字列比較より速く、Size列は数値順（既定の文字列順では "9 KB" > "12 MB" となる）で並ぶ
+    private void FileListDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
+    {
+        if (CollectionViewSource.GetDefaultView(FileListDataGrid.ItemsSource) is not ListCollectionView view)
+        {
+            return;
+        }
+
+        Comparison<FileItemViewModel>? compareAscending = null;
+        if (ReferenceEquals(e.Column, SizeColumn))
+        {
+            // サイズ未取得（null）は最小として先頭に寄せる
+            compareAscending = (a, b) => (a.SizeBytes ?? -1L).CompareTo(b.SizeBytes ?? -1L);
+        }
+        else if (ReferenceEquals(e.Column, ModifiedColumn))
+        {
+            compareAscending = (a, b) => a.ModifiedAt.CompareTo(b.ModifiedAt);
+        }
+        else if (ReferenceEquals(e.Column, CreatedColumn))
+        {
+            compareAscending = (a, b) => (a.CreatedAt ?? DateTime.MinValue).CompareTo(b.CreatedAt ?? DateTime.MinValue);
+        }
+
+        if (compareAscending is null)
+        {
+            // その他の列は既定のソートに任せる。カスタムソートが残っていると
+            // SortDescriptions より優先されてしまうため解除しておく
+            view.CustomSort = null;
+            return;
+        }
+
+        e.Handled = true;
+
+        var direction = e.Column.SortDirection != ListSortDirection.Ascending
+            ? ListSortDirection.Ascending
+            : ListSortDirection.Descending;
+
+        // e.Handled = true にすると既定処理によるヘッダーの矢印表示の更新も行われないため、自前で反映する
+        foreach (var column in FileListDataGrid.Columns)
+        {
+            column.SortDirection = ReferenceEquals(column, e.Column) ? direction : null;
+        }
+
+        // 既定ソートで積まれた SortDescriptions が残っていると意図しない並びになるため消しておく
+        view.SortDescriptions.Clear();
+        view.CustomSort = direction == ListSortDirection.Ascending
+            ? Comparer<FileItemViewModel>.Create(compareAscending)
+            : Comparer<FileItemViewModel>.Create((a, b) => compareAscending(b, a));
     }
 
     // 行以外（空白部分・列ヘッダー）ではコンテキストメニューを表示しない
