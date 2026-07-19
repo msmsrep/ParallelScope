@@ -370,7 +370,18 @@ public partial class MainWindow : Window
         }
 
         Comparison<FileItemViewModel>? compareAscending = null;
-        if (ReferenceEquals(e.Column, SizeColumn))
+        if (ReferenceEquals(e.Column, NameColumn))
+        {
+            // 初期表示と同じ「フォルダを先に、次に名前順」で並べる（降順では全体が反転してフォルダが末尾側になる）
+            compareAscending = (a, b) =>
+            {
+                var folderCompare = b.IsFolder.CompareTo(a.IsFolder);
+                return folderCompare != 0
+                    ? folderCompare
+                    : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            };
+        }
+        else if (ReferenceEquals(e.Column, SizeColumn))
         {
             // サイズ未取得（null）は最小として先頭に寄せる
             compareAscending = (a, b) => (a.SizeBytes ?? -1L).CompareTo(b.SizeBytes ?? -1L);

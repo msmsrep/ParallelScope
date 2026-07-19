@@ -166,7 +166,9 @@
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Name" Width="*">
+                    <!-- テンプレート列は SortMemberPath が無いとヘッダークリックがソート対象にならない
+                         （実際の比較はコードビハインドのカスタムソートで行う） -->
+                    <DataGridTemplateColumn x:Name="NameColumn" Header="Name" Width="*" SortMemberPath="Name">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
