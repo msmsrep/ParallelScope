@@ -83,16 +83,8 @@
 
         <!-- 左側: フォルダツリー -->
         <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
-            <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <TextBlock Grid.Row="0" Text="Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
-            
-            <!-- 最上位は仮想「Roots」ノードのみで、各ルートはその子として表示される -->
-            <TreeView Grid.Row="1" Name="FolderTreeView"
+            <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
+            <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
@@ -118,7 +110,6 @@
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
-            </Grid>
         </Border>
 
         <!-- セパレーター -->

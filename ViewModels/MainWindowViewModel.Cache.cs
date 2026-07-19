@@ -44,7 +44,7 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>仮想「Roots」表示用に、各ルートをフォルダ行として一覧化する（合計サイズはキャッシュから集計）。</summary>
+    /// <summary>仮想「Folders」表示用に、各ルートをフォルダ行として一覧化する（合計サイズはキャッシュから集計）。</summary>
     private async Task LoadAllRootsListingAsync(int navigationVersion)
     {
         var rootPaths = _rootPathsSnapshot;

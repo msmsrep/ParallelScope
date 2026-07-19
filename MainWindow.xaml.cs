@@ -205,7 +205,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 仮想「Roots」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
+        // 仮想「Folders」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
         if (AllRootsVirtualFolder.Matches(folderItem.Path))
         {
             e.Handled = true;
@@ -488,7 +488,7 @@ public partial class MainWindow : Window
             .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
             .ToList();
 
-        // ルートは仮想「Roots」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
+        // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
         if (FolderTreeView.ItemContainerGenerator.ContainerFromIndex(0) is not TreeViewItem allRootsItem)
         {
             return;

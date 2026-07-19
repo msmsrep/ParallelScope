@@ -50,7 +50,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Roots」ノード1件のみを含み、
+    /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Folders」ノード1件のみを含み、
     /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
     /// </summary>
     public ObservableCollection<FolderItemViewModel> TreeRoots { get; }

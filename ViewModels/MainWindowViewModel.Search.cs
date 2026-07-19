@@ -92,7 +92,7 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>検索起点が仮想「Roots」の場合は全ルートを横断検索し、それ以外は単一パス配下を検索する。</summary>
+    /// <summary>検索起点が仮想「Folders」の場合は全ルートを横断検索し、それ以外は単一パス配下を検索する。</summary>
     private List<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
     {
         if (!AllRootsVirtualFolder.Matches(rootPath))

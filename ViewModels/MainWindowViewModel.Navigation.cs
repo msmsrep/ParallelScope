@@ -113,7 +113,7 @@ public partial class MainWindowViewModel
     /// <summary>現在地・アドレス表示・検索状態を更新し、キャッシュ読込とバックグラウンド更新を開始する。</summary>
     private bool LoadFilesInternal(string folderPath)
     {
-        // 仮想「Roots」ノード: 実パスではないため存在確認・ライブFS更新は行わず、
+        // 仮想「Folders」ノード: 実パスではないため存在確認・ライブFS更新は行わず、
         // 各ルートをフォルダ行として一覧表示する（サイズはキャッシュから集計）
         if (AllRootsVirtualFolder.Matches(folderPath))
         {
@@ -212,7 +212,7 @@ public partial class MainWindowViewModel
             return null;
         }
 
-        // 仮想「Roots」はツリーの最上位なので親は無い（Directory.GetParent に仮想パスを渡さない）
+        // 仮想「Folders」はツリーの最上位なので親は無い（Directory.GetParent に仮想パスを渡さない）
         if (AllRootsVirtualFolder.Matches(path))
         {
             return null;

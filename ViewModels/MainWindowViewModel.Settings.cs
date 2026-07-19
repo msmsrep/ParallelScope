@@ -145,7 +145,7 @@ public partial class MainWindowViewModel
 
         if (AllRootsVirtualFolder.Matches(CurrentPath))
         {
-            // 仮想「Roots」を表示中はナビゲーションせず、変更後のルート構成で一覧を取り直す
+            // 仮想「Folders」を表示中はナビゲーションせず、変更後のルート構成で一覧を取り直す
             RefreshCurrentFolder();
             return;
         }

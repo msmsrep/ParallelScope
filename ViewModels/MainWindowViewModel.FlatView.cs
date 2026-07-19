@@ -59,7 +59,7 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>起点が仮想「Roots」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを取得する。</summary>
+    /// <summary>起点が仮想「Folders」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを取得する。</summary>
     private List<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
     {
         if (!AllRootsVirtualFolder.Matches(folderPath))

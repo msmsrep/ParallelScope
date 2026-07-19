@@ -16,7 +16,7 @@ public static class PathNormalizer
             return string.Empty;
         }
 
-        // 仮想「Roots」パスは Path.GetFullPath に通せない（相対パス扱いで壊れる）ため、そのまま返す。
+        // 仮想「Folders」パスは Path.GetFullPath に通せない（相対パス扱いで壊れる）ため、そのまま返す。
         // これにより AreSame / IsAncestorOrSame も仮想パスに対して安全に動作する
         if (AllRootsVirtualFolder.Matches(path))
         {

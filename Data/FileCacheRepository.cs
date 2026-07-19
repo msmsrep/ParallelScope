@@ -155,7 +155,7 @@ public class FileCacheRepository
         return results;
     }
 
-    /// <summary>各ルートパス配下のファイル合計サイズをキャッシュから集計する（仮想「Roots」の一覧表示用）。</summary>
+    /// <summary>各ルートパス配下のファイル合計サイズをキャッシュから集計する（仮想「Folders」の一覧表示用）。</summary>
     public Dictionary<string, long> GetCachedTotalSizesUnderPaths(IEnumerable<string> rootPaths)
     {
         var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);

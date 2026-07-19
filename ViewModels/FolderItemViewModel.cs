@@ -48,7 +48,7 @@ public class FolderItemViewModel : ObservableObject
         set => SetProperty(ref _hasSubFolders, value);
     }
 
-    /// <summary>ツリー上の展開状態。仮想「Roots」ノードを既定で展開表示するために持つ。</summary>
+    /// <summary>ツリー上の展開状態。仮想「Folders」ノードを既定で展開表示するために持つ。</summary>
     public bool IsExpanded
     {
         get => _isExpanded;
@@ -83,14 +83,14 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    /// <summary>全ルートフォルダを子として表示する、ツリー最上位の仮想「Roots」ノードを生成する。</summary>
+    /// <summary>全ルートフォルダを子として表示する、ツリー最上位の仮想「Folders」ノードを生成する。</summary>
     public static FolderItemViewModel CreateAllRootsNode(ObservableCollection<FolderItemViewModel> rootFolders)
     {
         return new FolderItemViewModel(rootFolders);
     }
 
     /// <summary>
-    /// 仮想「Roots」ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体）を共有するため、
+    /// 仮想「Folders」ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体）を共有するため、
     /// ルート設定の差分更新がそのままツリーへ反映される。実パスを持たないため遅延読み込みは行わない。
     /// </summary>
     private FolderItemViewModel(ObservableCollection<FolderItemViewModel> subFolders)
