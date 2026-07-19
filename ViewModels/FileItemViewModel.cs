@@ -105,8 +105,8 @@ public class FileItemViewModel : ObservableObject
     /// </summary>
     public long CachedSizeBytes { get; set; }
 
-    /// <summary>ファイル用コンストラクタ。</summary>
-    public FileItemViewModel(string fullPath, string name, long sizeBytes, DateTime modifiedTime)
+    /// <summary>ファイル用コンストラクタ。location を渡すとその文字列インスタンスを共有し、パス文字列の再生成を避ける。</summary>
+    public FileItemViewModel(string fullPath, string name, long sizeBytes, DateTime modifiedTime, string? location = null)
     {
         FullPath = fullPath;
         Name = name;
@@ -114,20 +114,20 @@ public class FileItemViewModel : ObservableObject
         // 種類名は拡張子単位でキャッシュされるため、2回目以降は辞書引きのみで実質コストゼロ
         TypeText = WindowsShellIconProvider.GetFileTypeName(fullPath);
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
-        Location = GetLocation(fullPath);
+        Location = location ?? GetLocation(fullPath);
         IsFolder = false;
         CachedSizeBytes = sizeBytes;
     }
 
     /// <summary>フォルダ用コンストラクタ。cachedTotalSizeBytes が無い場合はサイズ未取得として空表示にする。</summary>
-    public FileItemViewModel(string fullPath, string name, DateTime modifiedTime, long? cachedTotalSizeBytes = null)
+    public FileItemViewModel(string fullPath, string name, DateTime modifiedTime, long? cachedTotalSizeBytes = null, string? location = null)
     {
         FullPath = fullPath;
         Name = name;
         SizeText = cachedTotalSizeBytes.HasValue ? FileSizeFormatter.Format(cachedTotalSizeBytes.Value) : string.Empty;
         TypeText = WindowsShellIconProvider.GetFolderTypeName();
         ModifiedTime = modifiedTime.ToString("yyyy-MM-dd HH:mm:ss");
-        Location = GetLocation(fullPath);
+        Location = location ?? GetLocation(fullPath);
         IsFolder = true;
         CachedSizeBytes = cachedTotalSizeBytes ?? 0;
     }

@@ -118,6 +118,8 @@ public partial class MainWindowViewModel
             {
                 _fileCacheRepository.DeleteStaleEntries(completedRootPaths, allConfiguredRootPaths, visitedDirectories);
                 _fileCacheRepository.TruncateWal();
+                // スキャン中に増えたプール接続が抱えるページキャッシュ等のネイティブメモリを解放する
+                _fileCacheRepository.ReleasePooledConnections();
             }
             catch
             {

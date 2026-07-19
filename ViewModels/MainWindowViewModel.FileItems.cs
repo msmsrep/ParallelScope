@@ -140,9 +140,11 @@ public partial class MainWindowViewModel
     {
         var modifiedLocalTime = DateTime.SpecifyKind(entry.LastWriteTimeUtc, DateTimeKind.Utc).ToLocalTime();
 
+        // Location は ParentPath と同じ値になるため、GetDirectoryName で行ごとに文字列を
+        // 再生成せず、リポジトリ側でプール済みのインスタンスを共有する
         var item = entry.IsFolder
-            ? new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime)
-            : new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime);
+            ? new FileItemViewModel(entry.FullPath, entry.Name, modifiedLocalTime, location: entry.ParentPath)
+            : new FileItemViewModel(entry.FullPath, entry.Name, entry.SizeBytes ?? 0L, modifiedLocalTime, location: entry.ParentPath);
 
         // 作成日時・属性は列追加前のキャッシュ行には無い（null）ため、次のスキャンで埋まるまで空表示になる
         if (entry.CreationTimeUtc is { } creationUtc)
@@ -154,6 +156,27 @@ public partial class MainWindowViewModel
         return item;
     }
 
+    // 表記は16通りしかないため事前生成して共有し、1アイテムごとの文字列生成・保持をなくす
+    private static readonly string[] AttributeTextByMask = BuildAttributeTextByMask();
+
+    private static string[] BuildAttributeTextByMask()
+    {
+        var texts = new string[16];
+        Span<char> letters = stackalloc char[4];
+
+        for (var mask = 0; mask < texts.Length; mask++)
+        {
+            var count = 0;
+            if ((mask & 1) != 0) letters[count++] = 'R';
+            if ((mask & 2) != 0) letters[count++] = 'H';
+            if ((mask & 4) != 0) letters[count++] = 'S';
+            if ((mask & 8) != 0) letters[count++] = 'A';
+            texts[mask] = count == 0 ? string.Empty : new string(letters[..count]);
+        }
+
+        return texts;
+    }
+
     /// <summary>ファイル属性をエクスプローラー風の文字列（R/H/S/A）へ変換する。未取得（null）や該当なしは空。</summary>
     private static string FormatAttributes(int? attributes)
     {
@@ -163,14 +186,11 @@ public partial class MainWindowViewModel
         }
 
         var value = (FileAttributes)attributes.Value;
-        Span<char> letters = stackalloc char[4];
-        var count = 0;
+        var mask = (value.HasFlag(FileAttributes.ReadOnly) ? 1 : 0)
+                 | (value.HasFlag(FileAttributes.Hidden) ? 2 : 0)
+                 | (value.HasFlag(FileAttributes.System) ? 4 : 0)
+                 | (value.HasFlag(FileAttributes.Archive) ? 8 : 0);
 
-        if (value.HasFlag(FileAttributes.ReadOnly)) letters[count++] = 'R';
-        if (value.HasFlag(FileAttributes.Hidden)) letters[count++] = 'H';
-        if (value.HasFlag(FileAttributes.System)) letters[count++] = 'S';
-        if (value.HasFlag(FileAttributes.Archive)) letters[count++] = 'A';
-
-        return count == 0 ? string.Empty : new string(letters[..count]);
+        return AttributeTextByMask[mask];
     }
 }
