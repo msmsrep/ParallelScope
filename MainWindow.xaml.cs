@@ -173,6 +173,26 @@ public partial class MainWindow : Window
         }
     }
 
+    // 縦スクロールが上端/下端に達したら横スクロールも左端/右端へ寄せる
+    // （上端付近はルートが左寄り、下端付近は深い階層が右寄りに表示されるため）。
+    // 横スクロール操作と競合しないよう、縦オフセットが実際に動いたときだけ反応する
+    private void FolderTreeView_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.OriginalSource is not ScrollViewer scrollViewer || e.VerticalChange == 0)
+        {
+            return;
+        }
+
+        if (scrollViewer.VerticalOffset <= 0)
+        {
+            scrollViewer.ScrollToLeftEnd();
+        }
+        else if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight)
+        {
+            scrollViewer.ScrollToRightEnd();
+        }
+    }
+
     private async void FolderTreeItem_Expanded(object sender, RoutedEventArgs e)
     {
         if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem })

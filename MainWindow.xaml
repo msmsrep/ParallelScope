@@ -92,7 +92,8 @@
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
-                      SelectedItemChanged="FolderTreeView_SelectedItemChanged">
+                      SelectedItemChanged="FolderTreeView_SelectedItemChanged"
+                      ScrollViewer.ScrollChanged="FolderTreeView_ScrollChanged">
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
