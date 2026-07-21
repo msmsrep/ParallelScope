@@ -99,6 +99,7 @@
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
+                        <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
                     </Style>
                 </TreeView.ItemContainerStyle>

@@ -95,6 +95,37 @@ public partial class MainWindow : Window
         }
     }
 
+    // ツリーから外れたTreeViewItem（設定変更でのルート再構築・子の再読み込みで破棄されたもの）への
+    // 参照をマップに残さない（残すと配下のビジュアルツリーごと解放されず、メモリが増え続ける）。
+    // 同一パスに新しいインスタンスが登録済みの場合は消さない（Loaded→古い方のUnloadedの順で届くことがあるため）
+    private void FolderTreeViewItem_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TreeViewItem tvi)
+        {
+            return;
+        }
+
+        if (tvi.DataContext is FolderItemViewModel vm)
+        {
+            if (_treeItemMap.TryGetValue(vm.Path, out var mapped) && ReferenceEquals(mapped, tvi))
+            {
+                _treeItemMap.Remove(vm.Path);
+            }
+
+            return;
+        }
+
+        // DataContextが既に外れている場合は、値側から一致するエントリを探して除去する
+        foreach (var pair in _treeItemMap)
+        {
+            if (ReferenceEquals(pair.Value, tvi))
+            {
+                _treeItemMap.Remove(pair.Key);
+                return;
+            }
+        }
+    }
+
     private bool _restartFullScanRequested;
 
     private void KofiMenuItem_Click(object sender, RoutedEventArgs e)

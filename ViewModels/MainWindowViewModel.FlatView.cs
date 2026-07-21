@@ -59,19 +59,19 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>起点が仮想「Folders」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを取得する。</summary>
-    private List<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
+    /// <summary>起点が仮想「Folders」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを列挙する。</summary>
+    /// <remarks>数十万件規模のため List 化せず、リポジトリの逐次読み出しをそのまま流す（ピークメモリ削減）。</remarks>
+    private IEnumerable<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
     {
         if (!AllRootsVirtualFolder.Matches(folderPath))
         {
-            return _fileCacheRepository.GetFilesUnderPath(folderPath);
+            return _fileCacheRepository.EnumerateFilesUnderPath(folderPath);
         }
 
         // ルート同士が入れ子（例: D:\ と D:\Sub）の場合に同一エントリが重複するため、FullPathで除去する
         return _rootPathsSnapshot
-            .SelectMany(root => _fileCacheRepository.GetFilesUnderPath(root))
-            .DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .SelectMany(root => _fileCacheRepository.EnumerateFilesUnderPath(root))
+            .DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>取得結果が届いた時点でもまだ表示すべき状態か（フォルダ移動・モード解除・検索開始が起きていないか）を確認する。</summary>

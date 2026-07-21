@@ -56,6 +56,9 @@ public sealed class SingleFlightCoalescer<TRequest>
                     }
 
                     request = _pendingRequest!;
+                    // リクエストがエントリ一覧などの大きなオブジェクトを含む場合に、
+                    // 処理完了後もフィールド経由で保持し続けないようクリアする
+                    _pendingRequest = default;
                     _hasPendingRequest = false;
                 }
 
