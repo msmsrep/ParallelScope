@@ -193,8 +193,12 @@ public partial class MainWindowViewModel
             // 直下一覧の基準データ（_currentDirectoryItems）側にも反映しておく
             // （モード解除時に古いサイズが一瞬表示されるのを防ぐ）。
             // 対象は folderPath 直下のフォルダ行のみなので名前で一意に引ける
-            // （FullPath は保持されず都度生成のため、FullPath比較の線形探索より速く、文字列生成も避けられる）
-            var visibleFolderByName = BuildDirectChildFolderLookup(FileItems, folderPath);
+            // （FullPath は保持されず都度生成のため、FullPath比較の線形探索より速く、文字列生成も避けられる）。
+            // フラット表示中の FileItems はフォルダ行を含まない（検索中もファイルのみ）ため、
+            // 数十万行になりうる表示一覧のUIスレッドでの走査を丸ごと省く
+            var visibleFolderByName = IsFlatFileViewEnabled
+                ? new Dictionary<string, FileItemViewModel>(StringComparer.OrdinalIgnoreCase)
+                : BuildDirectChildFolderLookup(FileItems, folderPath);
             var baseFolderByName = BuildDirectChildFolderLookup(_currentDirectoryItems, folderPath);
 
             foreach (var folderEntry in folderEntries)

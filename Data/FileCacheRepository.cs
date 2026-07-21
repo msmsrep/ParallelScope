@@ -256,8 +256,12 @@ public class FileCacheRepository
         return result;
     }
 
-    /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索する。</summary>
-    public List<CachedFileSystemEntry> SearchEntriesUnderPath(string rootPath, string nameQuery)
+    /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索して列挙する。</summary>
+    /// <remarks>
+    /// インクリメンタルサーチは1文字の検索語で数十万件ヒットしうるため、List へ全件マテリアライズせず
+    /// 1件ずつ返して呼び出し側でViewModelへ直接変換させる（中間リストを持つとピークメモリがほぼ倍増する）。
+    /// </remarks>
+    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, string nameQuery)
     {
         using var db = CreateDbContext();
 
@@ -272,7 +276,7 @@ public class FileCacheRepository
         // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        return db.FileSystemEntries
+        var rows = db.FileSystemEntries
             .AsNoTracking()
             .Where(x => x.FullPath.StartsWith(rootWithSeparator) && EF.Functions.Like(x.Name, namePattern, "~"))
             .OrderByDescending(x => x.IsFolder)
@@ -288,8 +292,11 @@ public class FileCacheRepository
                 x.CreationTimeUtc,
                 x.Attributes
             })
-            .AsEnumerable()
-            .Select(x => new CachedFileSystemEntry(
+            .AsEnumerable();
+
+        foreach (var x in rows)
+        {
+            yield return new CachedFileSystemEntry(
                 GetPooledString(parentPathPool, x.ParentPath),
                 x.FullPath,
                 x.Name,
@@ -297,8 +304,8 @@ public class FileCacheRepository
                 x.SizeBytes,
                 x.LastWriteTimeUtc,
                 x.CreationTimeUtc,
-                x.Attributes))
-            .ToList();
+                x.Attributes);
+        }
     }
 
     /// <summary>単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。</summary>

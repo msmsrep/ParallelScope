@@ -131,6 +131,10 @@ public partial class MainWindowViewModel
                 return;
             }
 
+            // プールされたSQLite接続が抱えるページキャッシュ（接続あたり最大16MB）のネイティブメモリも返却する
+            // （使用中の接続には影響せず、次回アクセス時の再接続はローカルファイルでは数ms程度）
+            _fileCacheRepository.ReleasePooledConnections();
+
             // Aggressive はLOHを含む全ヒープを圧縮し、空き領域をOSへ返却する
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive);
         });

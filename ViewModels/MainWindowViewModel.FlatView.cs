@@ -68,10 +68,14 @@ public partial class MainWindowViewModel
             return _fileCacheRepository.EnumerateFilesUnderPath(folderPath);
         }
 
-        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合に同一エントリが重複するため、FullPathで除去する
-        return _rootPathsSnapshot
-            .SelectMany(root => _fileCacheRepository.EnumerateFilesUnderPath(root))
-            .DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+        var files = _rootPathsSnapshot
+            .SelectMany(root => _fileCacheRepository.EnumerateFilesUnderPath(root));
+
+        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
+        // FullPathで除去する（通常構成で全ファイル分の FullPath 文字列を判定セットに同時保持しないため）
+        return HasOverlappingRootPaths()
+            ? files.DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase)
+            : files;
     }
 
     /// <summary>取得結果が届いた時点でもまだ表示すべき状態か（フォルダ移動・モード解除・検索開始が起きていないか）を確認する。</summary>

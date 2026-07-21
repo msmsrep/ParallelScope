@@ -34,6 +34,27 @@ public partial class MainWindowViewModel : ObservableObject
     // RootFolders（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
+    /// <summary>
+    /// ルート同士が入れ子（例: D:\ と D:\Sub）になっている構成かどうか。
+    /// 全ルート横断の列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
+    /// </summary>
+    private bool HasOverlappingRootPaths()
+    {
+        var roots = _rootPathsSnapshot;
+        for (var i = 0; i < roots.Count; i++)
+        {
+            for (var j = 0; j < roots.Count; j++)
+            {
+                if (i != j && PathNormalizer.IsAncestorOrSame(roots[i], roots[j]))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     // ファイル一覧に表示する列キー（FileListColumns参照。Name列は常時表示のため含まない）
     private HashSet<string> _visibleColumns = FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
 

@@ -93,19 +93,26 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>検索起点が仮想「Folders」の場合は全ルートを横断検索し、それ以外は単一パス配下を検索する。</summary>
-    private List<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
+    /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
+    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
     {
         if (!AllRootsVirtualFolder.Matches(rootPath))
         {
-            return _fileCacheRepository.SearchEntriesUnderPath(rootPath, query);
+            return _fileCacheRepository.EnumerateSearchEntriesUnderPath(rootPath, query);
         }
 
-        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合に同一エントリが重複するため、FullPathで除去する
-        return _rootPathsSnapshot
-            .SelectMany(root => _fileCacheRepository.SearchEntriesUnderPath(root, query))
-            .DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase)
+        var results = _rootPathsSnapshot
+            .SelectMany(root => _fileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
+
+        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
+        // FullPathで除去する（通常構成でヒット全件分の FullPath 文字列を判定セットに同時保持しないため）
+        if (HasOverlappingRootPaths())
+        {
+            results = results.DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
+        }
+
+        return results
             .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
+            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase);
     }
 }
