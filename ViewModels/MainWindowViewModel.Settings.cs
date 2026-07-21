@@ -15,6 +15,7 @@ public partial class MainWindowViewModel
         _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
         _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
+        _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -36,11 +37,22 @@ public partial class MainWindowViewModel
         return _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
+    /// <summary>ファイル一覧に表示する列キーの一覧を、画面上の列順で取得する（Name列は常時表示のため含まない）。</summary>
+    public IReadOnlyList<string> GetVisibleColumns()
+    {
+        return FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList();
+    }
+
     /// <summary>設定画面からの入力を適用し、設定ファイルへ保存する。</summary>
-    public void ApplySettings(IEnumerable<string> rootPaths, IEnumerable<string> excludedPaths, int fullScanIntervalHours)
+    public void ApplySettings(
+        IEnumerable<string> rootPaths,
+        IEnumerable<string> excludedPaths,
+        int fullScanIntervalHours,
+        IEnumerable<string>? visibleColumns)
     {
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
         ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
     }
 
@@ -85,6 +97,37 @@ public partial class MainWindowViewModel
             }
         }
 
+        // 並び替え: 既存項目の削除・追加だけでは順序変更が反映されないため、設定の順序に合わせて移動する。
+        // 再生成せずMoveで並び替えることで、読み込み済みのサブフォルダツリーを保持する
+        var orderedIndex = 0;
+        foreach (var rootPath in normalizedRootPaths)
+        {
+            var currentIndex = -1;
+            for (var i = 0; i < RootFolders.Count; i++)
+            {
+                if (string.Equals(RootFolders[i].Path, rootPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+
+            if (currentIndex < 0)
+            {
+                // 除外パス等でRootFoldersに存在しないルートは順序合わせの対象外
+                continue;
+            }
+
+            if (currentIndex != orderedIndex)
+            {
+                RootFolders.Move(currentIndex, orderedIndex);
+            }
+
+            orderedIndex++;
+        }
+
+        _rootPathsSnapshot = RootFolders.Select(x => x.Path).ToList();
+
         if (saveSettings)
         {
             SaveSettings(normalizedRootPaths);
@@ -97,6 +140,13 @@ public partial class MainWindowViewModel
             AddressInput = string.Empty;
             _currentDirectoryItems.Clear();
             ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
+            return;
+        }
+
+        if (AllRootsVirtualFolder.Matches(CurrentPath))
+        {
+            // 仮想「Folders」を表示中はナビゲーションせず、変更後のルート構成で一覧を取り直す
+            RefreshCurrentFolder();
             return;
         }
 
@@ -115,8 +165,25 @@ public partial class MainWindowViewModel
             RootPaths = rootPaths.ToList(),
             ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
             FullScanIntervalHours = _fullScanIntervalHours,
-            IsFlatFileViewEnabled = _isFlatFileViewEnabled
+            IsFlatFileViewEnabled = _isFlatFileViewEnabled,
+            VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList()
         });
+    }
+
+    /// <summary>
+    /// 表示列キーを既知の列に絞り込んで正規化する。null（設定ファイルに項目が無い＝旧バージョンからの移行時）
+    /// はデフォルト列を返す。空リストは「全ての任意列を非表示」として尊重する。
+    /// </summary>
+    private static HashSet<string> NormalizeVisibleColumns(IReadOnlyCollection<string>? visibleColumns)
+    {
+        if (visibleColumns is null)
+        {
+            return FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return FileListColumns.OptionalColumns
+            .Where(column => visibleColumns.Contains(column, StringComparer.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static IEnumerable<string> NormalizeRootPaths(IEnumerable<string> rootPaths)

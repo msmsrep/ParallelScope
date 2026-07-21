@@ -1,6 +1,8 @@
+using System.Data.Common;
 using System.IO;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.Data;
@@ -11,7 +13,9 @@ public sealed record CachedFileSystemEntry(
     string Name,
     bool IsFolder,
     long? SizeBytes,
-    DateTime LastWriteTimeUtc);
+    DateTime LastWriteTimeUtc,
+    DateTime? CreationTimeUtc,
+    int? Attributes);
 
 /// <summary>
 /// ファイルシステムのスキャン結果を SQLite にキャッシュするリポジトリ。
@@ -57,37 +61,77 @@ public class FileCacheRepository
             {
                 options.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
             })
+            .AddInterceptors(PerConnectionPragmaInterceptor.Instance)
             .Options;
     }
 
-    /// <summary>マイグレーションを適用し、SQLiteのパフォーマンス関連PRAGMAを設定する。</summary>
+    /// <summary>マイグレーションを適用し、DBファイルに永続化されるSQLite設定（WAL・インデックス）を整える。</summary>
     private void MigrateDatabaseAndApplyPragmas()
     {
         using var db = CreateDbContext();
         db.Database.Migrate();
-        ApplySqlitePragmas(db);
-    }
 
-    private static void ApplySqlitePragmas(ParallelScopeDbContext db)
-    {
-        using var conn = db.Database.GetDbConnection();
-        conn.Open();
+        // journal_mode と CREATE INDEX はDBファイル側に永続化されるため起動時に1回だけ実行する。
+        // 接続ごとに効くPRAGMA（synchronous等）は PerConnectionPragmaInterceptor が接続オープンの都度適用する
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;
-            PRAGMA cache_size = -64000;
-            PRAGMA temp_store = MEMORY;
-            PRAGMA query_only = FALSE;
-            -- チェックポイント時にWALファイルをこのサイズまで切り詰める（フルスキャンでの肥大対策）
-            PRAGMA journal_size_limit = 67108864;
 
             -- All Files（配下再帰取得）の絞り込みを高速化
             CREATE INDEX IF NOT EXISTS IX_FileSystemEntries_IsFolder_FullPath
             ON FileSystemEntries(IsFolder, FullPath);
         ";
         cmd.ExecuteNonQuery();
-        conn.Close();
+    }
+
+    /// <summary>
+    /// 接続オープン時に、接続単位でしか効かないPRAGMAを毎回適用するインターセプター。
+    /// 以前は起動時の1接続にしか適用しておらず、接続プールに他の接続が増えると
+    /// synchronous 等が既定値のまま動く不整合があった。PRAGMAの再適用はI/Oを伴わず数マイクロ秒で済む。
+    /// </summary>
+    private sealed class PerConnectionPragmaInterceptor : DbConnectionInterceptor
+    {
+        public static readonly PerConnectionPragmaInterceptor Instance = new();
+
+        public override void ConnectionOpened(DbConnection connection, ConnectionEndEventData eventData)
+        {
+            ApplyPerConnectionPragmas(connection);
+        }
+
+        public override Task ConnectionOpenedAsync(DbConnection connection, ConnectionEndEventData eventData, CancellationToken cancellationToken = default)
+        {
+            ApplyPerConnectionPragmas(connection);
+            return Task.CompletedTask;
+        }
+
+        private static void ApplyPerConnectionPragmas(DbConnection connection)
+        {
+            using var cmd = connection.CreateCommand();
+            // cache_size はプールされた接続ごとに保持され続けるネイティブメモリの上限になる。
+            // ホットになるのは主にインデックスページで16MBあれば十分に収まり、残りはOSのファイル
+            // キャッシュが下支えするため、これ以上大きくしても体感は変わらずメモリだけ増える
+            cmd.CommandText = @"
+                PRAGMA synchronous = NORMAL;
+                PRAGMA cache_size = -16000;
+                PRAGMA temp_store = MEMORY;
+                PRAGMA query_only = FALSE;
+                -- チェックポイント時にWALファイルをこのサイズまで切り詰める（フルスキャンでの肥大対策）
+                PRAGMA journal_size_limit = 67108864;
+            ";
+            cmd.ExecuteNonQuery();
+        }
+    }
+
+    /// <summary>
+    /// プール済みのSQLite接続を破棄し、各接続が抱えるページキャッシュ等のネイティブメモリを解放する。
+    /// フルスキャン後に呼ぶ想定（スキャン中の並列アクセスで接続が増え、キャッシュを持ったまま滞留するため）。
+    /// 次回アクセス時の再接続コストはローカルファイルでは数ms程度で、体感には影響しない。
+    /// </summary>
+    public void ReleasePooledConnections()
+    {
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
     }
 
     /// <summary>指定した親パス直下のキャッシュ済みエントリ一覧を取得する。</summary>
@@ -95,18 +139,22 @@ public class FileCacheRepository
     {
         using var db = CreateDbContext();
 
+        // ParentPath は等値条件により全行で引数と同一値になるため、行ごとにDBから文字列を
+        // 生成せず引数のインスタンスを共有する（結果は一覧表示の間保持され続ける）
         return db.FileSystemEntries
             .AsNoTracking()
             .Where(x => x.ParentPath == parentPath)
             .OrderByDescending(x => x.IsFolder)
             .ThenBy(x => x.Name)
             .Select(x => new CachedFileSystemEntry(
-                x.ParentPath,
+                parentPath,
                 x.FullPath,
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList();
     }
 
@@ -117,12 +165,12 @@ public class FileCacheRepository
         var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
 
         using var db = CreateDbContext();
-        using var conn = db.Database.GetDbConnection();
-        conn.Open();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
-            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
             WHERE IsFolder = 0
                             AND FullPath LIKE @rootPattern";
@@ -132,21 +180,78 @@ public class FileCacheRepository
         rootPatternParam.Value = rootWithSeparator + "%";
         cmd.Parameters.Add(rootPatternParam);
 
+        // 同じ親フォルダのファイル数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
+        // 共有する（結果はAll Files表示のViewModelから保持され続けるので、保持メモリに直結する）
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+
         var results = new List<CachedFileSystemEntry>();
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
             results.Add(new CachedFileSystemEntry(
-                reader.GetString(0),
+                GetPooledString(parentPathPool, reader.GetString(0)),
                 reader.GetString(1),
                 reader.GetString(2),
                 reader.GetBoolean(3),
                 reader.IsDBNull(4) ? null : reader.GetInt64(4),
-                reader.GetDateTime(5)));
+                reader.GetDateTime(5),
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7)));
+        }
+
+        return results;
+    }
+
+    /// <summary>同一内容の文字列を1インスタンスへ共有するためのプール引き当て。</summary>
+    private static string GetPooledString(Dictionary<string, string> pool, string value)
+    {
+        if (pool.TryGetValue(value, out var pooled))
+        {
+            return pooled;
+        }
+
+        pool[value] = value;
+        return value;
+    }
+
+    /// <summary>各ルートパス配下のファイル合計サイズをキャッシュから集計する（仮想「Folders」の一覧表示用）。</summary>
+    public Dictionary<string, long> GetCachedTotalSizesUnderPaths(IEnumerable<string> rootPaths)
+    {
+        var result = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        foreach (var rootPath in rootPaths)
+        {
+            var normalizedRootPath = PathNormalizer.Normalize(rootPath);
+            if (string.IsNullOrEmpty(normalizedRootPath))
+            {
+                continue;
+            }
+
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT COALESCE(SUM(SizeBytes), 0)
+                FROM FileSystemEntries
+                WHERE IsFolder = 0
+                    AND FullPath LIKE @rootPattern";
+
+            var rootPatternParam = cmd.CreateParameter();
+            rootPatternParam.ParameterName = "@rootPattern";
+            rootPatternParam.Value = PathNormalizer.WithTrailingSeparator(normalizedRootPath) + "%";
+            cmd.Parameters.Add(rootPatternParam);
+
+            var total = Convert.ToInt64(cmd.ExecuteScalar());
+            if (total > 0)
+            {
+                result[normalizedRootPath] = total;
+            }
         }
 
         conn.Close();
-        return results;
+        return result;
     }
 
     /// <summary>指定パス配下から、名前に検索語を含むエントリをキャッシュから検索する。</summary>
@@ -161,18 +266,36 @@ public class FileCacheRepository
         // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
         var namePattern = "%" + EscapeLikePattern(nameQuery) + "%";
 
+        // 同じ親フォルダ内のヒット件数分だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
+        // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+
         return db.FileSystemEntries
             .AsNoTracking()
             .Where(x => x.FullPath.StartsWith(rootWithSeparator) && EF.Functions.Like(x.Name, namePattern, "~"))
             .OrderByDescending(x => x.IsFolder)
             .ThenBy(x => x.Name)
-            .Select(x => new CachedFileSystemEntry(
+            .Select(x => new
+            {
                 x.ParentPath,
                 x.FullPath,
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes
+            })
+            .AsEnumerable()
+            .Select(x => new CachedFileSystemEntry(
+                GetPooledString(parentPathPool, x.ParentPath),
+                x.FullPath,
+                x.Name,
+                x.IsFolder,
+                x.SizeBytes,
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList();
     }
 
@@ -264,7 +387,9 @@ public class FileCacheRepository
                 x.Name,
                 x.IsFolder,
                 x.SizeBytes,
-                x.LastWriteTimeUtc))
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
             .ToList()
             .GroupBy(x => x.ParentPath, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => (IReadOnlyCollection<CachedFileSystemEntry>)g.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -426,8 +551,8 @@ public class FileCacheRepository
     public void TruncateWal()
     {
         using var db = CreateDbContext();
+        db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
-        conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
         cmd.ExecuteNonQuery();
@@ -465,7 +590,7 @@ public class FileCacheRepository
     private static (string Sql, object[] Parameters) BuildBulkInsertCommand(List<(string ParentPath, CachedFileSystemEntry Entry)> batch)
     {
         var sb = new StringBuilder(
-            "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc) VALUES ");
+            "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes) VALUES ");
 
         var parameters = new List<object>();
         for (int j = 0; j < batch.Count; j++)
@@ -476,8 +601,8 @@ public class FileCacheRepository
                 sb.Append(",");
             }
 
-            int pIdx = j * 6;
-            sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5})");
+            int pIdx = j * 8;
+            sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5},@p{pIdx + 6},@p{pIdx + 7})");
 
             parameters.Add(parentPath);
             parameters.Add(entry.FullPath);
@@ -485,6 +610,9 @@ public class FileCacheRepository
             parameters.Add(entry.IsFolder);
             parameters.Add(entry.SizeBytes ?? 0L);
             parameters.Add(entry.LastWriteTimeUtc);
+            // EF書き込み経路（ReplaceEntriesByParentPathInternal）とNULL表現を揃え、差分判定の誤検知を防ぐ
+            parameters.Add((object?)entry.CreationTimeUtc ?? DBNull.Value);
+            parameters.Add((object?)entry.Attributes ?? DBNull.Value);
         }
 
         return (sb.ToString(), parameters.ToArray());
@@ -506,7 +634,9 @@ public class FileCacheRepository
                 Name = x.Name,
                 IsFolder = x.IsFolder,
                 SizeBytes = x.SizeBytes,
-                LastWriteTimeUtc = x.LastWriteTimeUtc
+                LastWriteTimeUtc = x.LastWriteTimeUtc,
+                CreationTimeUtc = x.CreationTimeUtc,
+                Attributes = x.Attributes
             });
 
             db.FileSystemEntries.AddRange(entities);
@@ -539,8 +669,8 @@ public class FileCacheRepository
         // 単位の合計をSQL側で集計し、転送するのは直下フォルダ数分の行だけにする。
         // プレフィックス長はUTF-16とコードポイントの数え方の差を避けるためSQL側の length() で求める
         using var db = CreateDbContext();
+        db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
-        conn.Open();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"

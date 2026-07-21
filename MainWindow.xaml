@@ -32,6 +32,11 @@
             </Style.Triggers>
         </Style>
 
+        <!-- 列幅で切れた文字列もホバーで全文読めるようにする -->
+        <Style x:Key="CellToolTipTextStyle" TargetType="TextBlock">
+            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+        </Style>
+
     </Window.Resources>
     <Grid Margin="5">
         <Grid.RowDefinitions>
@@ -83,20 +88,15 @@
 
         <!-- 左側: フォルダツリー -->
         <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
-            <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-            
-            <TextBlock Grid.Row="0" Text="Folders" Style="{StaticResource PaneHeaderTextStyle}"/>
-            
-            <TreeView Grid.Row="1" Name="FolderTreeView"
-                      ItemsSource="{Binding RootFolders}" 
+            <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
+            <TreeView Name="FolderTreeView"
+                      ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
-                      SelectedItemChanged="FolderTreeView_SelectedItemChanged">
+                      SelectedItemChanged="FolderTreeView_SelectedItemChanged"
+                      ScrollViewer.ScrollChanged="FolderTreeView_ScrollChanged">
                 <TreeView.ItemContainerStyle>
                     <Style TargetType="TreeViewItem">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
@@ -116,7 +116,6 @@
                     </HierarchicalDataTemplate>
                 </TreeView.ItemTemplate>
             </TreeView>
-            </Grid>
         </Border>
 
         <!-- セパレーター -->
@@ -147,27 +146,46 @@
                               IsChecked="{Binding IsFlatFileViewEnabled}"/>
             </Grid>
 
-            <DataGrid Grid.Row="1" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
+            <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                       ScrollViewer.CanContentScroll="True"
-                      MouseDoubleClick="FileListDataGrid_MouseDoubleClick">
+                      MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
+                      PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
+                      ContextMenuOpening="FileListDataGrid_ContextMenuOpening"
+                      Sorting="FileListDataGrid_Sorting">
+                <DataGrid.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Copy File" Click="CopyFileMenuItem_Click"/>
+                        <MenuItem Header="Copy File Name" Click="CopyFileNameMenuItem_Click"/>
+                        <MenuItem Header="Copy Full Path" Click="CopyFullPathMenuItem_Click"/>
+                        <Separator/>
+                        <MenuItem Header="Open Parent Folder" Click="OpenParentFolderMenuItem_Click"/>
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTemplateColumn Header="Name" Width="*">
+                    <!-- テンプレート列は SortMemberPath が無いとヘッダークリックがソート対象にならない
+                         （実際の比較はコードビハインドのカスタムソートで行う） -->
+                    <DataGridTemplateColumn x:Name="NameColumn" Header="Name" Width="*" SortMemberPath="Name">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
                                     <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
+                                               Style="{StaticResource CellToolTipTextStyle}"/>
                                 </StackPanel>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="Type" Binding="{Binding TypeText}" Width="100"/>
-                    <DataGridTextColumn Header="Size" Binding="{Binding SizeText}" Width="100"/>
-                    <DataGridTextColumn Header="Modified" Binding="{Binding ModifiedTime}" Width="150"/>
+                    <!-- Name以外の列は設定（Display Columns）で表示/非表示を切り替えられる（ApplyFileListColumnVisibility参照） -->
+                    <DataGridTextColumn x:Name="LocationColumn" Header="Location" Binding="{Binding Location}" Width="220" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="TypeColumn" Header="Type" Binding="{Binding TypeText}" Width="110" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="SizeColumn" Header="Size" Binding="{Binding SizeText}" Width="100" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="ModifiedColumn" Header="Modified" Binding="{Binding ModifiedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="CreatedColumn" Header="Created" Binding="{Binding CreatedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="AttributesColumn" Header="Attributes" Binding="{Binding AttributesText}" Width="80" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
                 </DataGrid.Columns>
             </DataGrid>
             </Grid>

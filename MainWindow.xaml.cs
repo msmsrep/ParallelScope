@@ -1,7 +1,9 @@
-﻿using System.Windows;
+﻿using System.ComponentModel;
+using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
 using System.IO;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -35,7 +37,26 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
 
+        ApplyFileListColumnVisibility();
         SyncTreeSelectionToCurrentPath();
+    }
+
+    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
+    private void ApplyFileListColumnVisibility()
+    {
+        var visibleColumns = _viewModel.GetVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        SetColumnVisibility(LocationColumn, visibleColumns.Contains(FileListColumns.Location));
+        SetColumnVisibility(TypeColumn, visibleColumns.Contains(FileListColumns.Type));
+        SetColumnVisibility(SizeColumn, visibleColumns.Contains(FileListColumns.Size));
+        SetColumnVisibility(ModifiedColumn, visibleColumns.Contains(FileListColumns.Modified));
+        SetColumnVisibility(CreatedColumn, visibleColumns.Contains(FileListColumns.Created));
+        SetColumnVisibility(AttributesColumn, visibleColumns.Contains(FileListColumns.Attributes));
+    }
+
+    private static void SetColumnVisibility(DataGridColumn column, bool isVisible)
+    {
+        column.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
@@ -114,7 +135,8 @@ public partial class MainWindow : Window
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
-            _viewModel.GetFullScanIntervalHours())
+            _viewModel.GetFullScanIntervalHours(),
+            _viewModel.GetVisibleColumns())
         {
             Owner = this
         };
@@ -124,7 +146,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours);
+        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours, dialog.ResultVisibleColumns);
+        ApplyFileListColumnVisibility();
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 
@@ -149,6 +172,26 @@ public partial class MainWindow : Window
         if (e.NewValue is FolderItemViewModel folderItem)
         {
             _viewModel.LoadFiles(folderItem.Path);
+        }
+    }
+
+    // 縦スクロールが上端/下端に達したら横スクロールも左端/右端へ寄せる
+    // （上端付近はルートが左寄り、下端付近は深い階層が右寄りに表示されるため）。
+    // 横スクロール操作と競合しないよう、縦オフセットが実際に動いたときだけ反応する
+    private void FolderTreeView_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.OriginalSource is not ScrollViewer scrollViewer || e.VerticalChange == 0)
+        {
+            return;
+        }
+
+        if (scrollViewer.VerticalOffset <= 0)
+        {
+            scrollViewer.ScrollToLeftEnd();
+        }
+        else if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight)
+        {
+            scrollViewer.ScrollToRightEnd();
         }
     }
 
@@ -181,6 +224,13 @@ public partial class MainWindow : Window
     {
         if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem } treeViewItem)
         {
+            return;
+        }
+
+        // 仮想「Folders」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
+        if (AllRootsVirtualFolder.Matches(folderItem.Path))
+        {
+            e.Handled = true;
             return;
         }
 
@@ -295,6 +345,177 @@ public partial class MainWindow : Window
             MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+    // 右クリックされた行を選択状態にしてからコンテキストメニューを表示する
+    private void FileListDataGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null)
+        {
+            return;
+        }
+
+        row.IsSelected = true;
+        row.Focus();
+    }
+
+    // Size/Modified/Created 列のヘッダークリック時のソートを、生値（バイト数・日時）比較の
+    // カスタムソートに差し替える。これらの列の表示文字列は保持されず表示時に生成されるため、
+    // 既定の（表示プロパティ経由の）ソートだと比較のたびに全行分の文字列生成が走ってしまう。
+    // 生値比較は文字列比較より速く、Size列は数値順（既定の文字列順では "9 KB" > "12 MB" となる）で並ぶ
+    private void FileListDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
+    {
+        if (CollectionViewSource.GetDefaultView(FileListDataGrid.ItemsSource) is not ListCollectionView view)
+        {
+            return;
+        }
+
+        Comparison<FileItemViewModel>? compareAscending = null;
+        if (ReferenceEquals(e.Column, NameColumn))
+        {
+            // 初期表示と同じ「フォルダを先に、次に名前順」で並べる（降順では全体が反転してフォルダが末尾側になる）
+            compareAscending = (a, b) =>
+            {
+                var folderCompare = b.IsFolder.CompareTo(a.IsFolder);
+                return folderCompare != 0
+                    ? folderCompare
+                    : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
+            };
+        }
+        else if (ReferenceEquals(e.Column, SizeColumn))
+        {
+            // サイズ未取得（null）は最小として先頭に寄せる
+            compareAscending = (a, b) => (a.SizeBytes ?? -1L).CompareTo(b.SizeBytes ?? -1L);
+        }
+        else if (ReferenceEquals(e.Column, ModifiedColumn))
+        {
+            compareAscending = (a, b) => a.ModifiedAt.CompareTo(b.ModifiedAt);
+        }
+        else if (ReferenceEquals(e.Column, CreatedColumn))
+        {
+            compareAscending = (a, b) => (a.CreatedAt ?? DateTime.MinValue).CompareTo(b.CreatedAt ?? DateTime.MinValue);
+        }
+
+        if (compareAscending is null)
+        {
+            // その他の列は既定のソートに任せる。カスタムソートが残っていると
+            // SortDescriptions より優先されてしまうため解除しておく
+            view.CustomSort = null;
+            return;
+        }
+
+        e.Handled = true;
+
+        var direction = e.Column.SortDirection != ListSortDirection.Ascending
+            ? ListSortDirection.Ascending
+            : ListSortDirection.Descending;
+
+        // e.Handled = true にすると既定処理によるヘッダーの矢印表示の更新も行われないため、自前で反映する
+        foreach (var column in FileListDataGrid.Columns)
+        {
+            column.SortDirection = ReferenceEquals(column, e.Column) ? direction : null;
+        }
+
+        // 既定ソートで積まれた SortDescriptions が残っていると意図しない並びになるため消しておく
+        view.SortDescriptions.Clear();
+        view.CustomSort = direction == ListSortDirection.Ascending
+            ? Comparer<FileItemViewModel>.Create(compareAscending)
+            : Comparer<FileItemViewModel>.Create((a, b) => compareAscending(b, a));
+    }
+
+    // 行以外（空白部分・列ヘッダー）ではコンテキストメニューを表示しない
+    private void FileListDataGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row is null || row.Item is not FileItemViewModel)
+        {
+            e.Handled = true;
+        }
+    }
+
+    private FileItemViewModel? GetSelectedFileItem()
+    {
+        return FileListDataGrid.SelectedItem as FileItemViewModel;
+    }
+
+    // 選択中のファイル/フォルダを、エクスプローラーに貼り付け可能な形式でクリップボードへコピーする
+    private void CopyFileMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() =>
+        {
+            var files = new System.Collections.Specialized.StringCollection { item.FullPath };
+            Clipboard.SetFileDropList(files);
+        });
+    }
+
+    private void CopyFileNameMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() => Clipboard.SetText(item.Name));
+    }
+
+    private void CopyFullPathMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        TrySetClipboard(() => Clipboard.SetText(item.FullPath));
+    }
+
+    // 選択中のアイテムの親フォルダをWindowsのエクスプローラーで開き、アイテムを選択状態にする
+    private void OpenParentFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is not { } item)
+        {
+            return;
+        }
+
+        try
+        {
+            // /select は対象の親フォルダを開いて対象を選択する。パスが存在しない場合でも
+            // explorer.exe は既定フォルダを開くだけでエラーにならないため、事前に存在確認する
+            if (!File.Exists(item.FullPath) && !Directory.Exists(item.FullPath))
+            {
+                MessageBox.Show("The item no longer exists.", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{item.FullPath}\"",
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open the parent folder: {ex.Message}", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // クリップボードは他プロセスがロックしていると失敗（COMException）することがあるため、エラー表示に集約する
+    private void TrySetClipboard(Action setAction)
+    {
+        try
+        {
+            setAction();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not copy to the clipboard: {ex.Message}", "Copy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // 指定アイテムの祖先TreeViewItemをすべて展開する
     private void ExpandParents(TreeViewItem item)
     {
@@ -353,7 +574,15 @@ public partial class MainWindow : Window
             .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
             .ToList();
 
-        ExpandAndSelectByPath(FolderTreeView, rootFolder, pathComponents, 0);
+        // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromIndex(0) is not TreeViewItem allRootsItem)
+        {
+            return;
+        }
+
+        allRootsItem.IsExpanded = true;
+
+        ExpandAndSelectByPath(allRootsItem, rootFolder, pathComponents, 0);
         if (_treeItemMap.TryGetValue(path, out tvi))
         {
             ExpandParents(tvi);
