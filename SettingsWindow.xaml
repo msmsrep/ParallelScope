@@ -24,6 +24,7 @@
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
                     <ListBoxItem Content="Root Folders" IsSelected="True" Padding="8,6"/>
                     <ListBoxItem Content="Display Columns" Padding="8,6"/>
+                    <ListBoxItem Content="Support" Padding="8,6"/>
                 </ListBox>
             </Border>
 
@@ -122,13 +123,40 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- 右側: 開発者サポートページへのリンクのページ -->
+            <Grid Grid.Column="1" Name="SupportPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Support" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,12">
+                            This app (Parallel Scope) is independently developed and managed. We accept voluntary support to help with continuous updates and feature improvements.
+                            <LineBreak/><LineBreak/>
+                            If you would like to support us, it would be a great encouragement if you could do so via the link below.
+                            <LineBreak/><LineBreak/>
+                            <Run Foreground="Gray">(This support is a voluntary donation without consideration, and no benefits are provided in return.)</Run>
+                        </TextBlock>
+                        <Button Name="KofiButton" Content="☕ Buy a coffee for the developer" HorizontalAlignment="Left"
+                                Padding="8,6" Click="KofiButton_Click"/>
+                        <Button Name="GitHubSponsorsButton" Content="💜 GitHub Sponsors" HorizontalAlignment="Left"
+                                Padding="8,6" Margin="0,8,0,0" Click="GitHubSponsorsButton_Click"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Grid>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
             <!-- フルスキャンが意味を持つのはルート/除外設定のみのため、Display Columnsページでは非表示にする -->
             <Button Name="SaveAndFullScanButton" Content="Save + Full Scan" Width="130" Margin="0,0,8,0" Click="SaveAndFullScanButton_Click"/>
-            <Button Content="Save" Width="90" IsDefault="True" Click="SaveButton_Click"/>
-            <Button Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"/>
+            <!-- Supportページには保存対象の設定がないため、Save/Cancelボタンは非表示にする -->
+            <Button Name="SaveButton" Content="Save" Width="90" IsDefault="True" Click="SaveButton_Click"/>
+            <Button Name="CancelButton" Content="Cancel" Width="90" Margin="0,0,8,0" IsCancel="True"/>
         </StackPanel>
     </Grid>
 </Window>

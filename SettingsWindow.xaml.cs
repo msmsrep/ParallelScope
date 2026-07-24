@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
@@ -57,19 +58,54 @@ public partial class SettingsWindow : Window
         }
     }
 
+    private readonly string _kofiUrl = "https://ko-fi.com/msmsrep";
+    private readonly string _gitHubSponsorsUrl = "https://github.com/sponsors/msmsrep";
+
     // 左メニューの選択に応じて右側の設定ページを切り替える
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null)
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null || SupportPanel is null)
         {
             return;
         }
 
         var showColumns = SettingsMenuListBox.SelectedIndex == 1;
-        RootSettingsPanel.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
+        var showSupport = SettingsMenuListBox.SelectedIndex == 2;
+        RootSettingsPanel.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
-        SaveAndFullScanButton.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
+        SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
+        SaveAndFullScanButton.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
+        SaveButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
+        CancelButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // 開発者への寄付ページ（Ko-fi）をブラウザで開く
+    private void KofiButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSupportUrl(_kofiUrl, "Ko-fi");
+    }
+
+    // GitHub Sponsorsページをブラウザで開く
+    private void GitHubSponsorsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSupportUrl(_gitHubSponsorsUrl, "GitHub Sponsors");
+    }
+
+    private void OpenSupportUrl(string url, string caption)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, caption, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     // 入力欄のルートパスを検証・正規化して一覧へ追加する
