@@ -1,7 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
+using ParallelScope.Services;
 using ParallelScope.Utilities;
 
 namespace ParallelScope;
@@ -11,6 +14,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<string> _rootPaths;
     private readonly ObservableCollection<string> _excludedPaths;
     private readonly Dictionary<string, CheckBox> _columnCheckBoxes;
+    private readonly StoreLicenseService _storeLicenseService;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -29,9 +33,13 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentRootPaths,
         IEnumerable<string> currentExcludedPaths,
         int currentFullScanIntervalHours,
-        IEnumerable<string> currentVisibleColumns)
+        IEnumerable<string> currentVisibleColumns,
+        StoreLicenseService storeLicenseService)
     {
         InitializeComponent();
+
+        _storeLicenseService = storeLicenseService;
+        ApplyPlusLicenseState();
 
         _rootPaths = new ObservableCollection<string>(currentRootPaths);
         _excludedPaths = new ObservableCollection<string>(currentExcludedPaths);
@@ -57,19 +65,110 @@ public partial class SettingsWindow : Window
         }
     }
 
+    // Plusの購読状態をDisplay Columnsページへ反映する。
+    // 未購読時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
+    private void ApplyPlusLicenseState()
+    {
+        var isActive = _storeLicenseService.IsPlusActive;
+        ColumnCheckBoxesPanel.IsEnabled = isActive;
+        PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+
+        if (!isActive)
+        {
+            _ = LoadPlusPriceAsync();
+        }
+    }
+
+    // ストアから実際の表示価格（通貨ローカライズ済み）を取得してボタンに反映する。取得できなければ汎用表記のまま
+    private async Task LoadPlusPriceAsync()
+    {
+        var price = await _storeLicenseService.GetPlusFormattedPriceAsync();
+        if (!string.IsNullOrEmpty(price))
+        {
+            SubscribePlusButton.Content = $"🔓 Subscribe to Plus ({price} / month)";
+        }
+    }
+
+    // 購入ダイアログを表示し、購読が成立したらチェックボックス群を有効化する
+    private async void SubscribePlusButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_storeLicenseService.IsStoreAvailable)
+        {
+            PlusStatusTextBlock.Text = "The Microsoft Store is not available. Please install this app from the Microsoft Store to subscribe.";
+            PlusStatusTextBlock.Visibility = Visibility.Visible;
+            return;
+        }
+
+        // 購入ダイアログ表示中の多重クリックを防ぐ
+        SubscribePlusButton.IsEnabled = false;
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var purchased = await _storeLicenseService.PurchasePlusAsync(hwnd);
+            if (purchased)
+            {
+                ApplyPlusLicenseState();
+            }
+            else
+            {
+                PlusStatusTextBlock.Text = "The purchase was not completed.";
+                PlusStatusTextBlock.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            SubscribePlusButton.IsEnabled = true;
+        }
+    }
+
+    private readonly string _kofiUrl = "https://ko-fi.com/msmsrep";
+    private readonly string _gitHubSponsorsUrl = "https://github.com/sponsors/msmsrep";
+
     // 左メニューの選択に応じて右側の設定ページを切り替える
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null)
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null || SupportPanel is null)
         {
             return;
         }
 
         var showColumns = SettingsMenuListBox.SelectedIndex == 1;
-        RootSettingsPanel.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
+        var showSupport = SettingsMenuListBox.SelectedIndex == 2;
+        RootSettingsPanel.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
-        SaveAndFullScanButton.Visibility = showColumns ? Visibility.Collapsed : Visibility.Visible;
+        SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
+        SaveAndFullScanButton.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
+        SaveButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
+        CancelButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // 開発者への寄付ページ（Ko-fi）をブラウザで開く
+    private void KofiButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSupportUrl(_kofiUrl, "Ko-fi");
+    }
+
+    // GitHub Sponsorsページをブラウザで開く
+    private void GitHubSponsorsButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSupportUrl(_gitHubSponsorsUrl, "GitHub Sponsors");
+    }
+
+    private void OpenSupportUrl(string url, string caption)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, caption, MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     // 入力欄のルートパスを検証・正規化して一覧へ追加する

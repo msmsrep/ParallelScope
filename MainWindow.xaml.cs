@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using ParallelScope.Services;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
@@ -18,11 +19,10 @@ namespace ParallelScope;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
+    private readonly StoreLicenseService _storeLicenseService = new();
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
-    private readonly string _kofiUrl = "https://ko-fi.com/msmsrep";
-    private readonly string _gitHubSponsorsUrl = "https://github.com/sponsors/msmsrep";
     public MainWindow()
     {
         InitializeComponent();
@@ -41,10 +41,14 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
-    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
+    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）。
+    // 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視してデフォルト列で表示する
     private void ApplyFileListColumnVisibility()
     {
-        var visibleColumns = _viewModel.GetVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var visibleColumns = (_storeLicenseService.IsPlusActive
+                ? _viewModel.GetVisibleColumns()
+                : FileListColumns.DefaultVisibleColumns)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         SetColumnVisibility(LocationColumn, visibleColumns.Contains(FileListColumns.Location));
         SetColumnVisibility(TypeColumn, visibleColumns.Contains(FileListColumns.Type));
@@ -68,6 +72,12 @@ public partial class MainWindow : Window
         }
 
         _hasStartedAutomaticFullScan = true;
+
+        // Plusの購読状態を確認し、購読済みならユーザー設定の表示列を反映し直す
+        // （コンストラクタ時点ではライセンス未取得のためデフォルト列で表示されている）
+        await _storeLicenseService.RefreshLicenseAsync();
+        ApplyFileListColumnVisibility();
+
         await RunAutomaticFullScanAsync();
         ConfigureScheduledFullScanTimer();
     }
@@ -95,39 +105,38 @@ public partial class MainWindow : Window
         }
     }
 
+    // ツリーから外れたTreeViewItem（設定変更でのルート再構築・子の再読み込みで破棄されたもの）への
+    // 参照をマップに残さない（残すと配下のビジュアルツリーごと解放されず、メモリが増え続ける）。
+    // 同一パスに新しいインスタンスが登録済みの場合は消さない（Loaded→古い方のUnloadedの順で届くことがあるため）
+    private void FolderTreeViewItem_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TreeViewItem tvi)
+        {
+            return;
+        }
+
+        if (tvi.DataContext is FolderItemViewModel vm)
+        {
+            if (_treeItemMap.TryGetValue(vm.Path, out var mapped) && ReferenceEquals(mapped, tvi))
+            {
+                _treeItemMap.Remove(vm.Path);
+            }
+
+            return;
+        }
+
+        // DataContextが既に外れている場合は、値側から一致するエントリを探して除去する
+        foreach (var pair in _treeItemMap)
+        {
+            if (ReferenceEquals(pair.Value, tvi))
+            {
+                _treeItemMap.Remove(pair.Key);
+                return;
+            }
+        }
+    }
+
     private bool _restartFullScanRequested;
-
-    private void KofiMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = _kofiUrl,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Ko-fi", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private void GitHubSponsorsMenuItem_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = _gitHubSponsorsUrl,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "GitHub Sponsors", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
 
     // 設定画面を開き、保存された場合は設定を適用してタイマー・ツリー選択を再構成する
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
@@ -136,13 +145,16 @@ public partial class MainWindow : Window
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
             _viewModel.GetFullScanIntervalHours(),
-            _viewModel.GetVisibleColumns())
+            _viewModel.GetVisibleColumns(),
+            _storeLicenseService)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() != true)
         {
+            // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、列表示は反映し直す
+            ApplyFileListColumnVisibility();
             return;
         }
 
