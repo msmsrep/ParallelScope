@@ -16,6 +16,7 @@ public partial class MainWindowViewModel
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
         _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
+        _developerUnlockKey = settings.DeveloperUnlockKey;
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -41,6 +42,12 @@ public partial class MainWindowViewModel
     public IReadOnlyList<string> GetVisibleColumns()
     {
         return FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList();
+    }
+
+    /// <summary>settings.jsonに書かれた開発者専用のPlus解放キーを取得する（未設定ならnull）。</summary>
+    public string? GetDeveloperUnlockKey()
+    {
+        return _developerUnlockKey;
     }
 
     /// <summary>設定画面からの入力を適用し、設定ファイルへ保存する。</summary>
@@ -166,7 +173,8 @@ public partial class MainWindowViewModel
             ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
             FullScanIntervalHours = _fullScanIntervalHours,
             IsFlatFileViewEnabled = _isFlatFileViewEnabled,
-            VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList()
+            VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
+            DeveloperUnlockKey = _developerUnlockKey
         });
     }
 

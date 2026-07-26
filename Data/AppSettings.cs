@@ -11,4 +11,10 @@ public sealed class AppSettings
 
     /// <summary>ファイル一覧に表示する列のキー一覧（FileListColumns参照）。nullは未設定＝デフォルト列を表示。</summary>
     public List<string>? VisibleColumns { get; set; }
+
+    /// <summary>
+    /// 開発者専用: Plus機能をStoreの購読なしで解放するためのキー。通常はnull。
+    /// 正しいキーかどうかはStoreLicenseServiceが埋め込みハッシュとの照合で判定する。
+    /// </summary>
+    public string? DeveloperUnlockKey { get; set; }
 }

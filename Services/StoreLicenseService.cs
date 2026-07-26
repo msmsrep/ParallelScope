@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using Windows.Services.Store;
 
 namespace ParallelScope.Services;
@@ -11,7 +13,13 @@ public sealed class StoreLicenseService
     // Partner Centerのサブスクリプションアドオン「PremiumSubscription」のStore ID
     private const string PlusAddOnStoreId = "9PPKXZMGHKKR";
 
+    // 開発者専用: settings.jsonのDeveloperUnlockKeyのSHA-256がこの値に一致する場合、
+    // Storeの購読状態に関わらずPlusを有効にする。ソースコードは公開されているため、
+    // キー本体は埋め込まずハッシュのみを保持する（キーを知っているのは開発者だけ）
+    private const string DeveloperUnlockKeyHashHex = "7C629C2677F717CC31D3E8F2C9937795FDEDB8515E433309962632E98112DB7E";
+
     private StoreContext? _context;
+    private bool _isDeveloperUnlocked;
 
     /// <summary>Plusサブスクリプションが現在有効か。InitializeAsync完了まではfalse。</summary>
     public bool IsPlusActive { get; private set; }
@@ -20,11 +28,32 @@ public sealed class StoreLicenseService
     public bool IsStoreAvailable => _context is not null;
 
     /// <summary>
+    /// settings.jsonの開発者キーを検証し、正しければPlusを強制的に有効化する。RefreshLicenseAsyncより先に呼ぶ。
+    /// </summary>
+    public void ApplyDeveloperUnlockKey(string? key)
+    {
+        _isDeveloperUnlocked = !string.IsNullOrEmpty(key)
+            && Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(key)))
+                .Equals(DeveloperUnlockKeyHashHex, StringComparison.OrdinalIgnoreCase);
+
+        if (_isDeveloperUnlocked)
+        {
+            IsPlusActive = true;
+        }
+    }
+
+    /// <summary>
     /// Storeのライセンス情報を取得してIsPlusActiveを更新する。起動時と設定画面表示時に呼ぶ。
     /// ライセンスはStoreがローカルにキャッシュしているためオフラインでも判定できる。
     /// </summary>
     public async Task RefreshLicenseAsync()
     {
+        if (_isDeveloperUnlocked)
+        {
+            IsPlusActive = true;
+            return;
+        }
+
 #if DEBUG
         // 開発時（非パッケージ実行）はStoreライセンスを取得できないため、
         // 購読済みUIの動作確認用に環境変数で強制的に有効化できるようにする
