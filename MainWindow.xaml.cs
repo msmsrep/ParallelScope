@@ -74,7 +74,9 @@ public partial class MainWindow : Window
         _hasStartedAutomaticFullScan = true;
 
         // Plusの購読状態を確認し、購読済みならユーザー設定の表示列を反映し直す
-        // （コンストラクタ時点ではライセンス未取得のためデフォルト列で表示されている）
+        // （コンストラクタ時点ではライセンス未取得のためデフォルト列で表示されている）。
+        // settings.jsonに開発者キーが設定されていればStoreの購読状態に関わらずPlusを有効化する
+        _storeLicenseService.ApplyDeveloperUnlockKey(_viewModel.GetDeveloperUnlockKey());
         await _storeLicenseService.RefreshLicenseAsync();
         ApplyFileListColumnVisibility();
 

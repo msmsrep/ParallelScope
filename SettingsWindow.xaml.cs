@@ -65,13 +65,17 @@ public partial class SettingsWindow : Window
         }
     }
 
-    // Plusの購読状態をDisplay Columnsページへ反映する。
+    // Plusの購読状態をDisplay Columns/Subscriptionページへ反映する。
     // 未購読時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
     private void ApplyPlusLicenseState()
     {
         var isActive = _storeLicenseService.IsPlusActive;
         ColumnCheckBoxesPanel.IsEnabled = isActive;
         PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+
+        // Subscriptionページ: 購読済みなら状態表示のみ、未購読なら購入ボタンを表示する
+        PlusActiveTextBlock.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
+        SubscribePlusButton.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
 
         if (!isActive)
         {
@@ -123,24 +127,42 @@ public partial class SettingsWindow : Window
 
     private readonly string _kofiUrl = "https://ko-fi.com/msmsrep";
     private readonly string _gitHubSponsorsUrl = "https://github.com/sponsors/msmsrep";
+    // Microsoft Storeのサブスクリプションはアプリ内から解約できないため、Microsoftアカウントの管理ページへ誘導する
+    private readonly string _manageSubscriptionUrl = "https://account.microsoft.com/services";
 
     // 左メニューの選択に応じて右側の設定ページを切り替える
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null || SupportPanel is null)
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null || SubscriptionPanel is null || SupportPanel is null)
         {
             return;
         }
 
         var showColumns = SettingsMenuListBox.SelectedIndex == 1;
-        var showSupport = SettingsMenuListBox.SelectedIndex == 2;
-        RootSettingsPanel.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
+        var showSubscription = SettingsMenuListBox.SelectedIndex == 2;
+        var showSupport = SettingsMenuListBox.SelectedIndex == 3;
+        var showRoot = !showColumns && !showSubscription && !showSupport;
+        RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
+        SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
         SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
-        SaveAndFullScanButton.Visibility = showColumns || showSupport ? Visibility.Collapsed : Visibility.Visible;
-        SaveButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
-        CancelButton.Visibility = showSupport ? Visibility.Collapsed : Visibility.Visible;
+        SaveAndFullScanButton.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
+        // Subscription/Supportページには保存対象の設定がないため、Save/Cancelボタンも非表示にする
+        SaveButton.Visibility = showSubscription || showSupport ? Visibility.Collapsed : Visibility.Visible;
+        CancelButton.Visibility = showSubscription || showSupport ? Visibility.Collapsed : Visibility.Visible;
+    }
+
+    // Display ColumnsページのアンロックからSubscriptionページへ遷移する
+    private void GoToSubscriptionButton_Click(object sender, RoutedEventArgs e)
+    {
+        SettingsMenuListBox.SelectedIndex = 2;
+    }
+
+    // Microsoftアカウントのサブスクリプション管理（解約）ページをブラウザで開く
+    private void ManageSubscriptionButton_Click(object sender, RoutedEventArgs e)
+    {
+        OpenSupportUrl(_manageSubscriptionUrl, "Manage subscription");
     }
 
     // 開発者への寄付ページ（Ko-fi）をブラウザで開く
