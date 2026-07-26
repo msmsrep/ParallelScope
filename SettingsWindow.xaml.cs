@@ -3,6 +3,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
+using ParallelScope.Services;
 using ParallelScope.Utilities;
 
 namespace ParallelScope;
@@ -12,6 +14,7 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<string> _rootPaths;
     private readonly ObservableCollection<string> _excludedPaths;
     private readonly Dictionary<string, CheckBox> _columnCheckBoxes;
+    private readonly StoreLicenseService _storeLicenseService;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -30,9 +33,13 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentRootPaths,
         IEnumerable<string> currentExcludedPaths,
         int currentFullScanIntervalHours,
-        IEnumerable<string> currentVisibleColumns)
+        IEnumerable<string> currentVisibleColumns,
+        StoreLicenseService storeLicenseService)
     {
         InitializeComponent();
+
+        _storeLicenseService = storeLicenseService;
+        ApplyPlusLicenseState();
 
         _rootPaths = new ObservableCollection<string>(currentRootPaths);
         _excludedPaths = new ObservableCollection<string>(currentExcludedPaths);
@@ -55,6 +62,62 @@ public partial class SettingsWindow : Window
         foreach (var (column, checkBox) in _columnCheckBoxes)
         {
             checkBox.IsChecked = visibleColumnSet.Contains(column);
+        }
+    }
+
+    // Plusの購読状態をDisplay Columnsページへ反映する。
+    // 未購読時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
+    private void ApplyPlusLicenseState()
+    {
+        var isActive = _storeLicenseService.IsPlusActive;
+        ColumnCheckBoxesPanel.IsEnabled = isActive;
+        PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+
+        if (!isActive)
+        {
+            _ = LoadPlusPriceAsync();
+        }
+    }
+
+    // ストアから実際の表示価格（通貨ローカライズ済み）を取得してボタンに反映する。取得できなければ汎用表記のまま
+    private async Task LoadPlusPriceAsync()
+    {
+        var price = await _storeLicenseService.GetPlusFormattedPriceAsync();
+        if (!string.IsNullOrEmpty(price))
+        {
+            SubscribePlusButton.Content = $"🔓 Subscribe to Plus ({price} / month)";
+        }
+    }
+
+    // 購入ダイアログを表示し、購読が成立したらチェックボックス群を有効化する
+    private async void SubscribePlusButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_storeLicenseService.IsStoreAvailable)
+        {
+            PlusStatusTextBlock.Text = "The Microsoft Store is not available. Please install this app from the Microsoft Store to subscribe.";
+            PlusStatusTextBlock.Visibility = Visibility.Visible;
+            return;
+        }
+
+        // 購入ダイアログ表示中の多重クリックを防ぐ
+        SubscribePlusButton.IsEnabled = false;
+        try
+        {
+            var hwnd = new WindowInteropHelper(this).Handle;
+            var purchased = await _storeLicenseService.PurchasePlusAsync(hwnd);
+            if (purchased)
+            {
+                ApplyPlusLicenseState();
+            }
+            else
+            {
+                PlusStatusTextBlock.Text = "The purchase was not completed.";
+                PlusStatusTextBlock.Visibility = Visibility.Visible;
+            }
+        }
+        finally
+        {
+            SubscribePlusButton.IsEnabled = true;
         }
     }
 

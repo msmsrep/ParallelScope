@@ -15,7 +15,7 @@ dotnet run --project ParallelScope.csproj
 dotnet publish -c Release
 ```
 
-- 自動テストプロジェクトはこのリポジトリに存在しません。変更の検証は `dotnet build`（0警告・0エラーであることを確認）で行い、UIや操作に関わる変更については実際にビルドしたexeを起動して機能を触って確認してください（WPFアプリのためブラウザベースのプレビューは使えません）。ビルドしたexeは `bin/Debug/net10.0-windows/win-x64/ParallelScope.exe` にあります（本格的なUI自動化なしで手早く確認するなら、PowerShellの `Start-Process` / `Get-Process ... | Select MainWindowTitle` が便利です）。
+- 自動テストプロジェクトはこのリポジトリに存在しません。変更の検証は `dotnet build`（0警告・0エラーであることを確認）で行い、UIや操作に関わる変更については実際にビルドしたexeを起動して機能を触って確認してください（WPFアプリのためブラウザベースのプレビューは使えません）。ビルドしたexeは `bin/Debug/net10.0-windows10.0.19041.0/win-x64/ParallelScope.exe` にあります（本格的なUI自動化なしで手早く確認するなら、PowerShellの `Start-Process` / `Get-Process ... | Select MainWindowTitle` が便利です）。
 - EF Core のマイグレーションは `dotnet-tools.json` で宣言されたローカルツール（`dotnet-ef` 10.0.9）を使います。
   ```powershell
   dotnet tool restore

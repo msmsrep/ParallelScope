@@ -18,17 +18,23 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 
 ## Release
 
+- Ver1.4.0.0 Added Monthly Subscription feature
+- Ver 1.3.0.0 Feature change
+  - Added "All Files" mode
+  - Changed search to incremental search
+- Ver 1.2.0.0 Adjustments
+  - Fixed display of search UI
+  - Optimized speed of file scanning logic
 - Ver 1.1.0.0 New features
   - Periodic scan execution (default 3 hours)
   - Scan execution from right-clicking a folder
   - Specification of exclusion folders
-
 - Ver 1.0.0.0 Release
 
 ## Requirements
 
 - Windows
-- .NET SDK 10.0 or later (`net10.0-windows`)
+- .NET SDK 10.0 or later (`net10.0-windows10.0.19041.0`)
 
 ## Setup
 
@@ -88,6 +94,19 @@ dotnet ef database update
 - `Data/`: settings/cache/DbContext
 - `Migrations/`: EF Core migrations
 
+## ParallelScope Plus (Monthly Subscription)
+
+Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
+
+- **Plus feature**: "Display Columns" in the settings window (customizing which columns are shown in the file list)
+- All other features remain free without a subscription. The Plus feature is shown grayed out in the settings window and only its controls are locked
+- You can subscribe from the "Subscribe to Plus" button on the "Settings > Display Columns" page in the Microsoft Store version of the app
+- Payment, billing, and cancellation are all handled by the Microsoft Store. 
+
+### Open Source and Paid Features
+
+The full source code of this app is public, including the in-app purchase implementation. The subscription state is verified against the Microsoft Store license, so **the purchase flow (and the Plus feature lock) only takes effect in the version installed from the Microsoft Store**.
+
 ## Support
 
 This app (ParallelScope) is independently developed and managed. We accept voluntary support to help with continuous updates and feature improvements.  
@@ -99,7 +118,7 @@ If you would like to support us, it would be a great encouragement if you could 
 
 ## Privacy Policy
 
-Last updated: 2026/6/14
+Last updated: 2026/7/26
 
 ### Data Collected and Stored
 
@@ -120,6 +139,12 @@ There is no mechanism that uploads data to developer-managed servers for process
 
 This app does not automatically transmit user data to external services.
 User data is not sold, shared, or provided to third parties.
+
+### In-App Purchases (ParallelScope Plus)
+
+Purchases, billing, and license management for the Plus subscription are handled by the Microsoft Store.
+The app communicates with the Microsoft Store through the OS to check the subscription state, but it never obtains or stores payment information (such as credit card numbers).
+You can review your purchase history and manage the subscription from your Microsoft account.
 
 ### Cookies and Tracking Technologies
 

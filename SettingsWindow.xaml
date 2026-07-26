@@ -103,13 +103,29 @@
             <Grid Grid.Column="1" Name="ColumnSettingsPanel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="Display Columns" Style="{StaticResource PaneHeaderTextStyle}"/>
 
-                <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                <!-- Plus未購読時のみ表示するアンロック案内。購読するとチェックボックス群が有効化される -->
+                <Border Grid.Row="1" Name="PlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
+                        Visibility="Collapsed">
                     <StackPanel>
+                        <TextBlock Text="ParallelScope Plus" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="Customizing display columns is a Plus feature. Subscribe to unlock it."/>
+                        <Button Name="SubscribePlusButton" Content="🔓 Subscribe to Plus" HorizontalAlignment="Left"
+                                Padding="8,6" Click="SubscribePlusButton_Click"/>
+                        <TextBlock Name="PlusStatusTextBlock" Foreground="Gray" TextWrapping="Wrap" Margin="0,8,0,0"
+                                   Visibility="Collapsed"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
+                <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                    <StackPanel Name="ColumnCheckBoxesPanel">
                         <TextBlock Text="Select the columns to show in the file list." Margin="0,0,0,4"/>
                         <TextBlock Text="The Name column is always shown." Foreground="Gray" Margin="0,0,0,12"/>
 

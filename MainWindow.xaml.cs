@@ -7,6 +7,7 @@ using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using ParallelScope.Services;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
@@ -18,6 +19,7 @@ namespace ParallelScope;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
+    private readonly StoreLicenseService _storeLicenseService = new();
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
@@ -39,10 +41,14 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
-    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
+    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）。
+    // 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視してデフォルト列で表示する
     private void ApplyFileListColumnVisibility()
     {
-        var visibleColumns = _viewModel.GetVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var visibleColumns = (_storeLicenseService.IsPlusActive
+                ? _viewModel.GetVisibleColumns()
+                : FileListColumns.DefaultVisibleColumns)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         SetColumnVisibility(LocationColumn, visibleColumns.Contains(FileListColumns.Location));
         SetColumnVisibility(TypeColumn, visibleColumns.Contains(FileListColumns.Type));
@@ -66,6 +72,12 @@ public partial class MainWindow : Window
         }
 
         _hasStartedAutomaticFullScan = true;
+
+        // Plusの購読状態を確認し、購読済みならユーザー設定の表示列を反映し直す
+        // （コンストラクタ時点ではライセンス未取得のためデフォルト列で表示されている）
+        await _storeLicenseService.RefreshLicenseAsync();
+        ApplyFileListColumnVisibility();
+
         await RunAutomaticFullScanAsync();
         ConfigureScheduledFullScanTimer();
     }
@@ -133,13 +145,16 @@ public partial class MainWindow : Window
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
             _viewModel.GetFullScanIntervalHours(),
-            _viewModel.GetVisibleColumns())
+            _viewModel.GetVisibleColumns(),
+            _storeLicenseService)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() != true)
         {
+            // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、列表示は反映し直す
+            ApplyFileListColumnVisibility();
             return;
         }
 
