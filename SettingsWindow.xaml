@@ -24,6 +24,7 @@
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
                     <ListBoxItem Content="Root Folders" IsSelected="True" Padding="8,6"/>
                     <ListBoxItem Content="Display Columns" Padding="8,6"/>
+                    <ListBoxItem Content="Subscription" Padding="8,6"/>
                     <ListBoxItem Content="Support" Padding="8,6"/>
                 </ListBox>
             </Border>
@@ -109,17 +110,15 @@
 
                 <TextBlock Grid.Row="0" Text="Display Columns" Style="{StaticResource PaneHeaderTextStyle}"/>
 
-                <!-- Plus未購読時のみ表示するアンロック案内。購読するとチェックボックス群が有効化される -->
+                <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
                 <Border Grid.Row="1" Name="PlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
                         Visibility="Collapsed">
                     <StackPanel>
                         <TextBlock Text="ParallelScope Plus" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
                                    Text="Customizing display columns is a Plus feature. Subscribe to unlock it."/>
-                        <Button Name="SubscribePlusButton" Content="🔓 Subscribe to Plus" HorizontalAlignment="Left"
-                                Padding="8,6" Click="SubscribePlusButton_Click"/>
-                        <TextBlock Name="PlusStatusTextBlock" Foreground="Gray" TextWrapping="Wrap" Margin="0,8,0,0"
-                                   Visibility="Collapsed"/>
+                        <Button Name="GoToSubscriptionButton" Content="Go to Subscription page" HorizontalAlignment="Left"
+                                Padding="8,6" Click="GoToSubscriptionButton_Click"/>
                     </StackPanel>
                 </Border>
 
@@ -138,6 +137,42 @@
                         <CheckBox Name="AttributesColumnCheckBox" Content="Attributes (R/H/S/A)" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Border>
+            </Grid>
+
+            <!-- 右側: Plusサブスクリプションの案内・購入・解約のページ -->
+            <Grid Grid.Column="1" Name="SubscriptionPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Subscription" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <StackPanel Grid.Row="1">
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12">
+                        <StackPanel>
+                            <TextBlock Text="ParallelScope Plus" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <!-- 購読済みの場合のみ表示する状態表示 -->
+                            <TextBlock Name="PlusActiveTextBlock" Text="✅ Your Plus subscription is active."
+                                       TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       Text="Subscribe to ParallelScope Plus to unlock premium features such as customizing display columns in the file list."/>
+                            <Button Name="SubscribePlusButton" Content="🔓 Subscribe to Plus" HorizontalAlignment="Left"
+                                    Padding="8,6" Click="SubscribePlusButton_Click"/>
+                            <TextBlock Name="PlusStatusTextBlock" Foreground="Gray" TextWrapping="Wrap" Margin="0,8,0,0"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       Text="Subscriptions are billed through the Microsoft Store. To cancel your subscription, open the subscriptions page of your Microsoft account."/>
+                            <Button Name="ManageSubscriptionButton" Content="🔗 Manage / Cancel subscription" HorizontalAlignment="Left"
+                                    Padding="8,6" Click="ManageSubscriptionButton_Click"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
 
             <!-- 右側: 開発者サポートページへのリンクのページ -->
