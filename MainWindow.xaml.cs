@@ -245,16 +245,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ContextMenuOpeningはバブリングするので祖先のTreeViewItemでも発火する。
+        // 右クリックされた最内側のノード以外は、e.Handledを触らずに抜けること
+        // （ここで打ち切ると内側のノードが構築したメニューの自動表示まで止まってしまう）
+        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
+        {
+            return;
+        }
+
         // 仮想「Folders」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
         if (AllRootsVirtualFolder.Matches(folderItem.Path))
         {
             e.Handled = true;
-            return;
-        }
-
-        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
-        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
-        {
             return;
         }
 
