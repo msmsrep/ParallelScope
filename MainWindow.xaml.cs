@@ -31,6 +31,8 @@ public partial class MainWindow : Window
         Title = BuildWindowTitleWithVersion(Title);
 
         _viewModel = new MainWindowViewModel();
+        // 保存済みテーマは最初の描画前に適用する（App.xamlのThemeMode="System"のままだと一瞬OSの配色で表示されてしまう）
+        AppTheme.Apply(_viewModel.GetTheme());
         _scheduledFullScanTimer = new DispatcherTimer();
         _scheduledFullScanTimer.Tick += ScheduledFullScanTimer_Tick;
         DataContext = _viewModel;
@@ -148,6 +150,8 @@ public partial class MainWindow : Window
             _viewModel.GetExcludedPaths(),
             _viewModel.GetFullScanIntervalHours(),
             _viewModel.GetVisibleColumns(),
+            _viewModel.GetTheme(),
+            _viewModel.ApplyTheme,
             _storeLicenseService)
         {
             Owner = this

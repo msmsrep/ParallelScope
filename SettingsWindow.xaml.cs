@@ -15,6 +15,8 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<string> _excludedPaths;
     private readonly Dictionary<string, CheckBox> _columnCheckBoxes;
     private readonly StoreLicenseService _storeLicenseService;
+    // テーマはSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
+    private readonly Action<AppThemeSetting> _applyTheme;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -34,12 +36,24 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentExcludedPaths,
         int currentFullScanIntervalHours,
         IEnumerable<string> currentVisibleColumns,
+        AppThemeSetting currentTheme,
+        Action<AppThemeSetting> applyTheme,
         StoreLicenseService storeLicenseService)
     {
         InitializeComponent();
 
+        _applyTheme = applyTheme;
         _storeLicenseService = storeLicenseService;
         ApplyPlusLicenseState();
+
+        // 現在のテーマのラジオを立てる。ここでCheckedハンドラが走るが、同値のため呼び出し先で無視される
+        var themeRadioButton = currentTheme switch
+        {
+            AppThemeSetting.Light => LightThemeRadioButton,
+            AppThemeSetting.Dark => DarkThemeRadioButton,
+            _ => SystemThemeRadioButton
+        };
+        themeRadioButton.IsChecked = true;
 
         _rootPaths = new ObservableCollection<string>(currentRootPaths);
         _excludedPaths = new ObservableCollection<string>(currentExcludedPaths);
@@ -134,29 +148,45 @@ public partial class SettingsWindow : Window
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null || SubscriptionPanel is null || SupportPanel is null)
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null || ThemePanel is null
+            || SubscriptionPanel is null || SupportPanel is null)
         {
             return;
         }
 
-        var showColumns = SettingsMenuListBox.SelectedIndex == 1;
-        var showSubscription = SettingsMenuListBox.SelectedIndex == 2;
-        var showSupport = SettingsMenuListBox.SelectedIndex == 3;
-        var showRoot = !showColumns && !showSubscription && !showSupport;
+        var selectedMenuItem = SettingsMenuListBox.SelectedItem;
+        var showColumns = ReferenceEquals(selectedMenuItem, ColumnsMenuItem);
+        var showTheme = ReferenceEquals(selectedMenuItem, ThemeMenuItem);
+        var showSubscription = ReferenceEquals(selectedMenuItem, SubscriptionMenuItem);
+        var showSupport = ReferenceEquals(selectedMenuItem, SupportMenuItem);
+        var showRoot = !showColumns && !showTheme && !showSubscription && !showSupport;
         RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
+        ThemePanel.Visibility = showTheme ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
         SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
         SaveAndFullScanButton.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
-        // Subscription/Supportページには保存対象の設定がないため、Save/Cancelボタンも非表示にする
-        SaveButton.Visibility = showSubscription || showSupport ? Visibility.Collapsed : Visibility.Visible;
-        CancelButton.Visibility = showSubscription || showSupport ? Visibility.Collapsed : Visibility.Visible;
+        // Theme/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、Save/Cancelボタンも非表示にする
+        var hasSaveTarget = showRoot || showColumns;
+        SaveButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
+        CancelButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    // テーマの切り替え。プレビューを兼ねるため、Saveボタンを待たずに即座に適用・保存する
+    private void ThemeRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton radioButton || radioButton.Tag is not string themeName)
+        {
+            return;
+        }
+
+        _applyTheme(AppTheme.Parse(themeName));
     }
 
     // Display ColumnsページのアンロックからSubscriptionページへ遷移する
     private void GoToSubscriptionButton_Click(object sender, RoutedEventArgs e)
     {
-        SettingsMenuListBox.SelectedIndex = 2;
+        SettingsMenuListBox.SelectedItem = SubscriptionMenuItem;
     }
 
     // Microsoftアカウントのサブスクリプション管理（解約）ページをブラウザで開く

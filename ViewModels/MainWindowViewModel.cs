@@ -30,6 +30,7 @@ public partial class MainWindowViewModel : ObservableObject
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
+    private AppThemeSetting _theme = AppThemeSetting.System;
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
     // バックグラウンド処理（横断検索・フラット表示・Roots一覧）から参照するルートパスの不変スナップショット。

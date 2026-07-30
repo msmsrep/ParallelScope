@@ -22,10 +22,11 @@
             <Border Grid.Column="0" Style="{StaticResource CardBorderStyle}" Padding="4" Margin="0,0,10,0">
                 <ListBox Name="SettingsMenuListBox" BorderThickness="0" Background="Transparent"
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
-                    <ListBoxItem Content="Root Folders" IsSelected="True" Padding="8,6"/>
-                    <ListBoxItem Content="Display Columns" Padding="8,6"/>
-                    <ListBoxItem Content="Subscription" Padding="8,6"/>
-                    <ListBoxItem Content="Support" Padding="8,6"/>
+                    <ListBoxItem Name="RootFoldersMenuItem" Content="Root Folders" IsSelected="True" Padding="8,6"/>
+                    <ListBoxItem Name="ColumnsMenuItem" Content="Display Columns" Padding="8,6"/>
+                    <ListBoxItem Name="ThemeMenuItem" Content="Theme" Padding="8,6"/>
+                    <ListBoxItem Name="SubscriptionMenuItem" Content="Subscription" Padding="8,6"/>
+                    <ListBoxItem Name="SupportMenuItem" Content="Support" Padding="8,6"/>
                 </ListBox>
             </Border>
 
@@ -135,6 +136,33 @@
                         <CheckBox Name="ModifiedColumnCheckBox" Content="Modified" Margin="0,8,0,0"/>
                         <CheckBox Name="CreatedColumnCheckBox" Content="Created" Margin="0,8,0,0"/>
                         <CheckBox Name="AttributesColumnCheckBox" Content="Attributes (R/H/S/A)" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- 右側: 配色テーマのページ。切り替えは即座に適用・保存されるためSave/Cancelボタンは出さない -->
+            <Grid Grid.Column="1" Name="ThemePanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Theme" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                    <StackPanel>
+                        <TextBlock Text="Choose the color theme of the app." Margin="0,0,0,12"/>
+
+                        <!-- Tagの値はAppTheme.Parseでそのまま解釈する -->
+                        <RadioButton Name="SystemThemeRadioButton" GroupName="Theme" Tag="System"
+                                     Content="System (follow Windows)" Checked="ThemeRadioButton_Checked"/>
+                        <RadioButton Name="LightThemeRadioButton" GroupName="Theme" Tag="Light"
+                                     Content="Light" Margin="0,8,0,0" Checked="ThemeRadioButton_Checked"/>
+                        <RadioButton Name="DarkThemeRadioButton" GroupName="Theme" Tag="Dark"
+                                     Content="Dark" Margin="0,8,0,0" Checked="ThemeRadioButton_Checked"/>
+
+                        <TextBlock Text="The theme is applied and saved immediately." TextWrapping="Wrap"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>

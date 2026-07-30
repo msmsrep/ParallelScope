@@ -17,6 +17,7 @@ public partial class MainWindowViewModel
         _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
         _developerUnlockKey = settings.DeveloperUnlockKey;
+        _theme = AppTheme.Parse(settings.Theme);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -48,6 +49,28 @@ public partial class MainWindowViewModel
     public string? GetDeveloperUnlockKey()
     {
         return _developerUnlockKey;
+    }
+
+    /// <summary>現在の配色テーマ設定を取得する。</summary>
+    public AppThemeSetting GetTheme()
+    {
+        return _theme;
+    }
+
+    /// <summary>
+    /// 配色テーマを切り替えて即座に適用し、設定ファイルへ保存する。
+    /// 設定画面では見た目のプレビューを兼ねるため、Saveボタンを待たずにここで確定させる。
+    /// </summary>
+    public void ApplyTheme(AppThemeSetting theme)
+    {
+        if (_theme == theme)
+        {
+            return;
+        }
+
+        _theme = theme;
+        AppTheme.Apply(_theme);
+        SaveSettings(RootFolders.Select(x => x.Path));
     }
 
     /// <summary>設定画面からの入力を適用し、設定ファイルへ保存する。</summary>
@@ -164,7 +187,7 @@ public partial class MainWindowViewModel
         }
     }
 
-    /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード）をsettings.jsonへ保存する。</summary>
+    /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ）をsettings.jsonへ保存する。</summary>
     private void SaveSettings(IEnumerable<string> rootPaths)
     {
         _appSettingsRepository.Save(new AppSettings
@@ -174,6 +197,7 @@ public partial class MainWindowViewModel
             FullScanIntervalHours = _fullScanIntervalHours,
             IsFlatFileViewEnabled = _isFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
+            Theme = _theme.ToString(),
             DeveloperUnlockKey = _developerUnlockKey
         });
     }
