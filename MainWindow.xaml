@@ -98,6 +98,19 @@
                          Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <!-- 階層ごとのインデントを19px（Fluent既定）から約半分に縮める。
+                             インデント幅はFluentのTreeViewItemテンプレート内の
+                             MinWidth="19" 固定列で作られておりリソース化されていないため、
+                             テンプレートを複製する代わりに子アイテムのパネルを負のマージンで左に寄せる。
+                             注: VirtualizingPanel.IsVirtualizing をONにするとFluent側のトリガーが
+                             ItemsPanel を差し替えるため、このマージンも一緒に指定し直す必要がある -->
+                        <Setter Property="ItemsPanel">
+                            <Setter.Value>
+                                <ItemsPanelTemplate>
+                                    <VirtualizingStackPanel Margin="-9,0,0,0"/>
+                                </ItemsPanelTemplate>
+                            </Setter.Value>
+                        </Setter>
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
