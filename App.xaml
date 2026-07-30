@@ -11,11 +11,27 @@
                 <ResourceDictionary Source="pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <!-- 選択行・トグルON状態の色。Fluent既定はアクセント色を不透明でそのまま敷くため
+                 （ダークでは #99EBFF や #4CC2FF ＋反転文字）主張が強すぎるので、薄く敷くだけにする。
+                 アクセント色は明暗テーマに依らず同じなので、これらの定義を両テーマで共用できる。
+                 文字色はMainWindow側で通常の色に戻している（選択行はCellStyle、トグルはContent） -->
+            <SolidColorBrush x:Key="DataGridRowSelectedBackgroundThemeBrush"
+                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.25"/>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundChecked"
+                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.25"/>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver"
+                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.35"/>
+            <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"
+                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.2"/>
+
             <Style x:Key="CardBorderStyle" TargetType="Border">
                 <Setter Property="CornerRadius" Value="10"/>
                 <Setter Property="Padding" Value="5"/>
-                <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.WindowBrushKey}}"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.ControlDarkBrushKey}}"/>
+                <!-- SystemColors はWindowsのダークモードに追従せず常にライト配色（白背景）を返すため、
+                     Fluentテーマのブラシキーを使う。SurfaceStrokeColorDefaultBrush は
+                     ライト/ダーク共通の半透明グレーで、どちらでも枠線が視認できる -->
+                <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}"/>
                 <Setter Property="BorderThickness" Value="1"/>
             </Style>
 

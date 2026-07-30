@@ -13,7 +13,8 @@
         <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
             <Setter Property="Text" Value="⟳"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="Foreground" Value="#060a0e"/>
+            <!-- 固定色にするとダークモードで背景に埋もれるため、テーマ追従のブラシを使う -->
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Visibility" Value="Collapsed"/>
             <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
@@ -93,7 +94,9 @@
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged"
                       ScrollViewer.ScrollChanged="FolderTreeView_ScrollChanged">
                 <TreeView.ItemContainerStyle>
-                    <Style TargetType="TreeViewItem">
+                    <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
+                         Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
+                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                         <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
@@ -141,8 +144,13 @@
                          Height="28"
                          VerticalContentAlignment="Center"/>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
-                <ToggleButton Grid.Column="1" Content="All Files" Width="72"
-                              IsChecked="{Binding IsFlatFileViewEnabled}"/>
+                <ToggleButton Grid.Column="1" Width="72"
+                              IsChecked="{Binding IsFlatFileViewEnabled}">
+                    <!-- ON時の背景を薄くした（App.xaml参照）ので、文字色も通常の色にする。
+                         テンプレート側がON時の文字色を直接指定してくるため、スタイルではなく
+                         Contentに置いたTextBlockのローカル値で上書きする -->
+                    <TextBlock Text="All Files" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                </ToggleButton>
             </Grid>
 
             <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
@@ -155,6 +163,42 @@
                       PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
                       ContextMenuOpening="FileListDataGrid_ContextMenuOpening"
                       Sorting="FileListDataGrid_Sorting">
+                <!-- 選択行の背景を薄くした（App.xaml参照）ので、文字色もFluent既定の反転色ではなく通常の色にする。
+                     FluentのDataGridCellスタイルは暗黙スタイルではなくキー付きのため、BasedOnで明示的に引き継ぐ -->
+                <DataGrid.CellStyle>
+                    <Style TargetType="DataGridCell" BasedOn="{StaticResource DefaultDataGridCellStyle}">
+                        <!-- Fluent既定のテンプレートはクリック（フォーカス）時にセルを1pxの枠で囲うが、
+                             選択色だけで十分なので枠を出さない。枠の色はテンプレート内で
+                             ComponentResourceKey経由の固定色（ダークでも黒）になっており、
+                             リソース上書きでもスタイルのセッターでも消せないため、
+                             フォーカス時のトリガーを持たない同等のテンプレートに差し替えている -->
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="DataGridCell">
+                                    <Border x:Name="Border" Background="Transparent" SnapsToDevicePixels="True"
+                                            HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
+                                            VerticalAlignment="{TemplateBinding VerticalAlignment}">
+                                        <ContentPresenter Content="{TemplateBinding Content}"
+                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                          ContentStringFormat="{TemplateBinding ContentStringFormat}"
+                                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsSelected" Value="True">
+                                            <Setter TargetName="Border" Property="Background"
+                                                    Value="{DynamicResource DataGridRowSelectedBackgroundThemeBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.CellStyle>
                 <DataGrid.ContextMenu>
                     <ContextMenu>
                         <MenuItem Header="Copy File" Click="CopyFileMenuItem_Click"/>

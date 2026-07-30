@@ -126,7 +126,7 @@
                 <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
                     <StackPanel Name="ColumnCheckBoxesPanel">
                         <TextBlock Text="Select the columns to show in the file list." Margin="0,0,0,4"/>
-                        <TextBlock Text="The Name column is always shown." Foreground="Gray" Margin="0,0,0,12"/>
+                        <TextBlock Text="The Name column is always shown." Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
 
                         <!-- 画面上の列順に並べる（FileListColumns.OptionalColumns と同順） -->
                         <CheckBox Name="LocationColumnCheckBox" Content="Location (parent folder path)" Margin="0,4,0,0"/>
@@ -159,7 +159,7 @@
                                        Text="Subscribe to ParallelScope Plus to unlock premium features such as customizing display columns in the file list."/>
                             <Button Name="SubscribePlusButton" Content="🔓 Subscribe to Plus" HorizontalAlignment="Left"
                                     Padding="8,6" Click="SubscribePlusButton_Click"/>
-                            <TextBlock Name="PlusStatusTextBlock" Foreground="Gray" TextWrapping="Wrap" Margin="0,8,0,0"
+                            <TextBlock Name="PlusStatusTextBlock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
@@ -191,7 +191,7 @@
                             <LineBreak/><LineBreak/>
                             If you would like to support us, it would be a great encouragement if you could do so via the link below.
                             <LineBreak/><LineBreak/>
-                            <Run Foreground="Gray">(This support is a voluntary donation without consideration, and no benefits are provided in return.)</Run>
+                            <Run Foreground="{DynamicResource TextFillColorSecondaryBrush}">(This support is a voluntary donation without consideration, and no benefits are provided in return.)</Run>
                         </TextBlock>
                         <Button Name="KofiButton" Content="☕ Buy a coffee for the developer" HorizontalAlignment="Left"
                                 Padding="8,6" Click="KofiButton_Click"/>
