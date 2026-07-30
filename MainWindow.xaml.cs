@@ -31,6 +31,8 @@ public partial class MainWindow : Window
         Title = BuildWindowTitleWithVersion(Title);
 
         _viewModel = new MainWindowViewModel();
+        // 保存済みテーマは最初の描画前に適用する（App.xamlのThemeMode="System"のままだと一瞬OSの配色で表示されてしまう）
+        AppTheme.Apply(_viewModel.GetTheme());
         _scheduledFullScanTimer = new DispatcherTimer();
         _scheduledFullScanTimer.Tick += ScheduledFullScanTimer_Tick;
         DataContext = _viewModel;
@@ -148,6 +150,8 @@ public partial class MainWindow : Window
             _viewModel.GetExcludedPaths(),
             _viewModel.GetFullScanIntervalHours(),
             _viewModel.GetVisibleColumns(),
+            _viewModel.GetTheme(),
+            _viewModel.ApplyTheme,
             _storeLicenseService)
         {
             Owner = this
@@ -241,16 +245,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ContextMenuOpeningはバブリングするので祖先のTreeViewItemでも発火する。
+        // 右クリックされた最内側のノード以外は、e.Handledを触らずに抜けること
+        // （ここで打ち切ると内側のノードが構築したメニューの自動表示まで止まってしまう）
+        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
+        {
+            return;
+        }
+
         // 仮想「Folders」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
         if (AllRootsVirtualFolder.Matches(folderItem.Path))
         {
             e.Handled = true;
-            return;
-        }
-
-        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
-        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
-        {
             return;
         }
 

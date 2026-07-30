@@ -12,6 +12,9 @@ public sealed class AppSettings
     /// <summary>ファイル一覧に表示する列のキー一覧（FileListColumns参照）。nullは未設定＝デフォルト列を表示。</summary>
     public List<string>? VisibleColumns { get; set; }
 
+    /// <summary>配色テーマ（AppThemeSettingの名前）。nullは未設定＝Windowsの設定に追従。</summary>
+    public string? Theme { get; set; }
+
     /// <summary>
     /// 開発者専用: Plus機能をStoreの購読なしで解放するためのキー。通常はnull。
     /// 正しいキーかどうかはStoreLicenseServiceが埋め込みハッシュとの照合で判定する。

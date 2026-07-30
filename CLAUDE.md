@@ -37,7 +37,8 @@ dotnet publish -c Release
   - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。
   - `FileSizeFormatter`: バイト数を `"12.3 MB"` のような表示用文字列に変換します。
   - `AppVersionProvider`: `AppxManifest.xml`（csprojの設定によりexeと同じフォルダにコピーされる）の `Identity/@Version` を読み取り、ウィンドウタイトルにバージョンを表示するために使います。
-- **データ層**（`Data/`）: `ParallelScopeDbContext`（EF Core + SQLite、WALジャーナルモード、PRAGMA設定は `FileCacheRepository` のコンストラクタで調整）がファイル一覧キャッシュ（`FileSystemEntryEntity`、テーブル `FileSystemEntries`）を支えます。`AppSettingsRepository` は `AppSettings`（ルートパス・除外パス・フルスキャン間隔時間・All Filesモードの有効状態など）を `settings.json` として永続化します。どちらも保存先フォルダは `AppDataPathProvider` 経由で解決します。永続化したい状態を増やす場合は `AppSettings` にプロパティを足した上で、`MainWindowViewModel.Settings.cs` の `SaveSettings(rootPaths)` ヘルパー（現在の全設定値から `AppSettings` を組み立てて保存する一箇所）に反映し、変更のたびに呼び出すようにしてください（`IsFlatFileViewEnabled` セッターがその実装例です）。
+  - `AppTheme` / `AppThemeSetting`: 配色テーマ設定（System/Light/Dark）の解釈と、`Application.ThemeMode` へのアプリ全体への適用。`ThemeMode` は実験的APIのため、この中で診断 `WPF0001` を抑止しています。
+- **データ層**（`Data/`）: `ParallelScopeDbContext`（EF Core + SQLite、WALジャーナルモード、PRAGMA設定は `FileCacheRepository` のコンストラクタで調整）がファイル一覧キャッシュ（`FileSystemEntryEntity`、テーブル `FileSystemEntries`）を支えます。`AppSettingsRepository` は `AppSettings`（ルートパス・除外パス・フルスキャン間隔時間・All Filesモードの有効状態・配色テーマなど）を `settings.json` として永続化します。どちらも保存先フォルダは `AppDataPathProvider` 経由で解決します。永続化したい状態を増やす場合は `AppSettings` にプロパティを足した上で、`MainWindowViewModel.Settings.cs` の `SaveSettings(rootPaths)` ヘルパー（現在の全設定値から `AppSettings` を組み立てて保存する一箇所）に反映し、変更のたびに呼び出すようにしてください（`IsFlatFileViewEnabled` セッターがその実装例です）。
 - **MSIXパッケージング。** リポジトリルートの `AppxManifest.xml`（`Identity/Name = msmsrep.ParallelScope`）は、MSIXパッケージングと、実行時のバージョン取得元（`AppVersionProvider`）の両方に使われます。アプリは非パッケージ実行（開発時/F5）とパッケージ実行の両方を想定しています。ビルド済みの `.msix` はバージョンごとに `MSIX/verX.Y.Z.W/` 配下にアーカイブされます（`.gitignore` 対象で、ビルド成果物には含まれません）。
 
 ## 規約
