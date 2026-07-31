@@ -10,10 +10,14 @@
     <UseWPF>true</UseWPF>
     <!-- ターゲットランタイム -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <!-- MSIXなのでランタイムを含めない -->
-    <SelfContained>false</SelfContained>
+    <!-- .NETランタイムはMSIXフレームワークパッケージとして配布されておらず、ストア経由でも自動導入されない。
+         フレームワーク依存だと初回起動時にランタイム導入を促されるため、自己完結で発行する -->
+    <SelfContained>true</SelfContained>
     <!-- アプリのアイコンをMSIXにも設定 -->
     <ApplicationIcon>Assets/logo.ico</ApplicationIcon>
+    <!-- 自己完結発行だとWPFの各国語リソースまで同梱される。アプリUIは英語なので、
+         TextBoxの右クリックメニュー等がWindowsの言語に追従する ja だけ残して他は落とす -->
+    <SatelliteResourceLanguages>en;ja</SatelliteResourceLanguages>
   </PropertyGroup>
 
 
@@ -46,5 +50,6 @@
     <Resource Include="Assets/logo.ico" />
 
   </ItemGroup>
+
 
 </Project>
