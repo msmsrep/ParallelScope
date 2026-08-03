@@ -91,8 +91,7 @@
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
-                      SelectedItemChanged="FolderTreeView_SelectedItemChanged"
-                      ScrollViewer.ScrollChanged="FolderTreeView_ScrollChanged">
+                      SelectedItemChanged="FolderTreeView_SelectedItemChanged">
                 <TreeView.ItemContainerStyle>
                     <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
                          Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
