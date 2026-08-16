@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParallelScope 使い方ガイド</title>
+<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
+<link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="langbar"><a href="index.html">English</a><span class="current">日本語</span></div>
+    <h1>ParallelScope 使い方ガイド</h1>
+    <p class="tagline">複数のルートフォルダを登録して、横断的にブラウズ・検索できる Windows デスクトップアプリ。</p>
+    <div class="badges">
+      <span class="badge">Windows 10 / 11</span>
+      <span class="badge">Microsoft Store</span>
+      <span class="badge">ローカル SQLite キャッシュ</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#about">ParallelScope とは</a></li>
+    <li><a href="#screen">画面の見方</a></li>
+    <li><a href="#setup">最初にすること（ルートフォルダの登録）</a></li>
+    <li><a href="#browse">フォルダを見る・移動する</a></li>
+    <li><a href="#search">検索する</a></li>
+    <li><a href="#allfiles">All Files モード</a></li>
+    <li><a href="#contextmenu">右クリックメニュー</a></li>
+    <li><a href="#scan">スキャンとキャッシュ</a></li>
+    <li><a href="#customize">表示のカスタマイズ</a></li>
+    <li><a href="#plus">ParallelScope Plus</a></li>
+    <li><a href="#data">データの保存先</a></li>
+    <li><a href="#tips">困ったときは</a></li>
+  </ol>
+</nav>
+
+<section id="about">
+  <h2>ParallelScope とは</h2>
+  <p>
+    ParallelScope は、バラバラの場所にあるフォルダを <strong>1 つのツリーにまとめて</strong> 扱うためのファイルブラウザです。
+    たとえば「作業中のプロジェクト」「デザイン素材」「レポート置き場」のように離れた場所にあるフォルダをルートとして登録しておくと、
+    エクスプローラーのウィンドウを行き来せずに、1 つの画面から参照・検索できます。
+  </p>
+  <p>
+    フォルダ構成とファイル一覧はローカルの SQLite キャッシュに保存されます。表示はまずキャッシュから行われるため、
+    フォルダを開いた瞬間に一覧が出て、そのあとバックグラウンドで実際のファイルシステムを読み直して内容が最新化されます。
+    ネットワーク越しの NAS のように応答が遅い場所でも待たされにくいのが特徴です。
+  </p>
+  <div class="note">
+    <p>このページの画面写真はすべて <code>C:\ScopeDemo</code> 配下に用意したダミーデータで撮影したものです。実際のフォルダ構成とは関係ありません。</p>
+  </div>
+</section>
+
+<section id="screen">
+  <h2>画面の見方</h2>
+  <figure class="callout-shot">
+    <a href="images/01-overview.png"><img src="images/01-overview.png" alt="ParallelScope のメイン画面。左にフォルダツリー、右にファイル一覧が並ぶ"></a>
+    <span class="pin" style="left:3.8%;  top:10.9%">1</span>
+    <span class="pin" style="left:14.7%; top:10.9%">2</span>
+    <span class="pin" style="left:62%;   top:11%">3</span>
+    <span class="pin" style="left:45%;   top:20.9%">4</span>
+    <span class="pin" style="left:93.2%; top:17.6%">5</span>
+    <span class="pin" style="left:8.8%;  top:86%">6</span>
+    <span class="pin" style="left:60%;   top:85%">7</span>
+  </figure>
+  <ol class="legend">
+    <li><span><strong>Menu</strong> — 設定画面を開きます。</span></li>
+    <li><span><strong>← Back / Forward → / ↑ Up</strong> — 移動履歴を戻る・進む、親フォルダへ上がる。</span></li>
+    <li><span><strong>アドレスバー</strong> — 現在地のフルパス。直接入力して <kbd>Enter</kbd> でそのフォルダへ移動できます。</span></li>
+    <li><span><strong>検索ボックス</strong> — 入力するたびに現在フォルダ配下を検索します（インクリメンタルサーチ）。</span></li>
+    <li><span><strong>All Files トグル</strong> — 現在フォルダ配下のファイルをすべてフラットに表示します。</span></li>
+    <li><span><strong>フォルダツリー</strong> — 最上位の「Folders」の下に、登録したルートフォルダが並びます。</span></li>
+    <li><span><strong>ファイル一覧</strong> — 選択中フォルダの内容。列見出しをクリックすると並べ替えできます。</span></li>
+  </ol>
+</section>
+
+<section id="setup">
+  <h2>最初にすること（ルートフォルダの登録）</h2>
+  <p>インストール直後はルートフォルダが未登録で、デスクトップが暫定的に表示されます。まずは見たいフォルダを登録します。</p>
+
+  <ol class="steps">
+    <li><strong>「Menu」→「⚙ Settings」を開く</strong></li>
+    <li><strong>「Root Folders」ページで、登録したいフォルダのフルパスを入力して「Add」</strong>
+      <br>登録した順にツリーへ並びます。「↑ Up」「↓ Down」で並び順を変更、「Remove」で削除できます。</li>
+    <li><strong>必要なら「Excluded Folders」に除外したいフォルダを追加</strong>
+      <br><code>node_modules</code> や <code>bin</code> のように中身が多くて見る必要のないフォルダを指定しておくと、ツリー・一覧・検索・スキャンのすべてから外れます。</li>
+    <li><strong>「Save + Full Scan」で保存してスキャンを実行</strong>
+      <br>ルートを追加・変更した直後はキャッシュが空なので、ここで全体をスキャンしておくと以降の表示と検索が速くなります。設定だけ保存したい場合は「Save」を押します。</li>
+  </ol>
+
+  <div class="shot-pair">
+    <figure>
+      <a href="images/11-menu.png"><img src="images/11-menu.png" alt="Menu をクリックして Settings を選ぶ"></a>
+      <figcaption>「Menu」→「⚙ Settings」で設定画面を開きます。</figcaption>
+    </figure>
+    <figure>
+      <a href="images/06-settings-roots.png"><img src="images/06-settings-roots.png" alt="設定画面の Root Folders ページ"></a>
+      <figcaption>ルートフォルダ・除外フォルダ・自動フルスキャンの間隔をここで設定します。</figcaption>
+    </figure>
+  </div>
+
+  <div class="note">
+    <p><strong>除外フォルダはフルパス指定です。</strong>「<code>node_modules</code> という名前をすべて除外」のようなパターン指定ではなく、指定したパスとその配下だけが対象になります。</p>
+  </div>
+</section>
+
+<section id="browse">
+  <h2>フォルダを見る・移動する</h2>
+  <ul>
+    <li><strong>ツリーで選択</strong> — 左のツリーでフォルダをクリックすると、右側にその直下の内容が表示されます。<code>&gt;</code> をクリックすると子フォルダを展開します（展開時に読み込まれます）。</li>
+    <li><strong>ダブルクリック</strong> — 一覧のフォルダをダブルクリックするとその中へ移動、ファイルをダブルクリックすると既定のアプリで開きます。</li>
+    <li><strong>Back / Forward / Up</strong> — ブラウザと同じ感覚で移動履歴を行き来できます。</li>
+    <li><strong>アドレスバー</strong> — パスを貼り付けて <kbd>Enter</kbd> を押すと、そのフォルダへ直接移動します。</li>
+    <li><strong>並べ替え</strong> — 「Name」「Size」「Modified」などの列見出しをクリックすると並べ替えできます。サイズや日時は表示文字列ではなく元の値で比較されるため、<code>9 KB</code> と <code>12 MB</code> のような大小も正しく並びます。</li>
+  </ul>
+
+  <h3>最上位の「Folders」</h3>
+  <p>
+    ツリーの一番上にある「Folders」は、登録したすべてのルートをまとめた仮想フォルダです。実在するパスではないため、
+    選択するとアドレスバーには <code>::Folders::</code> と表示され、一覧には各ルートが 1 行ずつ並びます。
+    ここを選んだ状態で検索すると、<strong>すべてのルートを横断して検索</strong>できます。
+  </p>
+
+  <h3>フォルダのサイズ表示</h3>
+  <p>
+    一覧のフォルダ行に表示されるサイズは、キャッシュから集計した配下の合計サイズです。まだスキャンされていないフォルダでは空欄になり、
+    スキャンが進むと表示されます。
+  </p>
+</section>
+
+<section id="search">
+  <h2>検索する</h2>
+  <figure>
+    <a href="images/02-search.png"><img src="images/02-search.png" alt="「report」で検索し、複数のルートにまたがる結果が表示されている画面"></a>
+    <figcaption>「Folders」を選んだ状態で <code>report</code> と入力したところ。登録した全ルートの結果がまとめて出ます。</figcaption>
+  </figure>
+  <ul>
+    <li><strong>検索ボタンはありません。</strong>検索ボックスに文字を入力すると、その都度自動的に検索されます。</li>
+    <li>検索範囲は<strong>現在表示しているフォルダの配下</strong>です。全体を探したいときは、ツリーの最上位「Folders」を選んでから入力します。</li>
+    <li>検索は<strong>キャッシュに対して行われます</strong>。実際のファイルシステムを歩き回らないので、NAS などでも待たされません。逆に、スキャン後に増えたファイルは次のスキャンまでヒットしません。</li>
+    <li>検索ボックスを空にすると、元のフォルダ表示に戻ります。</li>
+    <li>除外フォルダの中身は検索結果に出ません。</li>
+  </ul>
+</section>
+
+<section id="allfiles">
+  <h2>All Files モード</h2>
+  <figure>
+    <a href="images/03-allfiles.png"><img src="images/03-allfiles.png" alt="All Files をONにして、Projects 配下のファイルがフラットに並んでいる画面"></a>
+    <figcaption>「All Files」がONのとき、現在フォルダ配下のファイルがサブフォルダの階層に関係なく 1 つのリストに並びます。</figcaption>
+  </figure>
+  <p>
+    右上の「All Files」をONにすると、選択中フォルダの<strong>配下すべてのファイル</strong>を再帰的に一覧表示します（フォルダ行は出ません）。
+    「どのフォルダに入れたか忘れたが、とにかく全部見たい」というときに便利です。
+  </p>
+  <ul>
+    <li>この表示もキャッシュから作られるため、直近のスキャン時点の内容になります。</li>
+    <li>ONのまま別のフォルダを選ぶと、そのフォルダ配下のファイルに切り替わります。</li>
+    <li>ONのまま検索すると、結果はファイルのみになります。</li>
+    <li>ON / OFF の状態は保存され、次回起動時も引き継がれます。</li>
+  </ul>
+</section>
+
+<section id="contextmenu">
+  <h2>右クリックメニュー</h2>
+  <div class="shot-pair">
+    <figure>
+      <a href="images/04-context-menu.png"><img src="images/04-context-menu.png" alt="ファイル一覧の右クリックメニュー"></a>
+      <figcaption>ファイル一覧の行を右クリック。</figcaption>
+    </figure>
+    <figure>
+      <a href="images/05-tree-context.png"><img src="images/05-tree-context.png" alt="フォルダツリーの右クリックメニュー"></a>
+      <figcaption>フォルダツリーのノードを右クリック。</figcaption>
+    </figure>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>メニュー</th><th>動作</th></tr></thead>
+      <tbody>
+        <tr><td>Copy File</td><td>ファイル自体をコピーします。エクスプローラーに貼り付けて複製できます。</td></tr>
+        <tr><td>Copy File Name</td><td>ファイル名だけをテキストとしてコピーします。</td></tr>
+        <tr><td>Copy Full Path</td><td>フルパスをテキストとしてコピーします。</td></tr>
+        <tr><td>Open Parent Folder</td><td>エクスプローラーで親フォルダを開き、その項目を選択状態にします。</td></tr>
+        <tr><td>Scan everything under this folder</td><td>（ツリー側）そのフォルダ配下だけをスキャンし、キャッシュを更新します。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="scan">
+  <h2>スキャンとキャッシュ</h2>
+  <p>
+    ParallelScope の表示と検索は SQLite のキャッシュを土台にしています。キャッシュは次の 3 つの方法で更新されます。
+  </p>
+  <ul>
+    <li><strong>自動フルスキャン</strong> — アプリ起動時に 1 回、以降は設定した間隔（既定 3 時間）ごとに、登録した全ルートをスキャンします。実行中はツリーのルート名の左でアイコンが回転します。</li>
+    <li><strong>Save + Full Scan</strong> — 設定画面で保存と同時に全体スキャンを実行します。ルートを追加・変更した直後におすすめです。</li>
+    <li><strong>フォルダ単位スキャン</strong> — ツリーでフォルダを右クリックして「Scan everything under this folder」。そのフォルダ配下だけを更新するので、全体スキャンより短時間で済みます。</li>
+  </ul>
+  <p>
+    このほか、フォルダを開いた直後にはその<strong>直下だけ</strong>が実ファイルシステムから読み直され、一覧とキャッシュが更新されます。
+    「ファイルを追加したのに検索でヒットしない」という場合は、そのフォルダをスキャンするか、次の自動フルスキャンを待ってください。
+  </p>
+  <div class="note">
+    <p>スキャン中もアプリはそのまま操作できます。スキャン実行中に設定画面から「Save + Full Scan」を再度実行すると、走っているスキャンを中断して新しい設定でやり直します。</p>
+  </div>
+</section>
+
+<section id="customize">
+  <h2>表示のカスタマイズ</h2>
+
+  <h3>配色テーマ</h3>
+  <div class="shot-pair">
+    <figure>
+      <a href="images/08-settings-theme.png"><img src="images/08-settings-theme.png" alt="設定画面の Theme ページ"></a>
+      <figcaption>「Settings &gt; Theme」で System / Light / Dark を切り替え。選んだ瞬間に適用・保存されます。</figcaption>
+    </figure>
+    <figure>
+      <a href="images/09-dark.png"><img src="images/09-dark.png" alt="ダークテーマのメイン画面"></a>
+      <figcaption>Dark を選んだときのメイン画面。</figcaption>
+    </figure>
+  </div>
+
+  <h3>表示する列（ParallelScope Plus 機能）</h3>
+  <figure>
+    <a href="images/07-settings-columns.png"><img src="images/07-settings-columns.png" alt="設定画面の Display Columns ページ"></a>
+    <figcaption>未購読の場合、チェックボックスは薄字で表示され操作できません。</figcaption>
+  </figure>
+  <p>
+    ファイル一覧に表示する列は「Settings &gt; Display Columns」で選べます。選択できる列は Location（親フォルダのパス）・Type・Size・Modified・Created・Attributes で、
+    Name 列は常に表示されます。この列カスタマイズは有料の Plus 機能で、未購読のときは既定の Name / Type / Size / Modified で表示されます。
+  </p>
+</section>
+
+<section id="plus">
+  <h2>ParallelScope Plus（月額サブスクリプション）</h2>
+  <figure>
+    <a href="images/10-settings-subscription.png"><img src="images/10-settings-subscription.png" alt="設定画面の Subscription ページ"></a>
+    <figcaption>「Settings &gt; Subscription」から購読と解約の入り口にアクセスできます。</figcaption>
+  </figure>
+  <ul>
+    <li>対象機能は現在「Display Columns（表示列のカスタマイズ）」です。それ以外のすべての機能は購読なしで使えます。</li>
+    <li>購入・請求・解約はすべて Microsoft Store が処理します。解約は「Manage / Cancel subscription」から Microsoft アカウントのサブスクリプション管理ページを開いて行います。</li>
+    <li>購読状態は Microsoft Store のライセンスで判定されるため、この機能が働くのは Microsoft Store 版のみです。</li>
+  </ul>
+</section>
+
+<section id="data">
+  <h2>データの保存先</h2>
+  <p>設定とキャッシュはローカルにのみ保存されます。外部サーバーへ送信する仕組みはありません。</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ファイル</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td><code>settings.json</code></td><td>ルートフォルダ・除外フォルダ・スキャン間隔・テーマなどの設定</td></tr>
+        <tr><td><code>ParallelScope.sqlite</code></td><td>フォルダ構成とファイル一覧のキャッシュ</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    保存場所は Microsoft Store 版では <code>%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState</code> です。
+    アプリをアンインストールすると、これらのデータも一緒に削除されます。
+  </p>
+</section>
+
+<section id="tips">
+  <h2>困ったときは</h2>
+
+  <h3>追加したファイルが検索に出てこない</h3>
+  <p>検索はキャッシュを対象にしています。そのフォルダをツリーで右クリックして「Scan everything under this folder」を実行するか、次の自動フルスキャンを待ってください。</p>
+
+  <h3>ツリーに出てこないフォルダがある</h3>
+  <p>除外フォルダに含まれていないか、「Settings &gt; Root Folders」の Excluded Folders を確認してください。除外したパスとその配下は、ツリー・一覧・検索のいずれにも表示されません。</p>
+
+  <h3>NAS やネットワークドライブが遅い・切断されている</h3>
+  <p>接続できないルートがあっても、キャッシュ済みの内容はそのまま閲覧・検索できます。接続が戻れば、次のスキャンで内容が最新化されます。</p>
+
+  <h3>フォルダのサイズが空欄のまま</h3>
+  <p>フォルダの合計サイズはスキャン済みのキャッシュから集計しています。まだスキャンされていないフォルダでは空欄になります。</p>
+
+  <h3>表示列を変えたい</h3>
+  <p>列の増減は Plus 機能です。「Settings &gt; Display Columns」から購読ページへ移動できます。</p>
+</section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <ul>
+      <li><a href="https://github.com/msmsrep/ParallelScope">GitHub リポジトリ</a></li>
+      <li><a href="https://github.com/msmsrep/ParallelScope/issues">お問い合わせ / 不具合報告</a></li>
+      <li><a href="https://github.com/msmsrep/ParallelScope/blob/main/Readme.ja.md">Readme・プライバシーポリシー</a></li>
+      <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
+      <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
+    </ul>
+    <p>画面写真は ver1.4.4.0 のものです。実際の画面はバージョンにより異なる場合があります。</p>
+  </div>
+</footer>
+
+</body>
+</html>

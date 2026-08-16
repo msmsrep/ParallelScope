@@ -5,6 +5,8 @@ English | [日本語](./Readme.ja.md)
 ParallelScope is a Windows desktop application that lets you browse folders and files across multiple configured root paths.
 It is built with WPF and uses a local SQLite cache to speed up listing and search.
 
+📖 **[User Guide](https://msmsrep.github.io/ParallelScope/)** — how to use the app, with screenshots.
+
 ## Key Features
 
 - Register multiple root folders (add/remove from the settings window)
@@ -58,13 +60,15 @@ dotnet publish -c Release
 
 ## Usage
 
-1. After startup, click Settings > Open Settings.
-2. Add one or more root folders to monitor, then save.
+1. After startup, click Menu > Settings.
+2. Add one or more root folders to monitor, then click "Save + Full Scan".
 3. Select a folder in the left tree to display its contents on the right.
-4. Enter a query in the search box, then press Enter or click Search.
+4. Type in the search box to search under the current folder (results update as you type).
 5. Double-click an item in the list:
    - Folder: navigate into that folder
    - File: open with the default application
+
+See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 
 ## Data Storage
 

@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ParallelScope User Guide</title>
+<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, and how scanning and the cache work — with screenshots.">
+<link rel="icon" href="images/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="langbar"><span class="current">English</span><a href="index.ja.html">日本語</a></div>
+    <h1>ParallelScope User Guide</h1>
+    <p class="tagline">A Windows desktop app for browsing and searching across several root folders at once.</p>
+    <div class="badges">
+      <span class="badge">Windows 10 / 11</span>
+      <span class="badge">Microsoft Store</span>
+      <span class="badge">Local SQLite cache</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#about">What ParallelScope is</a></li>
+    <li><a href="#screen">The main window</a></li>
+    <li><a href="#setup">First run: add your root folders</a></li>
+    <li><a href="#browse">Browsing and navigating</a></li>
+    <li><a href="#search">Searching</a></li>
+    <li><a href="#allfiles">All Files mode</a></li>
+    <li><a href="#contextmenu">Right-click menus</a></li>
+    <li><a href="#scan">Scanning and the cache</a></li>
+    <li><a href="#customize">Customizing the view</a></li>
+    <li><a href="#plus">ParallelScope Plus</a></li>
+    <li><a href="#data">Where your data is stored</a></li>
+    <li><a href="#tips">Troubleshooting</a></li>
+  </ol>
+</nav>
+
+<section id="about">
+  <h2>What ParallelScope is</h2>
+  <p>
+    ParallelScope is a file browser that pulls folders from unrelated locations into <strong>a single tree</strong>.
+    Register the folders you actually work in — say your active projects, your design assets, and your reports —
+    and you can browse and search all of them from one window instead of juggling Explorer windows.
+  </p>
+  <p>
+    The folder structure and file listings are kept in a local SQLite cache. Listings are drawn from that cache first,
+    so a folder opens instantly; the real file system is then re-read in the background to bring the listing up to date.
+    That keeps the UI responsive even on slow locations such as a NAS over the network.
+  </p>
+  <div class="note">
+    <p>Every screenshot on this page was taken with dummy data placed under <code>C:\ScopeDemo</code>. It is not a real folder structure.</p>
+  </div>
+</section>
+
+<section id="screen">
+  <h2>The main window</h2>
+  <figure class="callout-shot">
+    <a href="images/01-overview.png"><img src="images/01-overview.png" alt="The ParallelScope main window, with the folder tree on the left and the file list on the right"></a>
+    <span class="pin" style="left:3.8%;  top:10.9%">1</span>
+    <span class="pin" style="left:14.7%; top:10.9%">2</span>
+    <span class="pin" style="left:62%;   top:11%">3</span>
+    <span class="pin" style="left:45%;   top:20.9%">4</span>
+    <span class="pin" style="left:93.2%; top:17.6%">5</span>
+    <span class="pin" style="left:8.8%;  top:86%">6</span>
+    <span class="pin" style="left:60%;   top:85%">7</span>
+  </figure>
+  <ol class="legend">
+    <li><span><strong>Menu</strong> — opens the settings window.</span></li>
+    <li><span><strong>← Back / Forward → / ↑ Up</strong> — move through your navigation history, or go to the parent folder.</span></li>
+    <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
+    <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
+    <li><span><strong>All Files toggle</strong> — lists every file under the current folder as one flat list.</span></li>
+    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node.</span></li>
+    <li><span><strong>File list</strong> — the contents of the selected folder. Click a column header to sort.</span></li>
+  </ol>
+</section>
+
+<section id="setup">
+  <h2>First run: add your root folders</h2>
+  <p>After installation no roots are registered yet, and the app falls back to showing your Desktop. Start by registering the folders you want to browse.</p>
+
+  <ol class="steps">
+    <li><strong>Open "Menu" → "⚙ Settings"</strong></li>
+    <li><strong>On the "Root Folders" page, type the full path of a folder and click "Add"</strong>
+      <br>Roots appear in the tree in the order listed. Reorder them with "↑ Up" / "↓ Down", or drop one with "Remove".</li>
+    <li><strong>Optionally add folders to "Excluded Folders"</strong>
+      <br>Excluding noisy folders such as <code>node_modules</code> or <code>bin</code> keeps them out of the tree, the file list, search results, and scans.</li>
+    <li><strong>Click "Save + Full Scan"</strong>
+      <br>The cache is empty right after you add a root, so scanning once here makes browsing and searching fast from then on. Use "Save" if you only want to store the settings.</li>
+  </ol>
+
+  <div class="shot-pair">
+    <figure>
+      <a href="images/11-menu.png"><img src="images/11-menu.png" alt="Clicking Menu and choosing Settings"></a>
+      <figcaption>"Menu" → "⚙ Settings" opens the settings window.</figcaption>
+    </figure>
+    <figure>
+      <a href="images/06-settings-roots.png"><img src="images/06-settings-roots.png" alt="The Root Folders page of the settings window"></a>
+      <figcaption>Root folders, excluded folders, and the automatic full-scan interval all live here.</figcaption>
+    </figure>
+  </div>
+
+  <div class="note">
+    <p><strong>Exclusions are full paths, not name patterns.</strong> Adding a path excludes exactly that folder and everything under it — it does not exclude every folder that happens to share the name.</p>
+  </div>
+</section>
+
+<section id="browse">
+  <h2>Browsing and navigating</h2>
+  <ul>
+    <li><strong>Select in the tree</strong> — click a folder on the left and its immediate contents appear on the right. Click <code>&gt;</code> to expand a node; children are loaded at that point.</li>
+    <li><strong>Double-click</strong> — double-clicking a folder in the list moves into it; double-clicking a file opens it in the default application.</li>
+    <li><strong>Back / Forward / Up</strong> — navigation history works the way it does in a browser.</li>
+    <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there.</li>
+    <li><strong>Sorting</strong> — click a column header such as "Name", "Size", or "Modified". Sizes and timestamps are compared as raw values rather than as displayed text, so <code>9 KB</code> and <code>12 MB</code> sort correctly.</li>
+  </ul>
+
+  <h3>The "Folders" node</h3>
+  <p>
+    The node at the very top of the tree is a virtual folder that gathers all your roots. It is not a real path, so selecting it
+    shows <code>::Folders::</code> in the address bar and lists one row per root. Searching from here
+    <strong>searches across every registered root at once</strong>.
+  </p>
+
+  <h3>Folder sizes</h3>
+  <p>
+    The size shown on a folder row is the total size of its contents, aggregated from the cache. Folders that have not been
+    scanned yet show a blank size until a scan reaches them.
+  </p>
+</section>
+
+<section id="search">
+  <h2>Searching</h2>
+  <figure>
+    <a href="images/02-search.png"><img src="images/02-search.png" alt="Searching for report, showing results from several roots at once"></a>
+    <figcaption>Typing <code>report</code> with "Folders" selected: hits from every registered root, in one list.</figcaption>
+  </figure>
+  <ul>
+    <li><strong>There is no search button.</strong> The list updates as you type.</li>
+    <li>The scope is <strong>everything under the folder you are currently viewing</strong>. To search everywhere, select the top-level "Folders" node first.</li>
+    <li>Search runs <strong>against the cache</strong>, never by walking the live file system, so it stays fast even on a NAS. The flip side: files added since the last scan are not found until the next one.</li>
+    <li>Clear the search box to return to the normal folder listing.</li>
+    <li>Excluded folders never appear in results.</li>
+  </ul>
+</section>
+
+<section id="allfiles">
+  <h2>All Files mode</h2>
+  <figure>
+    <a href="images/03-allfiles.png"><img src="images/03-allfiles.png" alt="All Files enabled, showing every file under Projects in one flat list"></a>
+    <figcaption>With "All Files" on, every file under the current folder appears in a single list, regardless of depth.</figcaption>
+  </figure>
+  <p>
+    Turning on "All Files" in the top right lists <strong>every file underneath the selected folder</strong>, recursively
+    (folder rows are omitted). It is the fastest way to answer "I know it's in here somewhere".
+  </p>
+  <ul>
+    <li>This view is also built from the cache, so it reflects the most recent scan.</li>
+    <li>Selecting another folder while it is on switches the flat list to that folder.</li>
+    <li>Searching while it is on returns files only.</li>
+    <li>The on/off state is saved and restored the next time you start the app.</li>
+  </ul>
+</section>
+
+<section id="contextmenu">
+  <h2>Right-click menus</h2>
+  <div class="shot-pair">
+    <figure>
+      <a href="images/04-context-menu.png"><img src="images/04-context-menu.png" alt="The right-click menu in the file list"></a>
+      <figcaption>Right-clicking a row in the file list.</figcaption>
+    </figure>
+    <figure>
+      <a href="images/05-tree-context.png"><img src="images/05-tree-context.png" alt="The right-click menu in the folder tree"></a>
+      <figcaption>Right-clicking a node in the folder tree.</figcaption>
+    </figure>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Menu item</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Copy File</td><td>Copies the file itself, so you can paste a copy in Explorer.</td></tr>
+        <tr><td>Copy File Name</td><td>Copies just the file name as text.</td></tr>
+        <tr><td>Copy Full Path</td><td>Copies the full path as text.</td></tr>
+        <tr><td>Open Parent Folder</td><td>Opens the parent folder in Explorer with the item selected.</td></tr>
+        <tr><td>Scan everything under this folder</td><td>(tree) Scans just that subtree and refreshes its cache.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="scan">
+  <h2>Scanning and the cache</h2>
+  <p>Browsing and searching are built on the SQLite cache, which is refreshed in three ways.</p>
+  <ul>
+    <li><strong>Automatic full scan</strong> — once when the app starts, then on the interval you configure (3 hours by default). While it runs, an icon spins next to each root in the tree.</li>
+    <li><strong>Save + Full Scan</strong> — saves your settings and immediately scans everything. Worth doing right after you add or change a root.</li>
+    <li><strong>Per-folder scan</strong> — right-click a folder in the tree and choose "Scan everything under this folder". Much quicker than a full scan when only one area changed.</li>
+  </ul>
+  <p>
+    In addition, opening a folder re-reads <strong>its immediate contents</strong> from the live file system and updates both the
+    listing and the cache. If a file you just added does not turn up in search, scan that folder or wait for the next automatic full scan.
+  </p>
+  <div class="note">
+    <p>The app stays usable while a scan runs. Triggering "Save + Full Scan" during a scan cancels the running one and restarts it with the new settings.</p>
+  </div>
+</section>
+
+<section id="customize">
+  <h2>Customizing the view</h2>
+
+  <h3>Theme</h3>
+  <div class="shot-pair">
+    <figure>
+      <a href="images/08-settings-theme.png"><img src="images/08-settings-theme.png" alt="The Theme page of the settings window"></a>
+      <figcaption>"Settings &gt; Theme" switches between System, Light, and Dark. The choice applies and is saved immediately.</figcaption>
+    </figure>
+    <figure>
+      <a href="images/09-dark.png"><img src="images/09-dark.png" alt="The main window with the dark theme"></a>
+      <figcaption>The main window with Dark selected.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Display columns (a ParallelScope Plus feature)</h3>
+  <figure>
+    <a href="images/07-settings-columns.png"><img src="images/07-settings-columns.png" alt="The Display Columns page of the settings window"></a>
+    <figcaption>Without a subscription the checkboxes are shown greyed out and cannot be changed.</figcaption>
+  </figure>
+  <p>
+    "Settings &gt; Display Columns" chooses which columns the file list shows: Location (the parent folder path), Type, Size,
+    Modified, Created, and Attributes. The Name column is always shown. Column customization is a paid Plus feature; without a
+    subscription the list uses the default Name / Type / Size / Modified.
+  </p>
+</section>
+
+<section id="plus">
+  <h2>ParallelScope Plus (monthly subscription)</h2>
+  <figure>
+    <a href="images/10-settings-subscription.png"><img src="images/10-settings-subscription.png" alt="The Subscription page of the settings window"></a>
+    <figcaption>"Settings &gt; Subscription" is where subscribing and cancelling start.</figcaption>
+  </figure>
+  <ul>
+    <li>The Plus feature today is "Display Columns" (customizing the file list columns). Everything else is free.</li>
+    <li>Purchase, billing, and cancellation are handled entirely by the Microsoft Store. "Manage / Cancel subscription" opens the subscriptions page of your Microsoft account.</li>
+    <li>The subscription state is checked against your Microsoft Store license, so this only applies to the Microsoft Store build.</li>
+  </ul>
+</section>
+
+<section id="data">
+  <h2>Where your data is stored</h2>
+  <p>Settings and the cache are stored locally. Nothing is uploaded to any server.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>File</th><th>Contents</th></tr></thead>
+      <tbody>
+        <tr><td><code>settings.json</code></td><td>Root folders, excluded folders, scan interval, theme, and other settings</td></tr>
+        <tr><td><code>ParallelScope.sqlite</code></td><td>Cached folder structure and file listings</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>
+    In the Microsoft Store build they live in <code>%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState</code>.
+    Uninstalling the app removes them as well.
+  </p>
+</section>
+
+<section id="tips">
+  <h2>Troubleshooting</h2>
+
+  <h3>A file I just added does not show up in search</h3>
+  <p>Search reads the cache. Right-click that folder in the tree and run "Scan everything under this folder", or wait for the next automatic full scan.</p>
+
+  <h3>A folder is missing from the tree</h3>
+  <p>Check "Settings &gt; Root Folders" and look at Excluded Folders — an excluded path and everything under it is hidden from the tree, the list, and search.</p>
+
+  <h3>A NAS or network drive is slow or disconnected</h3>
+  <p>Roots you cannot reach right now can still be browsed and searched from the cache. Once the connection is back, the next scan brings them up to date.</p>
+
+  <h3>A folder shows no size</h3>
+  <p>Folder totals are aggregated from scanned cache entries, so folders that have not been scanned yet show a blank size.</p>
+
+  <h3>I want different columns</h3>
+  <p>Adding or removing columns is a Plus feature. "Settings &gt; Display Columns" links through to the subscription page.</p>
+</section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <ul>
+      <li><a href="https://github.com/msmsrep/ParallelScope">GitHub repository</a></li>
+      <li><a href="https://github.com/msmsrep/ParallelScope/issues">Questions and bug reports</a></li>
+      <li><a href="https://github.com/msmsrep/ParallelScope/blob/main/Readme.md">Readme and privacy policy</a></li>
+      <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
+      <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
+    </ul>
+    <p>Screenshots were taken with ver1.4.4.0. Later versions may look slightly different.</p>
+  </div>
+</footer>
+
+</body>
+</html>
