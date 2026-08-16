@@ -61,6 +61,8 @@
             <Menu Grid.Column="0" HorizontalAlignment="Left">
                 <MenuItem Header="Menu">
                     <MenuItem Header="⚙  Settings" Click="OpenSettingsMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="📖  User Guide" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 

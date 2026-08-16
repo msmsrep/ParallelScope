@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -181,6 +182,29 @@ public partial class MainWindow : Window
             {
                 await RunFullScanFromSettingsAsync();
             }
+        }
+    }
+
+    // 使い方ガイド（GitHub Pages）を既定のブラウザーで開く
+    private void OpenUserGuideMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        // アプリのUIは英語のみだが、日本語環境では日本語版のページを開く
+        // （ページ側にも言語の切り替えリンクがあるため、外した場合も辿り着ける）
+        var url = string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ja", StringComparison.OrdinalIgnoreCase)
+            ? "https://msmsrep.github.io/ParallelScope/index.ja.html"
+            : "https://msmsrep.github.io/ParallelScope/";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open the user guide: {ex.Message}", "User Guide", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
