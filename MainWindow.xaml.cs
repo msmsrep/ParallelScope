@@ -2,6 +2,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Windows.Data;
 using System.Windows.Input;
@@ -184,32 +185,35 @@ public partial class MainWindow : Window
         }
     }
 
+    // 使い方ガイド（GitHub Pages）を既定のブラウザーで開く
+    private void OpenUserGuideMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        // アプリのUIは英語のみだが、日本語環境では日本語版のページを開く
+        // （ページ側にも言語の切り替えリンクがあるため、外した場合も辿り着ける）
+        var url = string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ja", StringComparison.OrdinalIgnoreCase)
+            ? "https://msmsrep.github.io/ParallelScope/index.ja.html"
+            : "https://msmsrep.github.io/ParallelScope/";
+
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not open the user guide: {ex.Message}", "User Guide", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // ツリーで選択されたフォルダのファイル一覧を読み込む
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (e.NewValue is FolderItemViewModel folderItem)
         {
             _viewModel.LoadFiles(folderItem.Path);
-        }
-    }
-
-    // 縦スクロールが上端/下端に達したら横スクロールも左端/右端へ寄せる
-    // （上端付近はルートが左寄り、下端付近は深い階層が右寄りに表示されるため）。
-    // 横スクロール操作と競合しないよう、縦オフセットが実際に動いたときだけ反応する
-    private void FolderTreeView_ScrollChanged(object sender, ScrollChangedEventArgs e)
-    {
-        if (e.OriginalSource is not ScrollViewer scrollViewer || e.VerticalChange == 0)
-        {
-            return;
-        }
-
-        if (scrollViewer.VerticalOffset <= 0)
-        {
-            scrollViewer.ScrollToLeftEnd();
-        }
-        else if (scrollViewer.VerticalOffset >= scrollViewer.ScrollableHeight)
-        {
-            scrollViewer.ScrollToRightEnd();
         }
     }
 

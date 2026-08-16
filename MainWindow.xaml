@@ -61,6 +61,8 @@
             <Menu Grid.Column="0" HorizontalAlignment="Left">
                 <MenuItem Header="Menu">
                     <MenuItem Header="⚙  Settings" Click="OpenSettingsMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="📖  User Guide" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 
@@ -91,8 +93,7 @@
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
-                      SelectedItemChanged="FolderTreeView_SelectedItemChanged"
-                      ScrollViewer.ScrollChanged="FolderTreeView_ScrollChanged">
+                      SelectedItemChanged="FolderTreeView_SelectedItemChanged">
                 <TreeView.ItemContainerStyle>
                     <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
                          Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
