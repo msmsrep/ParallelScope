@@ -16,11 +16,12 @@ public static class PathNormalizer
             return string.Empty;
         }
 
-        // 仮想「Folders」パスは Path.GetFullPath に通せない（相対パス扱いで壊れる）ため、そのまま返す。
+        // 仮想ノード（Favorites / Frequently Used / Folders）のパスは Path.GetFullPath に通せない
+        // （相対パス扱いで壊れる）ため、正規形をそのまま返す。
         // これにより AreSame / IsAncestorOrSame も仮想パスに対して安全に動作する
-        if (AllRootsVirtualFolder.Matches(path))
+        if (VirtualFolders.GetCanonicalPath(path) is { } virtualPath)
         {
-            return AllRootsVirtualFolder.Path;
+            return virtualPath;
         }
 
         var fullPath = Path.GetFullPath(path);

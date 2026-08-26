@@ -38,13 +38,20 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentVisibleColumns,
         AppThemeSetting currentTheme,
         Action<AppThemeSetting> applyTheme,
-        StoreLicenseService storeLicenseService)
+        StoreLicenseService storeLicenseService,
+        bool startOnSubscriptionPage = false)
     {
         InitializeComponent();
 
         _applyTheme = applyTheme;
         _storeLicenseService = storeLicenseService;
         ApplyPlusLicenseState();
+
+        // Plus機能のアンロック案内から開かれた場合は、最初からSubscriptionページを表示する
+        if (startOnSubscriptionPage)
+        {
+            SettingsMenuListBox.SelectedItem = SubscriptionMenuItem;
+        }
 
         // 現在のテーマのラジオを立てる。ここでCheckedハンドラが走るが、同値のため呼び出し先で無視される
         var themeRadioButton = currentTheme switch

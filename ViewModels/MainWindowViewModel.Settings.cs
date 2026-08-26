@@ -18,6 +18,8 @@ public partial class MainWindowViewModel
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
+        // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
+        LoadFavoritesAndUsage(settings);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -173,9 +175,9 @@ public partial class MainWindowViewModel
             return;
         }
 
-        if (AllRootsVirtualFolder.Matches(CurrentPath))
+        if (VirtualFolders.IsVirtual(CurrentPath))
         {
-            // 仮想「Folders」を表示中はナビゲーションせず、変更後のルート構成で一覧を取り直す
+            // 仮想ノードを表示中はナビゲーションせず、変更後の構成で一覧を取り直す
             RefreshCurrentFolder();
             return;
         }
@@ -187,7 +189,7 @@ public partial class MainWindowViewModel
         }
     }
 
-    /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ）をsettings.jsonへ保存する。</summary>
+    /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ・お気に入り・アクセス実績）をsettings.jsonへ保存する。</summary>
     private void SaveSettings(IEnumerable<string> rootPaths)
     {
         _appSettingsRepository.Save(new AppSettings
@@ -198,6 +200,8 @@ public partial class MainWindowViewModel
             IsFlatFileViewEnabled = _isFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
             Theme = _theme.ToString(),
+            FavoritePaths = _favoritePaths.ToList(),
+            FolderUsages = _folderUsages.Values.ToList(),
             DeveloperUnlockKey = _developerUnlockKey
         });
     }

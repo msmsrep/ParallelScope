@@ -44,14 +44,22 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
-    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）。
-    // 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視してデフォルト列で表示する
-    private void ApplyFileListColumnVisibility()
+    // 実際にファイル一覧へ表示しているオプション列を画面上の列順で返す。
+    // 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視してデフォルト列とする
+    private IReadOnlyList<string> GetEffectiveVisibleColumns()
     {
-        var visibleColumns = (_storeLicenseService.IsPlusActive
+        var configured = (_storeLicenseService.IsPlusActive
                 ? _viewModel.GetVisibleColumns()
                 : FileListColumns.DefaultVisibleColumns)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return FileListColumns.OptionalColumns.Where(configured.Contains).ToList();
+    }
+
+    // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
+    private void ApplyFileListColumnVisibility()
+    {
+        var visibleColumns = GetEffectiveVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         SetColumnVisibility(LocationColumn, visibleColumns.Contains(FileListColumns.Location));
         SetColumnVisibility(TypeColumn, visibleColumns.Contains(FileListColumns.Type));
@@ -59,6 +67,12 @@ public partial class MainWindow : Window
         SetColumnVisibility(ModifiedColumn, visibleColumns.Contains(FileListColumns.Modified));
         SetColumnVisibility(CreatedColumn, visibleColumns.Contains(FileListColumns.Created));
         SetColumnVisibility(AttributesColumn, visibleColumns.Contains(FileListColumns.Attributes));
+    }
+
+    // お気に入り・よく使うノードはPlus機能のため、購読状態に合わせてツリーへの表示を切り替える
+    private void ApplyPlusTreeNodes()
+    {
+        _viewModel.SetPlusFeaturesEnabled(_storeLicenseService.IsPlusActive);
     }
 
     private static void SetColumnVisibility(DataGridColumn column, bool isVisible)
@@ -82,6 +96,7 @@ public partial class MainWindow : Window
         _storeLicenseService.ApplyDeveloperUnlockKey(_viewModel.GetDeveloperUnlockKey());
         await _storeLicenseService.RefreshLicenseAsync();
         ApplyFileListColumnVisibility();
+        ApplyPlusTreeNodes();
 
         await RunAutomaticFullScanAsync();
         ConfigureScheduledFullScanTimer();
@@ -104,7 +119,9 @@ public partial class MainWindow : Window
     // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
     private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is TreeViewItem tvi && tvi.DataContext is FolderItemViewModel vm)
+        // お気に入り／よく使い配下は実体ツリーの複製なので登録しない
+        // （同じパスで上書きされると、実体ツリーで選択したつもりが複製側へ飛んでしまう）
+        if (sender is TreeViewItem tvi && tvi.DataContext is FolderItemViewModel { IsShortcut: false } vm)
         {
             _treeItemMap[vm.Path] = tvi;
         }
@@ -146,6 +163,11 @@ public partial class MainWindow : Window
     // 設定画面を開き、保存された場合は設定を適用してタイマー・ツリー選択を再構成する
     private async void OpenSettingsMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        await ShowSettingsDialogAsync(startOnSubscriptionPage: false);
+    }
+
+    private async Task ShowSettingsDialogAsync(bool startOnSubscriptionPage)
+    {
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
@@ -153,20 +175,23 @@ public partial class MainWindow : Window
             _viewModel.GetVisibleColumns(),
             _viewModel.GetTheme(),
             _viewModel.ApplyTheme,
-            _storeLicenseService)
+            _storeLicenseService,
+            startOnSubscriptionPage)
         {
             Owner = this
         };
 
         if (dialog.ShowDialog() != true)
         {
-            // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、列表示は反映し直す
+            // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、Plus機能の表示は反映し直す
             ApplyFileListColumnVisibility();
+            ApplyPlusTreeNodes();
             return;
         }
 
         _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours, dialog.ResultVisibleColumns);
         ApplyFileListColumnVisibility();
+        ApplyPlusTreeNodes();
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 
@@ -208,6 +233,88 @@ public partial class MainWindow : Window
         }
     }
 
+    // 表示中のファイル一覧（検索結果・All Files表示・通常一覧のいずれも、ソート順と表示列のまま）をCSVへ書き出す。
+    // Plus機能のため、未購読の場合は購読案内を表示して終了する
+    private async void ExportCsvMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_storeLicenseService.IsPlusActive)
+        {
+            var answer = MessageBox.Show(
+                "Exporting the file list to CSV is a ParallelScope Plus feature.\n\nDo you want to open the Subscription page?",
+                "Export CSV",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Information);
+
+            if (answer == MessageBoxResult.Yes)
+            {
+                await ShowSettingsDialogAsync(startOnSubscriptionPage: true);
+            }
+
+            return;
+        }
+
+        // ヘッダークリックのソート結果を反映するため、バインド元のコレクションではなくDataGridの表示順で取り出す
+        var items = FileListDataGrid.Items.OfType<FileItemViewModel>().ToList();
+        if (items.Count == 0)
+        {
+            MessageBox.Show("There are no items to export.", "Export CSV", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Export CSV",
+            Filter = "CSV file (*.csv)|*.csv|All files (*.*)|*.*",
+            DefaultExt = ".csv",
+            AddExtension = true,
+            FileName = BuildCsvFileName()
+        };
+
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        var filePath = dialog.FileName;
+        var columns = GetEffectiveVisibleColumns();
+
+        Cursor = Cursors.Wait;
+        try
+        {
+            // 数十万行になり得るため、書き出しはバックグラウンドで行う
+            // （FileItemViewModelは取得済みのスナップショットを読むだけなのでUIスレッド外から触って問題ない）
+            await Task.Run(() => FileListCsvExporter.Export(filePath, items, columns));
+
+            MessageBox.Show(
+                $"Exported {items.Count} item(s) to:\n{filePath}",
+                "Export CSV",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show($"Could not export the CSV file: {ex.Message}", "Export CSV", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            Cursor = null;
+        }
+    }
+
+    // 既定のファイル名を "ParallelScope_<フォルダ名>_yyyyMMdd_HHmmss.csv" で組み立てる
+    private string BuildCsvFileName()
+    {
+        var folderName = string.IsNullOrWhiteSpace(_viewModel.CurrentPath)
+            ? string.Empty
+            : Path.GetFileName(_viewModel.CurrentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+        // ドライブ直下（"D:\"）などフォルダ名が取れない場合と、パスに使えない文字を除去した結果空になる場合がある
+        var sanitized = new string(folderName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray());
+        var prefix = string.IsNullOrWhiteSpace(sanitized) ? "ParallelScope" : $"ParallelScope_{sanitized}";
+
+        return $"{prefix}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+    }
+
     // ツリーで選択されたフォルダのファイル一覧を読み込む
     private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
@@ -221,6 +328,13 @@ public partial class MainWindow : Window
     {
         if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem })
         {
+            return;
+        }
+
+        // 「よく使う」は展開のタイミングでだけ並べ直す（移動のたびに並べ替えるとツリーが目の前で動いてしまう）
+        if (VirtualFolders.GetKind(folderItem.Path) == VirtualFolderKind.Frequent)
+        {
+            _viewModel.RefreshFrequentFolders();
             return;
         }
 
@@ -258,26 +372,52 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 仮想「Folders」ノードは実パスを持たず個別スキャンできないため、メニューを表示しない
-        if (AllRootsVirtualFolder.Matches(folderItem.Path))
+        // 仮想ノード（Folders / Favorites / Frequently Used）は実パスを持たず個別スキャンできないため、メニューを表示しない
+        if (VirtualFolders.IsVirtual(folderItem.Path))
         {
             e.Handled = true;
             return;
         }
 
-        var menuItem = new MenuItem
+        var scanMenuItem = new MenuItem
         {
             Header = "Scan everything under this folder",
             DataContext = folderItem,
             IsEnabled = !folderItem.IsScanning
         };
-        menuItem.Click += ScanFolderMenuItem_Click;
+        scanMenuItem.Click += ScanFolderMenuItem_Click;
 
-        treeViewItem.ContextMenu = new ContextMenu
+        var contextMenu = new ContextMenu
         {
             DataContext = folderItem
         };
-        treeViewItem.ContextMenu.Items.Add(menuItem);
+        contextMenu.Items.Add(scanMenuItem);
+
+        // お気に入りはPlus機能のため、未購読の間はメニューにも出さない
+        if (_viewModel.ArePlusFeaturesEnabled)
+        {
+            var isFavorite = _viewModel.IsFavorite(folderItem.Path);
+            var favoriteMenuItem = new MenuItem
+            {
+                Header = isFavorite ? "☆  Remove from Favorites" : "★  Add to Favorites",
+                DataContext = folderItem
+            };
+            favoriteMenuItem.Click += ToggleFavoriteMenuItem_Click;
+
+            contextMenu.Items.Add(new Separator());
+            contextMenu.Items.Add(favoriteMenuItem);
+        }
+
+        treeViewItem.ContextMenu = contextMenu;
+    }
+
+    // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える
+    private void ToggleFavoriteMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            _viewModel.ToggleFavorite(folderItem.Path);
+        }
     }
 
     // 戻る履歴のフォルダへ移動し、ツリー選択を同期する
@@ -600,7 +740,8 @@ public partial class MainWindow : Window
             .ToList();
 
         // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
-        if (FolderTreeView.ItemContainerGenerator.ContainerFromIndex(0) is not TreeViewItem allRootsItem)
+        // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_viewModel.AllRootsNode) is not TreeViewItem allRootsItem)
         {
             return;
         }

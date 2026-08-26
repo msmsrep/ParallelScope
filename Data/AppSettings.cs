@@ -12,6 +12,12 @@ public sealed class AppSettings
     /// <summary>ファイル一覧に表示する列のキー一覧（FileListColumns参照）。nullは未設定＝デフォルト列を表示。</summary>
     public List<string>? VisibleColumns { get; set; }
 
+    /// <summary>お気に入りに登録されたフォルダのパス一覧（登録順）。</summary>
+    public List<string> FavoritePaths { get; set; } = new();
+
+    /// <summary>「Frequently Used」の並び順を決めるフォルダごとのアクセス実績。</summary>
+    public List<FolderUsageEntry> FolderUsages { get; set; } = new();
+
     /// <summary>配色テーマ（AppThemeSettingの名前）。nullは未設定＝Windowsの設定に追従。</summary>
     public string? Theme { get; set; }
 

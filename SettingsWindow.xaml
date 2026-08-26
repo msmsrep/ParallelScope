@@ -184,7 +184,7 @@
                             <TextBlock Name="PlusActiveTextBlock" Text="✅ Your Plus subscription is active."
                                        TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
                             <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                                       Text="Subscribe to ParallelScope Plus to unlock premium features such as customizing display columns in the file list."/>
+                                       Text="Subscribe to ParallelScope Plus to unlock premium features such as Favorites and Frequently Used folders in the tree, customizing display columns in the file list, and exporting the file list to CSV."/>
                             <Button Name="SubscribePlusButton" Content="🔓 Subscribe to Plus" HorizontalAlignment="Left"
                                     Padding="8,6" Click="SubscribePlusButton_Click"/>
                             <TextBlock Name="PlusStatusTextBlock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"

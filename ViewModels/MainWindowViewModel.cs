@@ -38,17 +38,28 @@ public partial class MainWindowViewModel : ObservableObject
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
     /// <summary>
-    /// ルート同士が入れ子（例: D:\ と D:\Sub）になっている構成かどうか。
-    /// 全ルート横断の列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
+    /// 横断列挙（All Files・横断検索）の起点となるパス群を返す。
+    /// 仮想ノード（Folders / Favorites / Frequently Used）なら対応するフォルダ群、実パスならそのパス自身。
     /// </summary>
-    private bool HasOverlappingRootPaths()
+    private IReadOnlyList<string> GetTraversalPaths(string path)
     {
-        var roots = _rootPathsSnapshot;
-        for (var i = 0; i < roots.Count; i++)
+        var kind = VirtualFolders.GetKind(path);
+        return kind == VirtualFolderKind.None
+            ? new[] { path }
+            : GetVirtualFolderPaths(kind);
+    }
+
+    /// <summary>
+    /// 対象パス同士が入れ子（例: D:\ と D:\Sub）になっているかどうか。
+    /// 横断列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
+    /// </summary>
+    private static bool HasOverlappingPaths(IReadOnlyList<string> paths)
+    {
+        for (var i = 0; i < paths.Count; i++)
         {
-            for (var j = 0; j < roots.Count; j++)
+            for (var j = 0; j < paths.Count; j++)
             {
-                if (i != j && PathNormalizer.IsAncestorOrSame(roots[i], roots[j]))
+                if (i != j && PathNormalizer.IsAncestorOrSame(paths[i], paths[j]))
                 {
                     return true;
                 }
@@ -77,7 +88,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Folders」ノード1件のみを含み、
     /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
     /// </summary>
-    public ObservableCollection<FolderItemViewModel> TreeRoots { get; }
+    public ObservableCollection<FolderItemViewModel> TreeRoots { get; } = new();
 
     public ObservableCollection<FileItemViewModel> FileItems
     {
@@ -164,10 +175,7 @@ public partial class MainWindowViewModel : ObservableObject
     public MainWindowViewModel()
     {
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
-        TreeRoots = new ObservableCollection<FolderItemViewModel>
-        {
-            FolderItemViewModel.CreateAllRootsNode(_rootFolders)
-        };
+        InitializeTreeNodes();
         _fileItems = new ObservableCollection<FileItemViewModel>();
         _fileCacheRepository = new FileCacheRepository();
         _appSettingsRepository = new AppSettingsRepository();

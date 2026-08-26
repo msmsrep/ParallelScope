@@ -62,6 +62,9 @@
                 <MenuItem Header="Menu">
                     <MenuItem Header="⚙  Settings" Click="OpenSettingsMenuItem_Click"/>
                     <Separator/>
+                    <!-- Plus機能。未購読時もメニューは出し、クリック時に購読案内を表示する -->
+                    <MenuItem Header="📄  Export CSV..." Click="ExportCsvMenuItem_Click"/>
+                    <Separator/>
                     <MenuItem Header="📖  User Guide" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>
@@ -120,7 +123,9 @@
                 </TreeView.ItemContainerStyle>
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
-                        <StackPanel Orientation="Horizontal">
+                        <!-- ToolTipTextは、同名フォルダが並びうるお気に入り／よく使い配下のノードのみ値を持つ
+                             （nullの通常ノードではツールチップ自体が出ない） -->
+                        <StackPanel Orientation="Horizontal" ToolTip="{Binding ToolTipText}">
                             <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
                             <TextBlock Style="{StaticResource ScanningIndicatorStyle}">
                                 <TextBlock.RenderTransform>

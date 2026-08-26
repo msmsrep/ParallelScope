@@ -44,10 +44,13 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>仮想「Folders」表示用に、各ルートをフォルダ行として一覧化する（合計サイズはキャッシュから集計）。</summary>
-    private async Task LoadAllRootsListingAsync(int navigationVersion)
+    /// <summary>
+    /// 仮想ノード（Folders / Favorites / Frequently Used）表示用に、対応するフォルダ群を
+    /// フォルダ行として一覧化する（合計サイズはキャッシュから集計）。
+    /// </summary>
+    private async Task LoadVirtualFolderListingAsync(string virtualPath, int navigationVersion)
     {
-        var rootPaths = _rootPathsSnapshot;
+        var rootPaths = GetVirtualFolderPaths(VirtualFolders.GetKind(virtualPath));
 
         List<FileItemViewModel> rootItems;
         try
@@ -85,14 +88,14 @@ public partial class MainWindowViewModel
             return;
         }
 
-        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !AllRootsVirtualFolder.Matches(CurrentPath))
+        if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, virtualPath))
         {
             return;
         }
 
         _uiContext.Post(_ =>
         {
-            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !AllRootsVirtualFolder.Matches(CurrentPath))
+            if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, virtualPath))
             {
                 return;
             }

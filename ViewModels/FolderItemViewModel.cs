@@ -19,6 +19,7 @@ public class FolderItemViewModel : ObservableObject
 
     private readonly string _path;
     private readonly Func<string, bool>? _isExcludedPath;
+    private readonly bool _isShortcut;
     private ObservableCollection<FolderItemViewModel>? _subFolders;
     private bool _isScanning;
     private bool _isLoaded;
@@ -29,6 +30,16 @@ public class FolderItemViewModel : ObservableObject
     public string DisplayName { get; set; }
 
     public string Path => _path;
+
+    /// <summary>
+    /// お気に入り／よく使う配下のノード（実体ツリーの複製）かどうか。
+    /// 同じパスのノードがツリー上に複数現れるため、パス→TreeViewItemのマップには実体ツリー側だけを登録する
+    /// （複製を登録すると、実体ツリーで選択したつもりが複製側へ飛んでしまう）。
+    /// </summary>
+    public bool IsShortcut => _isShortcut;
+
+    /// <summary>ツリーに表示するツールチップ。同名フォルダが並びうる複製ノードのみフルパスを出す。</summary>
+    public string? ToolTipText => _isShortcut ? _path : null;
 
     public ImageSource? IconSource
     {
@@ -64,10 +75,11 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null)
+    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null, bool isShortcut = false)
     {
         _path = path;
         _isExcludedPath = isExcludedPath;
+        _isShortcut = isShortcut;
         DisplayName = GetDisplayName(path);
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
 
@@ -83,25 +95,41 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    /// <summary>全ルートフォルダを子として表示する、ツリー最上位の仮想「Folders」ノードを生成する。</summary>
-    public static FolderItemViewModel CreateAllRootsNode(ObservableCollection<FolderItemViewModel> rootFolders)
+    /// <summary>ツリー最上位の仮想ノード（Favorites / Frequently Used / Folders）を生成する。</summary>
+    /// <param name="kind">仮想ノードの種類。</param>
+    /// <param name="children">子として共有するコレクション（RootFolders本体・お気に入り一覧など）。</param>
+    /// <param name="isExpanded">初期状態で展開するか。</param>
+    public static FolderItemViewModel CreateVirtualNode(
+        VirtualFolderKind kind,
+        ObservableCollection<FolderItemViewModel> children,
+        bool isExpanded)
     {
-        return new FolderItemViewModel(rootFolders);
+        return new FolderItemViewModel(kind, children, isExpanded);
     }
 
     /// <summary>
-    /// 仮想「Folders」ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体）を共有するため、
-    /// ルート設定の差分更新がそのままツリーへ反映される。実パスを持たないため遅延読み込みは行わない。
+    /// 仮想ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体・お気に入り一覧など）を
+    /// 共有するため、呼び出し側の差分更新がそのままツリーへ反映される。
+    /// 実パスを持たないため遅延読み込みは行わない。
     /// </summary>
-    private FolderItemViewModel(ObservableCollection<FolderItemViewModel> subFolders)
+    private FolderItemViewModel(VirtualFolderKind kind, ObservableCollection<FolderItemViewModel> children, bool isExpanded)
     {
-        _path = AllRootsVirtualFolder.Path;
+        _path = kind switch
+        {
+            VirtualFolderKind.Favorites => VirtualFolders.FavoritesPath,
+            VirtualFolderKind.Frequent => VirtualFolders.FrequentPath,
+            _ => VirtualFolders.AllRootsPath
+        };
         _isExcludedPath = null;
-        DisplayName = AllRootsVirtualFolder.DisplayName;
+        DisplayName = VirtualFolders.GetDisplayName(kind);
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
-        _subFolders = subFolders;
+        _subFolders = children;
         _isLoaded = true;
-        _isExpanded = true;
+        _isExpanded = isExpanded;
+
+        // 子が0件のとき（お気に入り未登録など）に展開ボタンを出さないよう、共有コレクションの増減に追従する
+        HasSubFolders = children.Count > 0;
+        children.CollectionChanged += (_, _) => HasSubFolders = children.Count > 0;
     }
 
     /// <summary>遅延読み込み（同期版）: パス遡査などで即座に実行が必要な場合に使用。</summary>
@@ -144,7 +172,7 @@ public class FolderItemViewModel : ObservableObject
                 .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
                 .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
                 .OrderBy(d => d.Name)
-                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath))
+                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath, _isShortcut))
                 .ToList();
         }
         catch
