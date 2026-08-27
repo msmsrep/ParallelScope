@@ -40,6 +40,7 @@ internal static class UiTextResources
         ["Tree.Folders"] = "Folders",
         ["Tree.Favorites"] = "★ Favorites",
         ["Tree.Frequent"] = "🕒 Frequently Used",
+        ["Tree.Recent"] = "🕘 Recent",
         ["Tree.Loading"] = "Loading...",
 
         // メインウィンドウのメッセージ
@@ -133,7 +134,7 @@ internal static class UiTextResources
         ["Settings.GoToSubscription"] = "Go to Subscription page",
         ["Settings.Subscription.Header"] = "Subscription",
         ["Settings.Subscription.Active"] = "✅ Your Plus subscription is active.",
-        ["Settings.Subscription.Description"] = "Subscribe to ParallelScope Plus to unlock premium features such as Favorites and Frequently Used folders in the tree, customizing display columns in the file list, and exporting the file list to CSV.",
+        ["Settings.Subscription.Description"] = "Subscribe to ParallelScope Plus to unlock premium features such as Favorites, Recent and Frequently Used folders in the tree, customizing display columns in the file list, and exporting the file list to CSV.",
         ["Settings.Subscription.Subscribe"] = "🔓 Subscribe to Plus",
         ["Settings.Subscription.SubscribeWithPrice"] = "🔓 Subscribe to Plus ({0} / month)",
         ["Settings.Subscription.StoreUnavailable"] = "The Microsoft Store is not available. Please install this app from the Microsoft Store to subscribe.",
@@ -184,6 +185,7 @@ internal static class UiTextResources
         ["Tree.Folders"] = "フォルダー",
         ["Tree.Favorites"] = "★ お気に入り",
         ["Tree.Frequent"] = "🕒 よく使うフォルダー",
+        ["Tree.Recent"] = "🕘 最近開いたフォルダー",
         ["Tree.Loading"] = "読み込み中...",
 
         // メインウィンドウのメッセージ
@@ -277,7 +279,7 @@ internal static class UiTextResources
         ["Settings.GoToSubscription"] = "サブスクリプションのページへ",
         ["Settings.Subscription.Header"] = "サブスクリプション",
         ["Settings.Subscription.Active"] = "✅ Plus のサブスクリプションは有効です。",
-        ["Settings.Subscription.Description"] = "ParallelScope Plus に登録すると、ツリーの「お気に入り」「よく使うフォルダー」、ファイル一覧の表示列のカスタマイズ、ファイル一覧のCSV書き出しといった機能が使えます。",
+        ["Settings.Subscription.Description"] = "ParallelScope Plus に登録すると、ツリーの「お気に入り」「最近開いたフォルダー」「よく使うフォルダー」、ファイル一覧の表示列のカスタマイズ、ファイル一覧のCSV書き出しといった機能が使えます。",
         ["Settings.Subscription.Subscribe"] = "🔓 Plus に登録する",
         ["Settings.Subscription.SubscribeWithPrice"] = "🔓 Plus に登録する（{0} / 月）",
         ["Settings.Subscription.StoreUnavailable"] = "Microsoft Store を利用できません。登録するには、Microsoft Store からこのアプリをインストールしてください。",

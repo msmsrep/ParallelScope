@@ -18,12 +18,13 @@ WPF で UI を構築し、ローカル SQLite キャッシュを使って表示�
 - 一覧のダブルクリックでフォルダ移動/ファイルを既定アプリで起動
 - 配色テーマ（System / Light / Dark）
 - 表示言語（System / English / 日本語。既定はWindowsの表示言語に追従。無料版でも利用可）
-- Plus機能: ツリーの「★ Favorites」「🕒 Frequently Used」、ファイル一覧の列カスタマイズ
+- Plus機能: ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」、ファイル一覧の列カスタマイズ
   （表示列・並び順・列幅）、表示中の一覧のCSV出力
 
 ## リリース
 
 - 未リリース
+  - ツリーに「🕘 Recent」（最近開いたフォルダー）を追加（Plus機能）
   - 英語/日本語の表示言語切り替えを追加（既定はWindowsの表示言語に追従）
   - ツリーに「★ Favorites」「🕒 Frequently Used」を追加（Plus機能）
   - 表示中の一覧の「Export CSV...」を追加（Plus機能）
@@ -126,7 +127,7 @@ dotnet ef database update
 一部の機能は、Microsoft Store のアドオン「ParallelScope Plus」（月額サブスクリプション）として提供しています。
 
 - **対象機能**:
-  - ツリーの「★ Favorites」「🕒 Frequently Used」（未購読の間はツリーに表示されません）
+  - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（未購読の間はツリーに表示されません）
   - 設定画面の「Display Columns」（ファイル一覧の表示列・並び順・列幅のカスタマイズ）
   - 「Menu > Export CSV...」（表示中の一覧のCSV出力）
 - 未購読でも、その他のすべての機能は引き続き無料で利用できます。対象機能は設定画面に薄字で表示されて操作のみ制限されるか、実行時に購読ページへの案内が表示されます

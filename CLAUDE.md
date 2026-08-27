@@ -36,6 +36,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
 - **フルスキャン実行中に再度フルスキャンを要求した場合**（例: 設定画面を開き直して「Save and Full Scan」を再度押す）、`_restartFullScanRequested` をセットし `_fullScanCts` をキャンセルします。キャンセルされた実行が終了すると、`RunFullScanAsync` の `finally` ブロックが自動的にスキャンを再実行します。
 - **`Utilities/` の共通ユーティリティ** — インラインで再実装せず、これらを再利用してください。
   - `PathNormalizer`: パスの正規化・比較・祖先判定（以前はViewModel・コードビハインド・リポジトリの間で重複実装されていました）。
+  - `VirtualFolders` / `VirtualFolderKind`: ツリー最上位の仮想ノード（`Folders` / `★ Favorites` / `🕘 Recent` / `🕒 Frequently Used`）の定義。仮想パス（`::Recent::` のようにWindowsのパスに使えない `:` を含む文字列）と表示名の対訳表キーはここに集約されているので、種類を増やすときは `GetKind` / `GetPath` / `GetDisplayNameKey` を足せば呼び出し側の分岐は増えません。
   - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。
   - `FileSizeFormatter`: バイト数を `"12.3 MB"` のような表示用文字列に変換します。
   - `AppVersionProvider`: `AppxManifest.xml`（csprojの設定によりexeと同じフォルダにコピーされる）の `Identity/@Version` を読み取り、ウィンドウタイトルにバージョンを表示するために使います。

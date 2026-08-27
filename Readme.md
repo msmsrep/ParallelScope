@@ -18,12 +18,13 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 - Double-click in the list to navigate into folders or open files with the default app
 - Color theme (System / Light / Dark)
 - Display language (System / English / Japanese; defaults to your Windows display language, available in the free version)
-- Plus features: "★ Favorites" and "🕒 Frequently Used" folders in the tree, file list column
+- Plus features: "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" folders in the tree, file list column
   customization (which columns, their order, and their widths), and CSV export of the current list
 
 ## Release
 
 - Unreleased
+  - Added a "🕘 Recent" node to the folder tree (Plus)
   - Added an English / Japanese display language setting (defaults to your Windows display language)
   - Added "★ Favorites" and "🕒 Frequently Used" nodes to the folder tree (Plus)
   - Added "Export CSV..." for the currently displayed list (Plus)
@@ -126,7 +127,7 @@ dotnet ef database update
 Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
 
 - **Plus features**:
-  - "★ Favorites" / "🕒 Frequently Used" folders in the tree (hidden entirely without a subscription)
+  - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree (hidden entirely without a subscription)
   - "Display Columns" in the settings window (which columns the file list shows, their order, and their widths)
   - "Menu > Export CSV..." (exporting the displayed list)
 - All other features remain free without a subscription. Locked features are either shown grayed out with only their controls disabled, or offer to open the Subscription page when used

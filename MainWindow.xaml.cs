@@ -90,7 +90,7 @@ public partial class MainWindow : Window
         SetColumnVisibility(AttributesColumn, visibleColumns.Contains(FileListColumns.Attributes));
     }
 
-    // お気に入り・よく使うノードはPlus機能のため、購読状態に合わせてツリーへの表示を切り替える
+    // お気に入り・最近・よく使うノードはPlus機能のため、購読状態に合わせてツリーへの表示を切り替える
     private void ApplyPlusTreeNodes()
     {
         _viewModel.SetPlusFeaturesEnabled(_storeLicenseService.IsPlusActive);
@@ -483,11 +483,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 「よく使う」は展開のタイミングでだけ並べ直す（移動のたびに並べ替えるとツリーが目の前で動いてしまう）
-        if (VirtualFolders.GetKind(folderItem.Path) == VirtualFolderKind.Frequent)
+        // 「最近」「よく使う」は展開のタイミングでだけ並べ直す（移動のたびに並べ替えるとツリーが目の前で動いてしまう）
+        switch (VirtualFolders.GetKind(folderItem.Path))
         {
-            _viewModel.RefreshFrequentFolders();
-            return;
+            case VirtualFolderKind.Frequent:
+                _viewModel.RefreshFrequentFolders();
+                return;
+            case VirtualFolderKind.Recent:
+                _viewModel.RefreshRecentFolders();
+                return;
         }
 
         // TreeViewItemが展開される時に、子フォルダを遅延読み込み（非同期）

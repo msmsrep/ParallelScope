@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope 使い方ガイド</title>
-<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・よく使うフォルダ、CSV出力、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
+<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・最近開いたフォルダ・よく使うフォルダ、CSV出力、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,7 +32,7 @@
     <li><a href="#screen">画面の見方</a></li>
     <li><a href="#setup">最初にすること（ルートフォルダの登録）</a></li>
     <li><a href="#browse">フォルダを見る・移動する</a></li>
-    <li><a href="#favorites">お気に入り・よく使うフォルダ</a></li>
+    <li><a href="#favorites">お気に入り・最近開いたフォルダ・よく使うフォルダ</a></li>
     <li><a href="#search">検索する</a></li>
     <li><a href="#allfiles">All Files モード</a></li>
     <li><a href="#contextmenu">右クリックメニュー</a></li>
@@ -80,7 +80,7 @@
     <li><span><strong>アドレスバー</strong> — 現在地のフルパス。直接入力して <kbd>Enter</kbd> でそのフォルダへ移動できます。</span></li>
     <li><span><strong>検索ボックス</strong> — 入力するたびに現在フォルダ配下を検索します（インクリメンタルサーチ）。</span></li>
     <li><span><strong>All Files トグル</strong> — 現在フォルダ配下のファイルをすべてフラットに表示します。</span></li>
-    <li><span><strong>フォルダツリー</strong> — 最上位の「Folders」の下に、登録したルートフォルダが並びます。Plusを購読していると、その上に「★ Favorites」「🕒 Frequently Used」が並びます。</span></li>
+    <li><span><strong>フォルダツリー</strong> — 最上位の「Folders」の下に、登録したルートフォルダが並びます。Plusを購読していると、その上に「★ Favorites」「🕘 Recent」「🕒 Frequently Used」が並びます。</span></li>
     <li><span><strong>ファイル一覧</strong> — 選択中フォルダの内容。列見出しをクリックすると並べ替えできます。</span></li>
   </ol>
 </section>
@@ -132,9 +132,9 @@
     ここを選んだ状態で検索すると、<strong>すべてのルートを横断して検索</strong>できます。
   </p>
   <p>
-    Plusを購読していると、その上に「★ Favorites」「🕒 Frequently Used」の 2 つの仮想フォルダが並びます。動きは「Folders」と同じで、
-    アドレスバーには <code>::Favorites::</code> / <code>::Frequent::</code> と表示され、一覧にはそのノードに集めたフォルダが 1 行ずつ並び、
-    そこで検索すれば集めたフォルダを横断して検索できます。詳しくは<a href="#favorites">お気に入り・よく使うフォルダ</a>を参照してください。
+    Plusを購読していると、その上に「★ Favorites」「🕘 Recent」「🕒 Frequently Used」の 3 つの仮想フォルダが並びます。動きは「Folders」と同じで、
+    アドレスバーには <code>::Favorites::</code> / <code>::Recent::</code> / <code>::Frequent::</code> と表示され、一覧にはそのノードに集めたフォルダが 1 行ずつ並び、
+    そこで検索すれば集めたフォルダを横断して検索できます。詳しくは<a href="#favorites">お気に入り・最近開いたフォルダ・よく使うフォルダ</a>を参照してください。
   </p>
 
   <h3>フォルダのサイズ表示</h3>
@@ -145,11 +145,11 @@
 </section>
 
 <section id="favorites">
-  <h2>お気に入り・よく使うフォルダ</h2>
+  <h2>お気に入り・最近開いたフォルダ・よく使うフォルダ</h2>
   <p>
     よく開くフォルダを片っ端からルートに登録していくと、かえって見通しが悪くなります。そこでツリーの最上位には、
-    自分で選んで並べるものと、アプリが自動で並べるものの 2 つのショートカット用ノードを用意しています。
-    どちらも <strong><a href="#plus">ParallelScope Plus</a> の機能</strong>で、未購読の間はツリーに表示されません。
+    自分で選んで並べるものが 1 つと、アプリが自動で並べるものが 2 つ、合わせて 3 つのショートカット用ノードを用意しています。
+    いずれも <strong><a href="#plus">ParallelScope Plus</a> の機能</strong>で、未購読の間はツリーに表示されません。
   </p>
 
   <h3>★ Favorites（お気に入り）</h3>
@@ -160,11 +160,19 @@
     <li>登録内容は <code>settings.json</code> に保存されるので、次回起動時も残ります。切断中のNAS配下のお気に入りも、消さずにそのまま保持します。</li>
   </ul>
 
+  <h3>🕘 Recent（最近開いたフォルダ）</h3>
+  <ul>
+    <li>最近開いたフォルダが新しい順に、最大<strong>20 件</strong>並びます。</li>
+    <li>元になる記録は「Frequently Used」と同じ（<strong>自分で操作した移動だけ</strong>）ですが、回数ではなく最後に開いた時刻の新しい順に並べます。</li>
+    <li>お気に入りに登録済みのフォルダは除外されるので、複数のノードに同じフォルダが重複して並ぶことはありません。除外フォルダも並びません。</li>
+    <li>並べ替えは起動時とノードを展開したときにだけ行います。ノード自体を選んだときの一覧は、常に最新の順で並びます。</li>
+  </ul>
+
   <h3>🕒 Frequently Used（よく使う）</h3>
   <ul>
     <li>フォルダを開いた回数を数えて、多い順に<strong>上位 10 件</strong>を並べます（同数の場合は最後に開いた時刻が新しい順）。</li>
     <li>数えるのは<strong>自分で操作した移動だけ</strong>です（ツリーのクリック、一覧のダブルクリック、Back / Forward / Up、アドレスバー）。起動時などにアプリが自動で開いたフォルダは数えません。</li>
-    <li>お気に入りに登録済みのフォルダは除外されるので、2 つのノードに同じフォルダが重複して並ぶことはありません。除外フォルダも並びません。</li>
+    <li>お気に入りに登録済みのフォルダは除外されるので、複数のノードに同じフォルダが重複して並ぶことはありません。除外フォルダも並びません。</li>
     <li>並べ替えは起動時とノードを展開したときにだけ行います。移動のたびに並べ替えると、操作中にツリーが目の前で動いてしまうためです。</li>
   </ul>
 </section>
@@ -303,7 +311,7 @@
   <ul>
     <li>現在の対象機能は次の 3 つです。
       <ul>
-        <li><a href="#favorites">「★ Favorites」「🕒 Frequently Used」</a>（ツリー最上位のショートカット）</li>
+        <li><a href="#favorites">「★ Favorites」「🕘 Recent」「🕒 Frequently Used」</a>（ツリー最上位のショートカット）</li>
         <li><a href="#customize">ファイル一覧の列のカスタマイズ</a>（表示する列・並び順・列幅）</li>
         <li><a href="#csv">ファイル一覧のCSV出力</a></li>
       </ul>
@@ -352,8 +360,11 @@
   <h3>列幅が既定に戻ってしまった</h3>
   <p>列幅とヘッダーの並び順はアプリを閉じるときに保存されるため、強制終了すると直前の変更が残りません。また、Plus未購読の間は保存済みの設定を無視して既定の列で表示します（購読が有効になれば元のレイアウトに戻ります）。</p>
 
-  <h3>「Favorites」「Frequently Used」がツリーに出てこない</h3>
-  <p>どちらも Plus 機能です。購読が確認できた時点で表示されるため、起動直後は少し遅れて現れることがあります。</p>
+  <h3>「Favorites」「Recent」「Frequently Used」がツリーに出てこない</h3>
+  <p>いずれも Plus 機能です。購読が確認できた時点で表示されるため、起動直後は少し遅れて現れることがあります。</p>
+
+  <h3>いま開いたフォルダが「Recent」に出てこない</h3>
+  <p>並べ替えは起動時とノードを展開したときにだけ行われます（移動のたびに並べ替えると、操作中にツリーが目の前で動いてしまうためです）。ノードを畳んで開き直すと最新になります。ノード自体を選んだときの一覧は常に最新の順です。なお、お気に入りに登録済みのフォルダは意図的に除外しています。</p>
 
   <h3>よく開くフォルダが「Frequently Used」に出てこない</h3>
   <p>お気に入りに登録済みのフォルダは意図的に除外しています。また、並ぶのは上位 10 件までで、並べ替えは起動時とノードを展開したときにだけ行われます。</p>
@@ -373,7 +384,7 @@
       <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
       <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
     </ul>
-    <p>画面写真は ver1.4.4.0 のもので、お気に入り・よく使う・CSV出力・刷新後の Display Columns ページは写っていません。実際の画面はバージョンにより異なる場合があります。</p>
+    <p>画面写真は ver1.4.4.0 のもので、お気に入り・最近開いたフォルダ・よく使う・CSV出力・刷新後の Display Columns ページは写っていません。実際の画面はバージョンにより異なる場合があります。</p>
   </div>
 </footer>
 

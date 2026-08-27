@@ -15,6 +15,7 @@ public class PlusFeatureGatingTests : IDisposable
 {
     private const string FavoritePath = @"C:\PlusTest\Favorite";
     private const string FrequentPath = @"C:\PlusTest\Frequent";
+    private const string RecentPath = @"C:\PlusTest\Recent";
 
     private readonly TempDirectory _temp = new();
     private readonly FileCacheRepository _fileCacheRepository;
@@ -40,7 +41,9 @@ public class PlusFeatureGatingTests : IDisposable
             FavoritePaths = { FavoritePath },
             FolderUsages =
             {
-                new FolderUsageEntry { Path = FrequentPath, Count = 5, LastAccessedAt = new DateTime(2026, 1, 1) }
+                // 回数はFrequentが多く、最終アクセスはRecentが新しい（それぞれのノードの並び基準を分けて確かめる）
+                new FolderUsageEntry { Path = FrequentPath, Count = 5, LastAccessedAt = new DateTime(2026, 1, 1) },
+                new FolderUsageEntry { Path = RecentPath, Count = 1, LastAccessedAt = new DateTime(2026, 6, 1) }
             },
             VisibleColumns = new List<string> { FileListColumns.Attributes }
         });
@@ -64,7 +67,7 @@ public class PlusFeatureGatingTests : IDisposable
     }
 
     [Fact]
-    public void PlusVersion_AddsFavoritesAndFrequentNodesAboveFolders()
+    public void PlusVersion_AddsFavoritesRecentAndFrequentNodesAboveFolders()
     {
         var viewModel = CreateViewModel();
 
@@ -72,12 +75,12 @@ public class PlusFeatureGatingTests : IDisposable
 
         Assert.True(viewModel.ArePlusFeaturesEnabled);
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
             TreeRootPaths(viewModel));
     }
 
     [Fact]
-    public void DisablingPlus_RemovesFavoritesAndFrequentNodesAgain()
+    public void DisablingPlus_RemovesFavoritesRecentAndFrequentNodesAgain()
     {
         // 購読が切れた場合（設定画面から戻った時など）に無料版の表示へ戻ること
         var viewModel = CreateViewModel();
@@ -99,7 +102,7 @@ public class PlusFeatureGatingTests : IDisposable
         viewModel.SetPlusFeaturesEnabled(true);
 
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
             TreeRootPaths(viewModel));
     }
 
@@ -138,13 +141,47 @@ public class PlusFeatureGatingTests : IDisposable
         var viewModel = CreateViewModel();
 
         Assert.Equal(new[] { FavoritePath }, viewModel.GetFavoritePaths());
-        Assert.Equal(new[] { FrequentPath }, viewModel.GetFrequentPaths());
+        Assert.Equal(new[] { FrequentPath, RecentPath }, viewModel.GetFrequentPaths());
 
         viewModel.SetPlusFeaturesEnabled(true);
         viewModel.SetPlusFeaturesEnabled(false);
 
         Assert.Equal(new[] { FavoritePath }, viewModel.GetFavoritePaths());
-        Assert.Equal(new[] { FrequentPath }, viewModel.GetFrequentPaths());
+        Assert.Equal(new[] { FrequentPath, RecentPath }, viewModel.GetFrequentPaths());
+    }
+
+    [Fact]
+    public void RecentPaths_AreOrderedByTheMostRecentAccess()
+    {
+        // 「よく使う」は回数順、「最近」は最終アクセス順で、同じ実績から別の並びになる
+        var viewModel = CreateViewModel();
+
+        Assert.Equal(new[] { RecentPath, FrequentPath }, viewModel.GetRecentPaths());
+        Assert.Equal(new[] { FrequentPath, RecentPath }, viewModel.GetFrequentPaths());
+    }
+
+    [Fact]
+    public void RecentPaths_LeaveOutFavoritesSoTheTreeHasNoDuplicates()
+    {
+        var viewModel = CreateViewModel();
+        Assert.Contains(RecentPath, viewModel.GetRecentPaths());
+
+        viewModel.ToggleFavorite(RecentPath);
+
+        Assert.DoesNotContain(RecentPath, viewModel.GetRecentPaths());
+    }
+
+    [Fact]
+    public void DisablingPlus_MovesAwayFromTheRecentNode()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SetPlusFeaturesEnabled(true);
+        viewModel.LoadFiles(VirtualFolders.RecentPath);
+        Assert.Equal(VirtualFolders.RecentPath, viewModel.CurrentPath);
+
+        viewModel.SetPlusFeaturesEnabled(false);
+
+        Assert.Equal(VirtualFolders.AllRootsPath, viewModel.CurrentPath);
     }
 
     [Theory]

@@ -11,6 +11,7 @@ public class VirtualFoldersTests
     [InlineData(VirtualFolders.FavoritesPath, VirtualFolderKind.Favorites)]
     [InlineData(VirtualFolders.FrequentPath, VirtualFolderKind.Frequent)]
     [InlineData("::folders::", VirtualFolderKind.AllRoots)]
+    [InlineData(VirtualFolders.RecentPath, VirtualFolderKind.Recent)]
     [InlineData(@"C:\Temp", VirtualFolderKind.None)]
     [InlineData("", VirtualFolderKind.None)]
     [InlineData(null, VirtualFolderKind.None)]
@@ -46,6 +47,7 @@ public class VirtualFoldersTests
     [Theory]
     [InlineData(VirtualFolderKind.Favorites, VirtualFolders.FavoritesDisplayNameKey)]
     [InlineData(VirtualFolderKind.Frequent, VirtualFolders.FrequentDisplayNameKey)]
+    [InlineData(VirtualFolderKind.Recent, VirtualFolders.RecentDisplayNameKey)]
     [InlineData(VirtualFolderKind.AllRoots, VirtualFolders.AllRootsDisplayNameKey)]
     [InlineData(VirtualFolderKind.None, VirtualFolders.AllRootsDisplayNameKey)]
     public void GetDisplayNameKey_ReturnsNodeLabelKey(VirtualFolderKind kind, string expected)

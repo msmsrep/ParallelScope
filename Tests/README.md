@@ -45,7 +45,7 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック |
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
 | `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
-| `ViewModels/PlusFeatureGatingTests` | 無料版とPlusの機能分け | お気に入り・よく使うノードのツリーへの出し入れ、非表示ノードからの退避、購読が切れても保存済みデータを消さないこと、列カスタマイズの既定列へのフォールバック |
+| `ViewModels/PlusFeatureGatingTests` | 無料版とPlusの機能分け | お気に入り・最近・よく使うノードのツリーへの出し入れ、非表示ノードからの退避、同じアクセス実績から「最近」（最終アクセス順）と「よく使う」（回数順）が別々に並ぶこと、購読が切れても保存済みデータを消さないこと、列カスタマイズの既定列へのフォールバック |
 
 ## テストを書くときの決まりごと
 
@@ -97,7 +97,7 @@ var viewModel = new MainWindowViewModel(new FileCacheRepository(temp.Path), sett
 Plus（Microsoft Storeのサブスクリプション）で解放される機能は、次の2段構えでテストしています。
 
 1. **購読状態の判定** — `StoreLicenseService`。ただし判定の本体は Store API（`StoreContext`）なので、テストで確認できるのは「購読が確認できない間は解放しない」側だけです。実行環境のStoreアカウントが実際にPlusを購読していると `RefreshLicenseAsync` の結果は true になり得るため、**この戻り値そのものはアサートしません**。正しい開発者キー（`ApplyDeveloperUnlockKey`）による解放も、埋め込まれているのがハッシュだけなのでテストできません。
-2. **判定結果を受け取った後の挙動** — `MainWindowViewModel.SetPlusFeaturesEnabled(bool)` に true/false を直接渡し、お気に入り・よく使うノードの出し入れを確認します。Storeには一切触れないので安定して動きます。
+2. **判定結果を受け取った後の挙動** — `MainWindowViewModel.SetPlusFeaturesEnabled(bool)` に true/false を直接渡し、お気に入り・最近・よく使うノードの出し入れを確認します。Storeには一切触れないので安定して動きます。
 
 Plus機能を増やしたときは、ゲート（`IsPlusActive` を見る分岐）を **`MainWindow.xaml.cs` の中に書かず、ViewModel か `Utilities/` の純粋な関数として切り出す**とテストできます。列カスタマイズの `FileListColumns.GetEffectiveVisibleColumns(configuredColumns, arePlusFeaturesEnabled)` がその形です。
 

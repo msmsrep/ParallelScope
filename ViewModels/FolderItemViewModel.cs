@@ -125,12 +125,7 @@ public class FolderItemViewModel : ObservableObject
     /// </summary>
     private FolderItemViewModel(VirtualFolderKind kind, ObservableCollection<FolderItemViewModel> children, bool isExpanded)
     {
-        _path = kind switch
-        {
-            VirtualFolderKind.Favorites => VirtualFolders.FavoritesPath,
-            VirtualFolderKind.Frequent => VirtualFolders.FrequentPath,
-            _ => VirtualFolders.AllRootsPath
-        };
+        _path = VirtualFolders.GetPath(kind) ?? VirtualFolders.AllRootsPath;
         _isExcludedPath = null;
         SetLocalizedDisplayName(VirtualFolders.GetDisplayNameKey(kind));
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();

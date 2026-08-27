@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope User Guide</title>
-<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites and Frequently Used folders, CSV export, and how scanning and the cache work — with screenshots.">
+<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites, Recent and Frequently Used folders, CSV export, and how scanning and the cache work — with screenshots.">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,7 +32,7 @@
     <li><a href="#screen">The main window</a></li>
     <li><a href="#setup">First run: add your root folders</a></li>
     <li><a href="#browse">Browsing and navigating</a></li>
-    <li><a href="#favorites">Favorites and Frequently Used</a></li>
+    <li><a href="#favorites">Favorites, Recent and Frequently Used</a></li>
     <li><a href="#search">Searching</a></li>
     <li><a href="#allfiles">All Files mode</a></li>
     <li><a href="#contextmenu">Right-click menus</a></li>
@@ -80,7 +80,7 @@
     <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
     <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
     <li><span><strong>All Files toggle</strong> — lists every file under the current folder as one flat list.</span></li>
-    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node. With a Plus subscription, "★ Favorites" and "🕒 Frequently Used" appear above it.</span></li>
+    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node. With a Plus subscription, "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" appear above it.</span></li>
     <li><span><strong>File list</strong> — the contents of the selected folder. Click a column header to sort.</span></li>
   </ol>
 </section>
@@ -132,9 +132,10 @@
     <strong>searches across every registered root at once</strong>.
   </p>
   <p>
-    With a Plus subscription two more virtual nodes sit above it — "★ Favorites" and "🕒 Frequently Used" — and they behave the
-    same way: the address bar shows <code>::Favorites::</code> or <code>::Frequent::</code>, the list shows one row per folder, and
-    searching from there covers every folder gathered under the node. See <a href="#favorites">Favorites and Frequently Used</a>.
+    With a Plus subscription three more virtual nodes sit above it — "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" — and they
+    behave the same way: the address bar shows <code>::Favorites::</code>, <code>::Recent::</code> or <code>::Frequent::</code>, the
+    list shows one row per folder, and searching from there covers every folder gathered under the node.
+    See <a href="#favorites">Favorites, Recent and Frequently Used</a>.
   </p>
 
   <h3>Folder sizes</h3>
@@ -145,10 +146,10 @@
 </section>
 
 <section id="favorites">
-  <h2>Favorites and Frequently Used</h2>
+  <h2>Favorites, Recent and Frequently Used</h2>
   <p>
-    Registering a root folder for every folder you care about quickly gets unwieldy. Two extra nodes at the top of the tree give
-    you shortcuts instead — one you curate by hand, one the app fills in for you. Both are
+    Registering a root folder for every folder you care about quickly gets unwieldy. Three extra nodes at the top of the tree give
+    you shortcuts instead — one you curate by hand, two the app fills in for you. All three are
     <strong><a href="#plus">ParallelScope Plus</a> features</strong> and are hidden entirely without a subscription.
   </p>
 
@@ -160,11 +161,19 @@
     <li>The list is saved in <code>settings.json</code>, so it survives restarts. A favorite on a disconnected NAS is kept rather than dropped.</li>
   </ul>
 
+  <h3>🕘 Recent</h3>
+  <ul>
+    <li>The folders you opened most recently, newest first, up to <strong>20</strong>.</li>
+    <li>It draws on the same record as "Frequently Used" — only navigation you perform yourself counts — but sorts by when you last opened each folder instead of how often.</li>
+    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
+    <li>The order is refreshed when the app starts and when you expand the node, not after every move. Selecting the node itself always lists the newest order.</li>
+  </ul>
+
   <h3>🕒 Frequently Used</h3>
   <ul>
     <li>The app counts how often you open each folder and lists the <strong>top 10</strong>, most-visited first (ties broken by the most recent visit).</li>
     <li>Only navigation you perform yourself is counted — tree clicks, double-clicks, Back / Forward / Up, and the address bar. Folders the app opens for you at startup do not count.</li>
-    <li>Folders already in Favorites are left out, so the two lists never show the same folder twice. Excluded folders never appear either.</li>
+    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
     <li>The order is refreshed when the app starts and when you expand the node, not after every move — so the tree does not rearrange itself while you are clicking through it.</li>
   </ul>
 </section>
@@ -302,7 +311,7 @@
   <ul>
     <li>The Plus features today are:
       <ul>
-        <li><a href="#favorites">"★ Favorites" and "🕒 Frequently Used"</a> in the folder tree</li>
+        <li><a href="#favorites">"★ Favorites", "🕘 Recent" and "🕒 Frequently Used"</a> in the folder tree</li>
         <li><a href="#customize">Customizing the file list columns</a> — which columns, their order, and their widths</li>
         <li><a href="#csv">Exporting the file list to CSV</a></li>
       </ul>
@@ -351,8 +360,11 @@
   <h3>My column widths went back to the defaults</h3>
   <p>Widths and the header order are written out when the app closes, so a forced shutdown loses the last change. They are also ignored while you have no Plus subscription — the saved layout returns once it is active again.</p>
 
-  <h3>"Favorites" and "Frequently Used" are missing from the tree</h3>
-  <p>Both are Plus features. They appear as soon as the subscription is confirmed, which can take a moment after the app starts.</p>
+  <h3>"Favorites", "Recent" and "Frequently Used" are missing from the tree</h3>
+  <p>All three are Plus features. They appear as soon as the subscription is confirmed, which can take a moment after the app starts.</p>
+
+  <h3>A folder I just opened is not in "Recent"</h3>
+  <p>The node is re-sorted when the app starts and when you expand it, not after every move, so the tree does not rearrange itself while you are clicking through it. Collapse and expand it to bring it up to date — or select the node itself, which always lists the newest order. Folders already in "★ Favorites" are deliberately left out.</p>
 
   <h3>A folder I use constantly is not in "Frequently Used"</h3>
   <p>Folders already in "★ Favorites" are deliberately left out, and the list holds the top 10 only. It is also re-sorted when the app starts and when you expand the node, not after every move.</p>
@@ -372,7 +384,7 @@
       <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
       <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
     </ul>
-    <p>Screenshots were taken with ver1.4.4.0, before Favorites, Frequently Used, CSV export, and the reworked Display Columns page were added, so those do not appear in them. Later versions may look slightly different.</p>
+    <p>Screenshots were taken with ver1.4.4.0, before Favorites, Recent, Frequently Used, CSV export, and the reworked Display Columns page were added, so those do not appear in them. Later versions may look slightly different.</p>
   </div>
 </footer>
 
