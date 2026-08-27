@@ -9,17 +9,24 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 
 ## Key Features
 
-- Register multiple root folders (add/remove from the settings window)
+- Register multiple root folders (add/remove/reorder from the settings window), plus excluded folders
 - Folder tree + file list browsing UI
 - Back/Forward/Up navigation
 - Direct path input in the address bar
-- Search under the current folder
-  - Cache search runs first
-  - If no match is found, a live file system scan runs
+- Incremental search under the current folder (runs against the cache as you type)
+- "All Files" mode: list every file under the current folder as one flat list
 - Double-click in the list to navigate into folders or open files with the default app
+- Color theme (System / Light / Dark)
+- Plus features: "★ Favorites" and "🕒 Frequently Used" folders in the tree, file list column
+  customization (which columns, their order, and their widths), and CSV export of the current list
 
 ## Release
 
+- Unreleased
+  - Added "★ Favorites" and "🕒 Frequently Used" nodes to the folder tree (Plus)
+  - Added "Export CSV..." for the currently displayed list (Plus)
+  - Reworked "Display Columns" so column order and widths are saved as well (Plus)
+- Ver 1.4.5.0 Added a "User Guide" menu item
 - Ver1.4.0.0 Added Monthly Subscription feature
 - Ver 1.3.0.0 Feature change
   - Added "All Files" mode
@@ -58,6 +65,14 @@ dotnet build ParallelScope.csproj
 dotnet publish -c Release
 ```
 
+## Test
+
+```powershell
+dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
+```
+
+Unit tests (xUnit) cover the UI-independent layers. See [Tests/README.md](./Tests/README.md) for what is covered and how to add tests.
+
 ## Usage
 
 1. After startup, click Menu > Settings.
@@ -67,6 +82,8 @@ dotnet publish -c Release
 5. Double-click an item in the list:
    - Folder: navigate into that folder
    - File: open with the default application
+6. Turn on "All Files" to list every file under the current folder, regardless of depth.
+7. Use "Menu > Export CSV..." to write the list you are looking at to a CSV file (Plus).
 
 See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 
@@ -75,7 +92,7 @@ See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 It is saved in the folder under `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`.
 Saved data will also be deleted when the app is uninstalled.
 
-- `settings.json`: root folder settings
+- `settings.json`: root/excluded folders, scan interval, theme, file list column layout, favorites, and folder access counts
 - `ParallelScope.sqlite`: file list cache
 
 ## Development Notes
@@ -93,18 +110,25 @@ dotnet ef database update
 ### Main Structure
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: main window
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: root folder settings dialog
-- `ViewModels/`: UI logic
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / display columns / theme / subscription / support)
+- `ViewModels/`: UI logic (`MainWindowViewModel` is split into partial classes by responsibility)
 - `Data/`: settings/cache/DbContext
+- `Utilities/`: shared helpers (path normalization, CSV export, column definitions, virtual folders, etc.)
+- `Services/`: Microsoft Store license lookup
 - `Migrations/`: EF Core migrations
+- `Tests/ParallelScope.Tests/`: unit tests
+- `docs/`: the published user guide
 
 ## ParallelScope Plus (Monthly Subscription)
 
 Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
 
-- **Plus feature**: "Display Columns" in the settings window (customizing which columns are shown in the file list)
-- All other features remain free without a subscription. The Plus feature is shown grayed out in the settings window and only its controls are locked
-- You can subscribe from the "Subscribe to Plus" button on the "Settings > Display Columns" page in the Microsoft Store version of the app
+- **Plus features**:
+  - "★ Favorites" / "🕒 Frequently Used" folders in the tree (hidden entirely without a subscription)
+  - "Display Columns" in the settings window (which columns the file list shows, their order, and their widths)
+  - "Menu > Export CSV..." (exporting the displayed list)
+- All other features remain free without a subscription. Locked features are either shown grayed out with only their controls disabled, or offer to open the Subscription page when used
+- You can subscribe from the "Subscribe to Plus" button on the "Settings > Subscription" page in the Microsoft Store version of the app
 - Payment, billing, and cancellation are all handled by the Microsoft Store. 
 
 ### Open Source and Paid Features

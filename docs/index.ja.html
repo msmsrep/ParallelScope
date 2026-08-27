@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope 使い方ガイド</title>
-<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
+<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・よく使うフォルダ、CSV出力、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,11 +32,13 @@
     <li><a href="#screen">画面の見方</a></li>
     <li><a href="#setup">最初にすること（ルートフォルダの登録）</a></li>
     <li><a href="#browse">フォルダを見る・移動する</a></li>
+    <li><a href="#favorites">お気に入り・よく使うフォルダ</a></li>
     <li><a href="#search">検索する</a></li>
     <li><a href="#allfiles">All Files モード</a></li>
     <li><a href="#contextmenu">右クリックメニュー</a></li>
     <li><a href="#scan">スキャンとキャッシュ</a></li>
     <li><a href="#customize">表示のカスタマイズ</a></li>
+    <li><a href="#csv">CSVへ書き出す</a></li>
     <li><a href="#plus">ParallelScope Plus</a></li>
     <li><a href="#data">データの保存先</a></li>
     <li><a href="#tips">困ったときは</a></li>
@@ -73,12 +75,12 @@
     <span class="pin" style="left:60%;   top:85%">7</span>
   </figure>
   <ol class="legend">
-    <li><span><strong>Menu</strong> — 設定画面を開きます。</span></li>
+    <li><span><strong>Menu</strong> — 設定画面を開くほか、表示中の一覧のCSV出力と、この使い方ガイドへのリンクがあります。</span></li>
     <li><span><strong>← Back / Forward → / ↑ Up</strong> — 移動履歴を戻る・進む、親フォルダへ上がる。</span></li>
     <li><span><strong>アドレスバー</strong> — 現在地のフルパス。直接入力して <kbd>Enter</kbd> でそのフォルダへ移動できます。</span></li>
     <li><span><strong>検索ボックス</strong> — 入力するたびに現在フォルダ配下を検索します（インクリメンタルサーチ）。</span></li>
     <li><span><strong>All Files トグル</strong> — 現在フォルダ配下のファイルをすべてフラットに表示します。</span></li>
-    <li><span><strong>フォルダツリー</strong> — 最上位の「Folders」の下に、登録したルートフォルダが並びます。</span></li>
+    <li><span><strong>フォルダツリー</strong> — 最上位の「Folders」の下に、登録したルートフォルダが並びます。Plusを購読していると、その上に「★ Favorites」「🕒 Frequently Used」が並びます。</span></li>
     <li><span><strong>ファイル一覧</strong> — 選択中フォルダの内容。列見出しをクリックすると並べ替えできます。</span></li>
   </ol>
 </section>
@@ -129,12 +131,42 @@
     選択するとアドレスバーには <code>::Folders::</code> と表示され、一覧には各ルートが 1 行ずつ並びます。
     ここを選んだ状態で検索すると、<strong>すべてのルートを横断して検索</strong>できます。
   </p>
+  <p>
+    Plusを購読していると、その上に「★ Favorites」「🕒 Frequently Used」の 2 つの仮想フォルダが並びます。動きは「Folders」と同じで、
+    アドレスバーには <code>::Favorites::</code> / <code>::Frequent::</code> と表示され、一覧にはそのノードに集めたフォルダが 1 行ずつ並び、
+    そこで検索すれば集めたフォルダを横断して検索できます。詳しくは<a href="#favorites">お気に入り・よく使うフォルダ</a>を参照してください。
+  </p>
 
   <h3>フォルダのサイズ表示</h3>
   <p>
     一覧のフォルダ行に表示されるサイズは、キャッシュから集計した配下の合計サイズです。まだスキャンされていないフォルダでは空欄になり、
     スキャンが進むと表示されます。
   </p>
+</section>
+
+<section id="favorites">
+  <h2>お気に入り・よく使うフォルダ</h2>
+  <p>
+    よく開くフォルダを片っ端からルートに登録していくと、かえって見通しが悪くなります。そこでツリーの最上位には、
+    自分で選んで並べるものと、アプリが自動で並べるものの 2 つのショートカット用ノードを用意しています。
+    どちらも <strong><a href="#plus">ParallelScope Plus</a> の機能</strong>で、未購読の間はツリーに表示されません。
+  </p>
+
+  <h3>★ Favorites（お気に入り）</h3>
+  <ul>
+    <li>ツリーでフォルダを右クリックして<strong>「★ Add to Favorites」</strong>で登録します。登録済みのフォルダを右クリックすると<strong>「☆ Remove from Favorites」</strong>になり、解除できます。</li>
+    <li>登録した順に並び、ルートフォルダと同じようにそれぞれ展開して配下をたどれます。</li>
+    <li>「★ Favorites」ノード自体を選ぶとお気に入りが一覧表示され、そのまま検索すると登録した全フォルダを横断して検索できます。</li>
+    <li>登録内容は <code>settings.json</code> に保存されるので、次回起動時も残ります。切断中のNAS配下のお気に入りも、消さずにそのまま保持します。</li>
+  </ul>
+
+  <h3>🕒 Frequently Used（よく使う）</h3>
+  <ul>
+    <li>フォルダを開いた回数を数えて、多い順に<strong>上位 10 件</strong>を並べます（同数の場合は最後に開いた時刻が新しい順）。</li>
+    <li>数えるのは<strong>自分で操作した移動だけ</strong>です（ツリーのクリック、一覧のダブルクリック、Back / Forward / Up、アドレスバー）。起動時などにアプリが自動で開いたフォルダは数えません。</li>
+    <li>お気に入りに登録済みのフォルダは除外されるので、2 つのノードに同じフォルダが重複して並ぶことはありません。除外フォルダも並びません。</li>
+    <li>並べ替えは起動時とノードを展開したときにだけ行います。移動のたびに並べ替えると、操作中にツリーが目の前で動いてしまうためです。</li>
+  </ul>
 </section>
 
 <section id="search">
@@ -191,6 +223,7 @@
         <tr><td>Copy Full Path</td><td>フルパスをテキストとしてコピーします。</td></tr>
         <tr><td>Open Parent Folder</td><td>エクスプローラーで親フォルダを開き、その項目を選択状態にします。</td></tr>
         <tr><td>Scan everything under this folder</td><td>（ツリー側）そのフォルダ配下だけをスキャンし、キャッシュを更新します。</td></tr>
+        <tr><td>★ Add to Favorites / ☆ Remove from Favorites</td><td>（ツリー側）そのフォルダを「★ Favorites」に登録・解除します。Plus機能のため、未購読の間はメニューに出ません。</td></tr>
       </tbody>
     </table>
   </div>
@@ -230,15 +263,35 @@
     </figure>
   </div>
 
-  <h3>表示する列（ParallelScope Plus 機能）</h3>
+  <h3>列の表示・並び順・幅（ParallelScope Plus 機能）</h3>
   <figure>
     <a href="images/07-settings-columns.png"><img src="images/07-settings-columns.png" alt="設定画面の Display Columns ページ"></a>
-    <figcaption>未購読の場合、チェックボックスは薄字で表示され操作できません。</figcaption>
+    <figcaption>未購読の場合、このページは薄字で表示され操作できません。</figcaption>
   </figure>
   <p>
-    ファイル一覧に表示する列は「Settings &gt; Display Columns」で選べます。選択できる列は Location（親フォルダのパス）・Type・Size・Modified・Created・Attributes で、
-    Name 列は常に表示されます。この列カスタマイズは有料の Plus 機能で、未購読のときは既定の Name / Type / Size / Modified で表示されます。
+    「Settings &gt; Display Columns」では、ファイル一覧に<strong>どの列を出すかと、その並び順</strong>をまとめて指定できます。
+    チェックを入れた列が表示され、「↑ Up」「↓ Down」で順番を入れ替えられます。選べる列は Location（親フォルダのパス）・Type・Size・Modified・Created・Attributes で、
+    Name 列は常に表示されますが、並び順の変更対象には含まれます。
   </p>
+  <ul>
+    <li><strong>ヘッダーのドラッグ操作も保存されます。</strong>ファイル一覧の列見出しをドラッグして順番を入れ替えたり、境目をドラッグして幅を変えたりした結果は、アプリを閉じるときにまとめて保存され、次回起動時に復元されます。</li>
+    <li><strong>「Reset columns to defaults」</strong>で、表示列・並び順・列幅をまとめて既定（Name / Type / Size / Modified）へ戻せます。列幅は保存した時点でリセットされます。</li>
+    <li>これらは有料の Plus 機能です。未購読の間は既定の Name / Type / Size / Modified が既定の並び順で表示されます。設定自体は残るので、購読すれば以前のレイアウトがそのまま復活します。</li>
+  </ul>
+</section>
+
+<section id="csv">
+  <h2>CSVへ書き出す</h2>
+  <p>
+    「Menu」→<strong>「📄 Export CSV...」</strong>で、いま表示している一覧をCSVファイルへ書き出せます。
+    <strong><a href="#plus">ParallelScope Plus</a> の機能</strong>のため、未購読の場合は購読ページを開くか尋ねるメッセージが出ます。
+  </p>
+  <ul>
+    <li><strong>書き出されるのは画面で見えているとおりの内容</strong>です。行の順番（ヘッダークリックの並べ替え結果）も表示中の列もそのまま出ます。検索結果や All Files 表示のままでも書き出せるので、絞り込んでから必要な分だけ出す使い方ができます。</li>
+    <li>保存ダイアログの<strong>「ファイルの種類」</strong>で、Size 列の書式を選べます。<em>sizes as displayed</em> は表示どおりの文字列（<code>11.8 MB</code>）、<em>sizes in bytes</em> は生のバイト数（<code>12345678</code>、見出しは「Size (bytes)」）です。表計算ソフトで合計や並べ替えをするならバイト数を選んでください。選んだ書式は次回の既定になります。</li>
+    <li>既定のファイル名は <code>ParallelScope_&lt;フォルダ名&gt;_&lt;日付&gt;_&lt;時刻&gt;.csv</code> です。</li>
+    <li>ファイルは BOM 付きの UTF-8 で書き出されるので、日本語のファイル名やパスも Excel で文字化けせずに開けます。</li>
+  </ul>
 </section>
 
 <section id="plus">
@@ -248,7 +301,13 @@
     <figcaption>「Settings &gt; Subscription」から購読と解約の入り口にアクセスできます。</figcaption>
   </figure>
   <ul>
-    <li>対象機能は現在「Display Columns（表示列のカスタマイズ）」です。それ以外のすべての機能は購読なしで使えます。</li>
+    <li>現在の対象機能は次の 3 つです。
+      <ul>
+        <li><a href="#favorites">「★ Favorites」「🕒 Frequently Used」</a>（ツリー最上位のショートカット）</li>
+        <li><a href="#customize">ファイル一覧の列のカスタマイズ</a>（表示する列・並び順・列幅）</li>
+        <li><a href="#csv">ファイル一覧のCSV出力</a></li>
+      </ul>
+      これら以外のすべての機能は購読なしで使えます。</li>
     <li>購入・請求・解約はすべて Microsoft Store が処理します。解約は「Manage / Cancel subscription」から Microsoft アカウントのサブスクリプション管理ページを開いて行います。</li>
     <li>購読状態は Microsoft Store のライセンスで判定されるため、この機能が働くのは Microsoft Store 版のみです。</li>
   </ul>
@@ -261,7 +320,7 @@
     <table>
       <thead><tr><th>ファイル</th><th>内容</th></tr></thead>
       <tbody>
-        <tr><td><code>settings.json</code></td><td>ルートフォルダ・除外フォルダ・スキャン間隔・テーマなどの設定</td></tr>
+        <tr><td><code>settings.json</code></td><td>ルートフォルダ・除外フォルダ・スキャン間隔・テーマ・列のレイアウト・お気に入り・フォルダごとのアクセス回数などの設定</td></tr>
         <tr><td><code>ParallelScope.sqlite</code></td><td>フォルダ構成とファイル一覧のキャッシュ</td></tr>
       </tbody>
     </table>
@@ -288,7 +347,19 @@
   <p>フォルダの合計サイズはスキャン済みのキャッシュから集計しています。まだスキャンされていないフォルダでは空欄になります。</p>
 
   <h3>表示列を変えたい</h3>
-  <p>列の増減は Plus 機能です。「Settings &gt; Display Columns」から購読ページへ移動できます。</p>
+  <p>列の増減・並び替えは Plus 機能です。「Settings &gt; Display Columns」から購読ページへ移動できます。</p>
+
+  <h3>列幅が既定に戻ってしまった</h3>
+  <p>列幅とヘッダーの並び順はアプリを閉じるときに保存されるため、強制終了すると直前の変更が残りません。また、Plus未購読の間は保存済みの設定を無視して既定の列で表示します（購読が有効になれば元のレイアウトに戻ります）。</p>
+
+  <h3>「Favorites」「Frequently Used」がツリーに出てこない</h3>
+  <p>どちらも Plus 機能です。購読が確認できた時点で表示されるため、起動直後は少し遅れて現れることがあります。</p>
+
+  <h3>よく開くフォルダが「Frequently Used」に出てこない</h3>
+  <p>お気に入りに登録済みのフォルダは意図的に除外しています。また、並ぶのは上位 10 件までで、並べ替えは起動時とノードを展開したときにだけ行われます。</p>
+
+  <h3>書き出したCSVのサイズが数値として扱われない</h3>
+  <p>出力時の保存ダイアログで「ファイルの種類」を「CSV - sizes in bytes」にしてください。桁区切りなしの生のバイト数で書き出され、表計算ソフトで合計できます。</p>
 </section>
 
 </div>
@@ -302,7 +373,7 @@
       <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
       <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
     </ul>
-    <p>画面写真は ver1.4.4.0 のものです。実際の画面はバージョンにより異なる場合があります。</p>
+    <p>画面写真は ver1.4.4.0 のもので、お気に入り・よく使う・CSV出力・刷新後の Display Columns ページは写っていません。実際の画面はバージョンにより異なる場合があります。</p>
   </div>
 </footer>
 
