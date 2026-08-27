@@ -24,9 +24,14 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
+    // XAML定義の既定の列幅。設定画面の「Reset column widths」で戻すため、保存済み幅を反映する前に控えておく
+    private readonly Dictionary<string, DataGridLength> _defaultFileListColumnWidths;
     public MainWindow()
     {
         InitializeComponent();
+
+        _defaultFileListColumnWidths = GetFileListColumnsByKey()
+            .ToDictionary(pair => pair.Key, pair => pair.Value.Width, StringComparer.OrdinalIgnoreCase);
 
         // AppxManifest.xmlのバージョンをタイトルに付与する（取得できない場合は元のタイトルのまま）
         Title = BuildWindowTitleWithVersion(Title);
@@ -117,6 +122,20 @@ public partial class MainWindow : Window
             if (columnsByKey.TryGetValue(columnKey, out var column))
             {
                 column.Width = new DataGridLength(width);
+            }
+        }
+    }
+
+    // 保存済みの列幅を破棄し、ファイル一覧の列幅をXAML定義の既定値へ戻す
+    private void ResetFileListColumnWidths()
+    {
+        _viewModel.ResetColumnWidths();
+
+        foreach (var (columnKey, column) in GetFileListColumnsByKey())
+        {
+            if (_defaultFileListColumnWidths.TryGetValue(columnKey, out var defaultWidth))
+            {
+                column.Width = defaultWidth;
             }
         }
     }
@@ -289,6 +308,12 @@ public partial class MainWindow : Window
             dialog.ResultFullScanIntervalHours,
             dialog.ResultVisibleColumns,
             dialog.ResultColumnOrder);
+        // 保存済み幅を消してから並び順・列幅を反映し直す（消し忘れると直後のApplyで元の幅に戻ってしまう）
+        if (dialog.ShouldResetColumnWidths)
+        {
+            ResetFileListColumnWidths();
+        }
+
         ApplyFileListColumnVisibility();
         ApplyFileListColumnLayout();
         ApplyPlusTreeNodes();

@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Windows;
@@ -32,6 +32,9 @@ public partial class SettingsWindow : Window
             .Where(option => option.CanToggleVisibility && option.IsVisible)
             .Select(option => option.Key)
             .ToList();
+
+    /// <summary>ファイル一覧の列幅を既定値へ戻すかどうか（列幅はこの画面に持っていないため、フラグで呼び出し元へ伝える）。</summary>
+    public bool ShouldResetColumnWidths { get; private set; }
 
     /// <summary>列の並び順（Nameを含む全ての列キー）。</summary>
     public IReadOnlyList<string> ResultColumnOrder =>
@@ -89,16 +92,25 @@ public partial class SettingsWindow : Window
         ExcludedPathsListBox.ItemsSource = _excludedPaths;
         FullScanIntervalHoursTextBox.Text = _fullScanIntervalHours.ToString();
 
-        var visibleColumnSet = currentVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
         _columnOptions = new ObservableCollection<ColumnOptionViewModel>(
-            OrderColumns(currentColumnOrder).Select(column => new ColumnOptionViewModel(
-                column,
-                ColumnDisplayNames[column],
-                // Name列は常に表示。チェックを外せないよう、チェック済み・操作不可で出す
-                isVisible: column == FileListColumns.Name || visibleColumnSet.Contains(column),
-                canToggleVisibility: column != FileListColumns.Name)));
+            BuildColumnOptions(currentColumnOrder, currentVisibleColumns));
 
         ColumnOrderListBox.ItemsSource = _columnOptions;
+    }
+
+    // 指定された並び順・表示列から一覧の項目を組み立てる
+    private static IEnumerable<ColumnOptionViewModel> BuildColumnOptions(
+        IEnumerable<string> columnOrder,
+        IEnumerable<string> visibleColumns)
+    {
+        var visibleColumnSet = visibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return OrderColumns(columnOrder).Select(column => new ColumnOptionViewModel(
+            column,
+            ColumnDisplayNames[column],
+            // Name列は常に表示。チェックを外せないよう、チェック済み・操作不可で出す
+            isVisible: column == FileListColumns.Name || visibleColumnSet.Contains(column),
+            canToggleVisibility: column != FileListColumns.Name));
     }
 
     /// <summary>指定された並び順に沿って全ての列を並べる（未知のキー・重複を除き、欠けた列は既定の順で末尾に補う）。</summary>
@@ -145,6 +157,21 @@ public partial class SettingsWindow : Window
         _columnOptions.Move(index, newIndex);
         ColumnOrderListBox.SelectedIndex = newIndex;
         ColumnOrderListBox.ScrollIntoView(ColumnOrderListBox.SelectedItem);
+    }
+
+    // 表示列・並び順・列幅をまとめて既定に戻す。表示列と並び順はその場で一覧へ反映し、
+    // 列幅は呼び出し元が持っているためフラグで伝える。どちらもSaveで確定する（Cancelで閉じれば取り消せる）
+    private void ResetColumnsButton_Click(object sender, RoutedEventArgs e)
+    {
+        ShouldResetColumnWidths = true;
+
+        _columnOptions.Clear();
+        foreach (var option in BuildColumnOptions(FileListColumns.AllColumns, FileListColumns.DefaultVisibleColumns))
+        {
+            _columnOptions.Add(option);
+        }
+
+        ResetColumnsHintTextBlock.Visibility = Visibility.Visible;
     }
 
     // Plusの購読状態をDisplay Columns/Subscriptionページへ反映する。

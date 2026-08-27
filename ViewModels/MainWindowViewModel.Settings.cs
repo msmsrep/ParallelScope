@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
@@ -81,6 +81,21 @@ public partial class MainWindowViewModel
 
         _columnOrder = normalizedOrder;
         _columnWidths = normalizedWidths;
+        SaveSettings(RootFolders.Select(x => x.Path));
+    }
+
+    /// <summary>
+    /// 保存済みの列幅をすべて破棄し、既定幅（XAML定義の幅）に戻す。
+    /// 列の並び順は保持する（設定画面で個別に編集できるため）。
+    /// </summary>
+    public void ResetColumnWidths()
+    {
+        if (_columnWidths.Count == 0)
+        {
+            return;
+        }
+
+        _columnWidths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
         SaveSettings(RootFolders.Select(x => x.Path));
     }
 
