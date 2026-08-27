@@ -126,16 +126,32 @@
                 <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
                 <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
                     <StackPanel Name="ColumnCheckBoxesPanel">
-                        <TextBlock Text="Select the columns to show in the file list." Margin="0,0,0,4"/>
-                        <TextBlock Text="The Name column is always shown." Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                        <TextBlock Text="Select the columns to show in the file list, and put them in the order you want." Margin="0,0,0,4"/>
+                        <TextBlock Text="The Name column is always shown. Column widths and the order you set by dragging the column headers are saved when you close the app."
+                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
 
-                        <!-- 画面上の列順に並べる（FileListColumns.OptionalColumns と同順） -->
-                        <CheckBox Name="LocationColumnCheckBox" Content="Location (parent folder path)" Margin="0,4,0,0"/>
-                        <CheckBox Name="TypeColumnCheckBox" Content="Type" Margin="0,8,0,0"/>
-                        <CheckBox Name="SizeColumnCheckBox" Content="Size" Margin="0,8,0,0"/>
-                        <CheckBox Name="ModifiedColumnCheckBox" Content="Modified" Margin="0,8,0,0"/>
-                        <CheckBox Name="CreatedColumnCheckBox" Content="Created" Margin="0,8,0,0"/>
-                        <CheckBox Name="AttributesColumnCheckBox" Content="Attributes (R/H/S/A)" Margin="0,8,0,0"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 並びがそのままファイル一覧の列順になる（項目は ColumnOptionItem） -->
+                            <ListBox Grid.Column="0" Name="ColumnOrderListBox" Height="240">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding DisplayName}"
+                                                  IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                  IsEnabled="{Binding CanToggleVisibility}"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top">
+                                <Button Content="↑ Up" Width="80" Padding="0,6" Click="MoveColumnUpButton_Click"/>
+                                <Button Content="↓ Down" Width="80" Margin="0,8,0,0" Padding="0,6" Click="MoveColumnDownButton_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
                 </Border>
             </Grid>

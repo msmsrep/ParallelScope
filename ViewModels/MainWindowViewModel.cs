@@ -69,6 +69,11 @@ public partial class MainWindowViewModel : ObservableObject
         return false;
     }
 
+    // ファイル一覧の列の並び順（列キー。Nameを含む）と、ユーザーが変更した列幅（列キー→ピクセル幅）。
+    // どちらもPlus機能のため、反映するかどうかはコードビハインド側が購読状態で判断する
+    private List<string> _columnOrder = FileListColumns.AllColumns.ToList();
+    private Dictionary<string, double> _columnWidths = new(StringComparer.OrdinalIgnoreCase);
+
     // CSV出力でSize列を生のバイト数で書き出すか（保存ダイアログのファイル種類で選ばれた前回の値）
     private bool _csvExportSizeInBytes;
 

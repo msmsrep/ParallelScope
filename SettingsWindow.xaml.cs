@@ -6,6 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Interop;
 using ParallelScope.Services;
 using ParallelScope.Utilities;
+using ParallelScope.ViewModels;
 
 namespace ParallelScope;
 
@@ -13,7 +14,8 @@ public partial class SettingsWindow : Window
 {
     private readonly ObservableCollection<string> _rootPaths;
     private readonly ObservableCollection<string> _excludedPaths;
-    private readonly Dictionary<string, CheckBox> _columnCheckBoxes;
+    // ファイル一覧の列（Nameを含む）。一覧の並びがそのまま列の並び順になる
+    private readonly ObservableCollection<ColumnOptionViewModel> _columnOptions;
     private readonly StoreLicenseService _storeLicenseService;
     // テーマはSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
     private readonly Action<AppThemeSetting> _applyTheme;
@@ -24,11 +26,28 @@ public partial class SettingsWindow : Window
     public int ResultFullScanIntervalHours => _fullScanIntervalHours;
     public bool ShouldRunFullScan { get; private set; }
 
-    /// <summary>チェックされた表示列のキー一覧（画面上の列順）。</summary>
+    /// <summary>チェックされた表示列のキー一覧（Name列は常時表示のため含まない）。</summary>
     public IReadOnlyList<string> ResultVisibleColumns =>
-        FileListColumns.OptionalColumns
-            .Where(column => _columnCheckBoxes[column].IsChecked == true)
+        _columnOptions
+            .Where(option => option.CanToggleVisibility && option.IsVisible)
+            .Select(option => option.Key)
             .ToList();
+
+    /// <summary>列の並び順（Nameを含む全ての列キー）。</summary>
+    public IReadOnlyList<string> ResultColumnOrder =>
+        _columnOptions.Select(option => option.Key).ToList();
+
+    // 設定画面に出す列名。ファイル一覧のヘッダーだけでは分かりにくい列は補足を付ける
+    private static readonly Dictionary<string, string> ColumnDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [FileListColumns.Name] = "Name (always shown)",
+        [FileListColumns.Location] = "Location (parent folder path)",
+        [FileListColumns.Type] = "Type",
+        [FileListColumns.Size] = "Size",
+        [FileListColumns.Modified] = "Modified",
+        [FileListColumns.Created] = "Created",
+        [FileListColumns.Attributes] = "Attributes (R/H/S/A)"
+    };
 
     // 現在の設定値でダイアログの初期状態を構築する
     public SettingsWindow(
@@ -36,6 +55,7 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentExcludedPaths,
         int currentFullScanIntervalHours,
         IEnumerable<string> currentVisibleColumns,
+        IEnumerable<string> currentColumnOrder,
         AppThemeSetting currentTheme,
         Action<AppThemeSetting> applyTheme,
         StoreLicenseService storeLicenseService,
@@ -69,21 +89,62 @@ public partial class SettingsWindow : Window
         ExcludedPathsListBox.ItemsSource = _excludedPaths;
         FullScanIntervalHoursTextBox.Text = _fullScanIntervalHours.ToString();
 
-        _columnCheckBoxes = new Dictionary<string, CheckBox>(StringComparer.OrdinalIgnoreCase)
-        {
-            [FileListColumns.Location] = LocationColumnCheckBox,
-            [FileListColumns.Type] = TypeColumnCheckBox,
-            [FileListColumns.Size] = SizeColumnCheckBox,
-            [FileListColumns.Modified] = ModifiedColumnCheckBox,
-            [FileListColumns.Created] = CreatedColumnCheckBox,
-            [FileListColumns.Attributes] = AttributesColumnCheckBox
-        };
-
         var visibleColumnSet = currentVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var (column, checkBox) in _columnCheckBoxes)
+        _columnOptions = new ObservableCollection<ColumnOptionViewModel>(
+            OrderColumns(currentColumnOrder).Select(column => new ColumnOptionViewModel(
+                column,
+                ColumnDisplayNames[column],
+                // Name列は常に表示。チェックを外せないよう、チェック済み・操作不可で出す
+                isVisible: column == FileListColumns.Name || visibleColumnSet.Contains(column),
+                canToggleVisibility: column != FileListColumns.Name)));
+
+        ColumnOrderListBox.ItemsSource = _columnOptions;
+    }
+
+    /// <summary>指定された並び順に沿って全ての列を並べる（未知のキー・重複を除き、欠けた列は既定の順で末尾に補う）。</summary>
+    private static IEnumerable<string> OrderColumns(IEnumerable<string> columnOrder)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in columnOrder)
         {
-            checkBox.IsChecked = visibleColumnSet.Contains(column);
+            var known = FileListColumns.AllColumns.FirstOrDefault(x => string.Equals(x, column, StringComparison.OrdinalIgnoreCase));
+            if (known is not null && seen.Add(known))
+            {
+                yield return known;
+            }
         }
+
+        foreach (var column in FileListColumns.AllColumns.Where(column => !seen.Contains(column)))
+        {
+            yield return column;
+        }
+    }
+
+    // 選択中の列を1つ上へ移動する
+    private void MoveColumnUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedColumn(-1);
+    }
+
+    // 選択中の列を1つ下へ移動する
+    private void MoveColumnDownButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedColumn(1);
+    }
+
+    private void MoveSelectedColumn(int offset)
+    {
+        var index = ColumnOrderListBox.SelectedIndex;
+        var newIndex = index + offset;
+        if (index < 0 || newIndex < 0 || newIndex >= _columnOptions.Count)
+        {
+            return;
+        }
+
+        _columnOptions.Move(index, newIndex);
+        ColumnOrderListBox.SelectedIndex = newIndex;
+        ColumnOrderListBox.ScrollIntoView(ColumnOrderListBox.SelectedItem);
     }
 
     // Plusの購読状態をDisplay Columns/Subscriptionページへ反映する。

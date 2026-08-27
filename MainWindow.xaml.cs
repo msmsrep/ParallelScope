@@ -80,6 +80,87 @@ public partial class MainWindow : Window
         column.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    // 列キーとファイル一覧の列を対応付ける（並び順・列幅の保存/復元で使う）
+    private Dictionary<string, DataGridColumn> GetFileListColumnsByKey()
+    {
+        return new Dictionary<string, DataGridColumn>(StringComparer.OrdinalIgnoreCase)
+        {
+            [FileListColumns.Name] = NameColumn,
+            [FileListColumns.Location] = LocationColumn,
+            [FileListColumns.Type] = TypeColumn,
+            [FileListColumns.Size] = SizeColumn,
+            [FileListColumns.Modified] = ModifiedColumn,
+            [FileListColumns.Created] = CreatedColumn,
+            [FileListColumns.Attributes] = AttributesColumn
+        };
+    }
+
+    // 保存済みの列の並び順・列幅を反映する。どちらもPlus機能のため、
+    // 未購読（購読期限切れ含む）の間は保存済み設定を無視してXAML定義のままにする
+    private void ApplyFileListColumnLayout()
+    {
+        if (!_storeLicenseService.IsPlusActive)
+        {
+            return;
+        }
+
+        var columnsByKey = GetFileListColumnsByKey();
+
+        // DisplayIndexは代入のたびに他の列がずれるため、目的の並び順で先頭から詰め直す
+        var displayIndex = 0;
+        foreach (var columnKey in _viewModel.GetColumnOrder())
+        {
+            if (columnsByKey.TryGetValue(columnKey, out var column))
+            {
+                column.DisplayIndex = displayIndex++;
+            }
+        }
+
+        foreach (var (columnKey, width) in _viewModel.GetColumnWidths())
+        {
+            if (columnsByKey.TryGetValue(columnKey, out var column))
+            {
+                column.Width = new DataGridLength(width);
+            }
+        }
+    }
+
+    // 現在の列の並び順・列幅を保存する。ヘッダーのドラッグ操作は個別に拾わず、
+    // ウィンドウを閉じる時に最終状態をまとめて保存する
+    private void SaveFileListColumnLayout()
+    {
+        if (!_storeLicenseService.IsPlusActive)
+        {
+            return;
+        }
+
+        var columnsByKey = GetFileListColumnsByKey();
+        var columnOrder = columnsByKey
+            .OrderBy(pair => pair.Value.DisplayIndex)
+            .Select(pair => pair.Key)
+            .ToList();
+
+        var columnWidths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (columnKey, column) in columnsByKey)
+        {
+            // 残り幅いっぱい（*）のままの列は、幅が固定されると画面幅に追従しなくなるため保存しない
+            if (column.Width.UnitType != DataGridLengthUnitType.Pixel)
+            {
+                continue;
+            }
+
+            // ヘッダーのドラッグでリサイズしてもDataGridLength.Valueは変わらず表示幅だけが更新されるため、
+            // 実際の幅はActualWidthから読む
+            var actualWidth = column.ActualWidth;
+            if (double.IsFinite(actualWidth) && actualWidth > 0)
+            {
+                columnWidths[columnKey] = actualWidth;
+            }
+        }
+
+        _viewModel.SaveColumnLayout(columnOrder, columnWidths);
+    }
+
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
@@ -96,6 +177,7 @@ public partial class MainWindow : Window
         _storeLicenseService.ApplyDeveloperUnlockKey(_viewModel.GetDeveloperUnlockKey());
         await _storeLicenseService.RefreshLicenseAsync();
         ApplyFileListColumnVisibility();
+        ApplyFileListColumnLayout();
         ApplyPlusTreeNodes();
 
         await RunAutomaticFullScanAsync();
@@ -105,6 +187,15 @@ public partial class MainWindow : Window
     // ウィンドウクローズ時に定期スキャンタイマーを停止する
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
+        try
+        {
+            SaveFileListColumnLayout();
+        }
+        catch
+        {
+            // 設定ファイルが書けない状況でも終了処理は続行する
+        }
+
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
     }
@@ -168,11 +259,16 @@ public partial class MainWindow : Window
 
     private async Task ShowSettingsDialogAsync(bool startOnSubscriptionPage)
     {
+        // 設定画面には最新の並び順を渡したいので、ヘッダーのドラッグで変わっている可能性のある
+        // 現在の列レイアウトを先に確定させる
+        SaveFileListColumnLayout();
+
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
             _viewModel.GetExcludedPaths(),
             _viewModel.GetFullScanIntervalHours(),
             _viewModel.GetVisibleColumns(),
+            _viewModel.GetColumnOrder(),
             _viewModel.GetTheme(),
             _viewModel.ApplyTheme,
             _storeLicenseService,
@@ -185,12 +281,20 @@ public partial class MainWindow : Window
         {
             // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、Plus機能の表示は反映し直す
             ApplyFileListColumnVisibility();
+            ApplyFileListColumnLayout();
             ApplyPlusTreeNodes();
             return;
         }
 
-        _viewModel.ApplySettings(dialog.ResultRootPaths, dialog.ResultExcludedPaths, dialog.ResultFullScanIntervalHours, dialog.ResultVisibleColumns);
+        // 設定画面で並び順を変える前に、ヘッダーのドラッグで変わっている可能性のある現在の並び順を確定させる
+        _viewModel.ApplySettings(
+            dialog.ResultRootPaths,
+            dialog.ResultExcludedPaths,
+            dialog.ResultFullScanIntervalHours,
+            dialog.ResultVisibleColumns,
+            dialog.ResultColumnOrder);
         ApplyFileListColumnVisibility();
+        ApplyFileListColumnLayout();
         ApplyPlusTreeNodes();
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();

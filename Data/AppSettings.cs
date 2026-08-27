@@ -12,6 +12,15 @@ public sealed class AppSettings
     /// <summary>ファイル一覧に表示する列のキー一覧（FileListColumns参照）。nullは未設定＝デフォルト列を表示。</summary>
     public List<string>? VisibleColumns { get; set; }
 
+    /// <summary>ファイル一覧の列の並び順（列キー。Nameを含む）。nullは未設定＝既定の並び順。</summary>
+    public List<string>? ColumnOrder { get; set; }
+
+    /// <summary>
+    /// ファイル一覧の列幅（列キー→ピクセル幅）。
+    /// 未収録の列は既定の幅で表示する（残り幅いっぱいのName列は、ユーザーが幅を変えるまで収録されない）。
+    /// </summary>
+    public Dictionary<string, double>? ColumnWidths { get; set; }
+
     /// <summary>CSV出力でSize列を生のバイト数で書き出すか（falseなら "11.8 MB" のような表示中の文字列）。</summary>
     public bool CsvExportSizeInBytes { get; set; }
 

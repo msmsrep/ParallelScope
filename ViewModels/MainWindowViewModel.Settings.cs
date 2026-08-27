@@ -16,6 +16,8 @@ public partial class MainWindowViewModel
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
         _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
+        _columnOrder = NormalizeColumnOrder(settings.ColumnOrder);
+        _columnWidths = NormalizeColumnWidths(settings.ColumnWidths);
         _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
@@ -46,6 +48,40 @@ public partial class MainWindowViewModel
     public IReadOnlyList<string> GetVisibleColumns()
     {
         return FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList();
+    }
+
+    /// <summary>ファイル一覧の列の並び順（列キー。Nameを含む）を取得する。</summary>
+    public IReadOnlyList<string> GetColumnOrder()
+    {
+        return _columnOrder.ToList();
+    }
+
+    /// <summary>ユーザーが変更した列幅（列キー→ピクセル幅）を取得する。未変更の列は含まれない。</summary>
+    public IReadOnlyDictionary<string, double> GetColumnWidths()
+    {
+        return new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// ファイル一覧の列レイアウト（並び順・列幅）を保存する。
+    /// ヘッダーのドラッグ操作はイベントで拾わずウィンドウを閉じる時にまとめて保存するため、
+    /// 変化が無ければ書き込まない。
+    /// </summary>
+    public void SaveColumnLayout(IEnumerable<string> columnOrder, IReadOnlyDictionary<string, double> columnWidths)
+    {
+        var normalizedOrder = NormalizeColumnOrder(columnOrder.ToList());
+        var normalizedWidths = NormalizeColumnWidths(columnWidths.ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase));
+
+        if (normalizedOrder.SequenceEqual(_columnOrder, StringComparer.OrdinalIgnoreCase)
+            && normalizedWidths.Count == _columnWidths.Count
+            && normalizedWidths.All(pair => _columnWidths.TryGetValue(pair.Key, out var width) && width == pair.Value))
+        {
+            return;
+        }
+
+        _columnOrder = normalizedOrder;
+        _columnWidths = normalizedWidths;
+        SaveSettings(RootFolders.Select(x => x.Path));
     }
 
     /// <summary>CSV出力でSize列を生のバイト数で書き出す設定か（保存ダイアログの既定選択に使う）。</summary>
@@ -99,11 +135,13 @@ public partial class MainWindowViewModel
         IEnumerable<string> rootPaths,
         IEnumerable<string> excludedPaths,
         int fullScanIntervalHours,
-        IEnumerable<string>? visibleColumns)
+        IEnumerable<string>? visibleColumns,
+        IEnumerable<string>? columnOrder)
     {
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
+        _columnOrder = NormalizeColumnOrder(columnOrder?.ToList());
         ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
     }
 
@@ -218,6 +256,8 @@ public partial class MainWindowViewModel
             FullScanIntervalHours = _fullScanIntervalHours,
             IsFlatFileViewEnabled = _isFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
+            ColumnOrder = _columnOrder.ToList(),
+            ColumnWidths = new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase),
             CsvExportSizeInBytes = _csvExportSizeInBytes,
             Theme = _theme.ToString(),
             FavoritePaths = _favoritePaths.ToList(),
@@ -240,6 +280,53 @@ public partial class MainWindowViewModel
         return FileListColumns.OptionalColumns
             .Where(column => visibleColumns.Contains(column, StringComparer.OrdinalIgnoreCase))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 列の並び順を正規化する。未知のキー・重複を除き、指定に無い列は既定の並び順で末尾に補う
+    /// （設定ファイルが古いバージョンで書かれていて列が増えている場合など）。
+    /// </summary>
+    private static List<string> NormalizeColumnOrder(IReadOnlyCollection<string>? columnOrder)
+    {
+        if (columnOrder is null)
+        {
+            return FileListColumns.AllColumns.ToList();
+        }
+
+        var result = new List<string>(FileListColumns.AllColumns.Count);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var column in columnOrder)
+        {
+            var known = FileListColumns.AllColumns.FirstOrDefault(x => string.Equals(x, column, StringComparison.OrdinalIgnoreCase));
+            if (known is not null && seen.Add(known))
+            {
+                result.Add(known);
+            }
+        }
+
+        result.AddRange(FileListColumns.AllColumns.Where(column => !seen.Contains(column)));
+        return result;
+    }
+
+    /// <summary>列幅を正規化する。未知のキーと、表示できない値（0以下・NaN・無限大）を除く。</summary>
+    private static Dictionary<string, double> NormalizeColumnWidths(IReadOnlyDictionary<string, double>? columnWidths)
+    {
+        var result = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+        if (columnWidths is null)
+        {
+            return result;
+        }
+
+        foreach (var column in FileListColumns.AllColumns)
+        {
+            if (columnWidths.TryGetValue(column, out var width) && double.IsFinite(width) && width > 0)
+            {
+                result[column] = width;
+            }
+        }
+
+        return result;
     }
 
     private static IEnumerable<string> NormalizeRootPaths(IEnumerable<string> rootPaths)
