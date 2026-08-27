@@ -44,16 +44,12 @@ public partial class MainWindow : Window
         SyncTreeSelectionToCurrentPath();
     }
 
-    // 実際にファイル一覧へ表示しているオプション列を画面上の列順で返す。
-    // 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視してデフォルト列とする
+    // 実際にファイル一覧へ表示しているオプション列を画面上の列順で返す（購読状態による絞り込みも含む）
     private IReadOnlyList<string> GetEffectiveVisibleColumns()
     {
-        var configured = (_storeLicenseService.IsPlusActive
-                ? _viewModel.GetVisibleColumns()
-                : FileListColumns.DefaultVisibleColumns)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        return FileListColumns.OptionalColumns.Where(configured.Contains).ToList();
+        return FileListColumns.GetEffectiveVisibleColumns(
+            _viewModel.GetVisibleColumns(),
+            _storeLicenseService.IsPlusActive);
     }
 
     // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）

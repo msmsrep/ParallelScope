@@ -181,12 +181,21 @@ public partial class MainWindowViewModel : ObservableObject
     public bool CanGoUp => GetParentPath(CurrentPath) is not null;
 
     public MainWindowViewModel()
+        : this(new FileCacheRepository(), new AppSettingsRepository())
+    {
+    }
+
+    /// <summary>
+    /// 保存先を差し替えたリポジトリを渡して生成する（単体テスト用）。
+    /// アプリ本体は引数なしのコンストラクタを使い、リポジトリはここで直接newする。
+    /// </summary>
+    internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository)
     {
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
         InitializeTreeNodes();
         _fileItems = new ObservableCollection<FileItemViewModel>();
-        _fileCacheRepository = new FileCacheRepository();
-        _appSettingsRepository = new AppSettingsRepository();
+        _fileCacheRepository = fileCacheRepository;
+        _appSettingsRepository = appSettingsRepository;
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(

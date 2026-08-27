@@ -1,4 +1,4 @@
-using System.Data.Common;
+﻿using System.Data.Common;
 using System.IO;
 using System.Text;
 using Microsoft.EntityFrameworkCore;
@@ -39,9 +39,13 @@ public class FileCacheRepository
 
     private readonly DbContextOptions<ParallelScopeDbContext> _dbOptions;
 
-    public FileCacheRepository()
+    /// <param name="databaseDirectory">
+    /// DBファイルを置くフォルダ。null（通常の起動時）ならアプリデータフォルダを使う。
+    /// テストから一時フォルダを指定し、実際のキャッシュDBを壊さずに動かすための引数。
+    /// </param>
+    public FileCacheRepository(string? databaseDirectory = null)
     {
-        var appDataDir = AppDataPathProvider.GetOrCreateAppDataDirectory();
+        var appDataDir = databaseDirectory ?? AppDataPathProvider.GetOrCreateAppDataDirectory();
         var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
 
         _dbOptions = BuildDbOptions(dbPath);
@@ -601,6 +605,8 @@ public class FileCacheRepository
         var sb = new StringBuilder(
             "INSERT INTO FileSystemEntries (ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes) VALUES ");
 
+        // 値を裸のobjectで渡すとEFが型から変換方法を決めるため、NULL（DBNull）で
+        // 「DBNull型のマッピングが無い」と落ちる。SqliteParameterに包んで渡し、NULLも通るようにする
         var parameters = new List<object>();
         for (int j = 0; j < batch.Count; j++)
         {
@@ -613,18 +619,23 @@ public class FileCacheRepository
             int pIdx = j * 8;
             sb.Append($"(@p{pIdx},@p{pIdx + 1},@p{pIdx + 2},@p{pIdx + 3},@p{pIdx + 4},@p{pIdx + 5},@p{pIdx + 6},@p{pIdx + 7})");
 
-            parameters.Add(parentPath);
-            parameters.Add(entry.FullPath);
-            parameters.Add(entry.Name);
-            parameters.Add(entry.IsFolder);
-            parameters.Add(entry.SizeBytes ?? 0L);
-            parameters.Add(entry.LastWriteTimeUtc);
+            parameters.Add(CreateParameter(pIdx, parentPath));
+            parameters.Add(CreateParameter(pIdx + 1, entry.FullPath));
+            parameters.Add(CreateParameter(pIdx + 2, entry.Name));
+            parameters.Add(CreateParameter(pIdx + 3, entry.IsFolder));
+            parameters.Add(CreateParameter(pIdx + 4, entry.SizeBytes ?? 0L));
+            parameters.Add(CreateParameter(pIdx + 5, entry.LastWriteTimeUtc));
             // EF書き込み経路（ReplaceEntriesByParentPathInternal）とNULL表現を揃え、差分判定の誤検知を防ぐ
-            parameters.Add((object?)entry.CreationTimeUtc ?? DBNull.Value);
-            parameters.Add((object?)entry.Attributes ?? DBNull.Value);
+            parameters.Add(CreateParameter(pIdx + 6, (object?)entry.CreationTimeUtc ?? DBNull.Value));
+            parameters.Add(CreateParameter(pIdx + 7, (object?)entry.Attributes ?? DBNull.Value));
         }
 
         return (sb.ToString(), parameters.ToArray());
+    }
+
+    private static Microsoft.Data.Sqlite.SqliteParameter CreateParameter(int index, object value)
+    {
+        return new Microsoft.Data.Sqlite.SqliteParameter($"@p{index}", value);
     }
 
     private void ReplaceEntriesByParentPathInternal(string normalizedParentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)

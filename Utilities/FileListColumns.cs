@@ -27,4 +27,19 @@ public static class FileListColumns
     /// <summary>並び順・列幅の指定対象となる全ての列（既定の並び順）。</summary>
     public static readonly IReadOnlyList<string> AllColumns =
         new[] { Name, Location, Type, Size, Modified, Created, Attributes };
+
+    /// <summary>
+    /// 実際にファイル一覧へ表示するオプション列を、画面上の列順で返す。
+    /// 列カスタマイズはPlus機能のため、未購読（購読期限切れ含む）の間は保存済み設定を無視して既定列にする。
+    /// 設定自体は残すので、購読すれば以前のカスタマイズがそのまま復活する。
+    /// </summary>
+    public static IReadOnlyList<string> GetEffectiveVisibleColumns(
+        IEnumerable<string> configuredColumns,
+        bool arePlusFeaturesEnabled)
+    {
+        var configured = (arePlusFeaturesEnabled ? configuredColumns : DefaultVisibleColumns)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return OptionalColumns.Where(configured.Contains).ToList();
+    }
 }
