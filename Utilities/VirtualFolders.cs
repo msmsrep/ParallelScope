@@ -27,10 +27,11 @@ public static class VirtualFolders
     public const string FavoritesPath = "::Favorites::";
     public const string FrequentPath = "::Frequent::";
 
-    public const string AllRootsDisplayName = "Folders";
+    // 表示名は言語設定で変わるため、対訳表（UiTextResources）のキーだけを持つ。
     // アイコンは実フォルダと共通のため、種類の区別は表示名の絵文字で付ける
-    public const string FavoritesDisplayName = "★ Favorites";
-    public const string FrequentDisplayName = "🕒 Frequently Used";
+    public const string AllRootsDisplayNameKey = "Tree.Folders";
+    public const string FavoritesDisplayNameKey = "Tree.Favorites";
+    public const string FrequentDisplayNameKey = "Tree.Frequent";
 
     /// <summary>指定パスがどの仮想ノードのものかを判定する（実在パスなら None）。</summary>
     public static VirtualFolderKind GetKind(string? path)
@@ -67,10 +68,14 @@ public static class VirtualFolders
         _ => null
     };
 
-    public static string GetDisplayName(VirtualFolderKind kind) => kind switch
+    /// <summary>現在の表示言語での仮想ノードの表示名を返す。</summary>
+    public static string GetDisplayName(VirtualFolderKind kind) => UiText.Get(GetDisplayNameKey(kind));
+
+    /// <summary>仮想ノードの表示名の対訳表キーを返す。</summary>
+    public static string GetDisplayNameKey(VirtualFolderKind kind) => kind switch
     {
-        VirtualFolderKind.Favorites => FavoritesDisplayName,
-        VirtualFolderKind.Frequent => FrequentDisplayName,
-        _ => AllRootsDisplayName
+        VirtualFolderKind.Favorites => FavoritesDisplayNameKey,
+        VirtualFolderKind.Frequent => FrequentDisplayNameKey,
+        _ => AllRootsDisplayNameKey
     };
 }

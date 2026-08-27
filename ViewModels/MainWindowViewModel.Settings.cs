@@ -21,6 +21,7 @@ public partial class MainWindowViewModel
         _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
+        _language = AppLanguage.Parse(settings.Language);
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
         LoadFavoritesAndUsage(settings);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
@@ -143,6 +144,37 @@ public partial class MainWindowViewModel
         _theme = theme;
         AppTheme.Apply(_theme);
         SaveSettings(RootFolders.Select(x => x.Path));
+    }
+
+    /// <summary>現在の表示言語設定を取得する。</summary>
+    public AppLanguageSetting GetLanguage()
+    {
+        return _language;
+    }
+
+    /// <summary>
+    /// 表示言語を切り替えて即座に適用し、設定ファイルへ保存する。
+    /// 配色テーマと同じく、設定画面ではその場で見た目が変わるためSaveボタンを待たずに確定させる。
+    /// </summary>
+    public void ApplyLanguage(AppLanguageSetting language)
+    {
+        if (_language == language)
+        {
+            return;
+        }
+
+        _language = language;
+        AppLanguage.Apply(_language);
+        // バインディング経由で更新されないツリーの表示名（仮想ノード・読み込み中のダミー）を引き直す
+        RefreshLocalizedTreeNames();
+        SaveSettings(RootFolders.Select(x => x.Path));
+    }
+
+    /// <summary>起動時に、保存済みの表示言語をアプリ全体へ適用する。</summary>
+    public void ApplySavedLanguage()
+    {
+        AppLanguage.Apply(_language);
+        RefreshLocalizedTreeNames();
     }
 
     /// <summary>設定画面からの入力を適用し、設定ファイルへ保存する。</summary>
@@ -275,6 +307,7 @@ public partial class MainWindowViewModel
             ColumnWidths = new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase),
             CsvExportSizeInBytes = _csvExportSizeInBytes,
             Theme = _theme.ToString(),
+            Language = _language.ToString(),
             FavoritePaths = _favoritePaths.ToList(),
             FolderUsages = _folderUsages.Values.ToList(),
             DeveloperUnlockKey = _developerUnlockKey

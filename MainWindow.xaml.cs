@@ -37,16 +37,36 @@ public partial class MainWindow : Window
         Title = BuildWindowTitleWithVersion(Title);
 
         _viewModel = new MainWindowViewModel();
-        // 保存済みテーマは最初の描画前に適用する（App.xamlのThemeMode="System"のままだと一瞬OSの配色で表示されてしまう）
+        // 保存済みの言語・テーマは最初の描画前に適用する
+        // （App.xamlのThemeMode="System"のままだと一瞬OSの配色で表示されてしまう）
+        _viewModel.ApplySavedLanguage();
         AppTheme.Apply(_viewModel.GetTheme());
         _scheduledFullScanTimer = new DispatcherTimer();
         _scheduledFullScanTimer.Tick += ScheduledFullScanTimer_Tick;
         DataContext = _viewModel;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        AppLanguage.Changed += AppLanguage_Changed;
 
+        ApplyFileListColumnHeaders();
         ApplyFileListColumnVisibility();
         SyncTreeSelectionToCurrentPath();
+    }
+
+    // 言語切り替え時、バインディングでは追従しない箇所（ファイル一覧の列見出し）を貼り替える
+    private void AppLanguage_Changed(object? sender, EventArgs e)
+    {
+        ApplyFileListColumnHeaders();
+    }
+
+    // ファイル一覧の列見出しを現在の言語で設定する。
+    // DataGridColumn は表示ツリーの外にあるため、XAMLのバインディングではなくコードから直接入れる
+    private void ApplyFileListColumnHeaders()
+    {
+        foreach (var (key, column) in GetFileListColumnsByKey())
+        {
+            column.Header = UiText.Get($"Column.{key}");
+        }
     }
 
     // 実際にファイル一覧へ表示しているオプション列を画面上の列順で返す（購読状態による絞り込みも含む）
@@ -213,6 +233,7 @@ public partial class MainWindow : Window
 
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
+        AppLanguage.Changed -= AppLanguage_Changed;
     }
 
     // "アプリ名" を "アプリ名 vX.Y.Z.W" に組み立てる。バージョンが取得できない場合は元のタイトルのまま返す
@@ -286,6 +307,8 @@ public partial class MainWindow : Window
             _viewModel.GetColumnOrder(),
             _viewModel.GetTheme(),
             _viewModel.ApplyTheme,
+            _viewModel.GetLanguage(),
+            _viewModel.ApplyLanguage,
             _storeLicenseService,
             startOnSubscriptionPage)
         {
@@ -338,7 +361,7 @@ public partial class MainWindow : Window
     // 使い方ガイド（GitHub Pages）を既定のブラウザーで開く
     private void OpenUserGuideMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        // アプリのUIは英語のみだが、日本語環境では日本語版のページを開く
+        // アプリの表示言語（CurrentUICultureはAppLanguage.Applyが設定済み）に合わせてページを選ぶ
         // （ページ側にも言語の切り替えリンクがあるため、外した場合も辿り着ける）
         var url = string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ja", StringComparison.OrdinalIgnoreCase)
             ? "https://msmsrep.github.io/ParallelScope/index.ja.html"
@@ -354,7 +377,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not open the user guide: {ex.Message}", "User Guide", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("UserGuide.OpenFailed", ex.Message), UiText.Get("UserGuide.Caption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -365,8 +388,8 @@ public partial class MainWindow : Window
         if (!_storeLicenseService.IsPlusActive)
         {
             var answer = MessageBox.Show(
-                "Exporting the file list to CSV is a ParallelScope Plus feature.\n\nDo you want to open the Subscription page?",
-                "Export CSV",
+                UiText.Get("Csv.PlusRequired"),
+                UiText.Get("Csv.Caption"),
                 MessageBoxButton.YesNo,
                 MessageBoxImage.Information);
 
@@ -382,15 +405,15 @@ public partial class MainWindow : Window
         var items = FileListDataGrid.Items.OfType<FileItemViewModel>().ToList();
         if (items.Count == 0)
         {
-            MessageBox.Show("There are no items to export.", "Export CSV", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(UiText.Get("Csv.NoItems"), UiText.Get("Csv.Caption"), MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
 
         // Size列の書式は保存ダイアログの「ファイルの種類」で選ばせる（選んだ書式は次回の既定になる）
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
-            Title = "Export CSV",
-            Filter = "CSV - sizes as displayed (*.csv)|*.csv|CSV - sizes in bytes (*.csv)|*.csv",
+            Title = UiText.Get("Csv.Caption"),
+            Filter = UiText.Get("Csv.Filter"),
             FilterIndex = _viewModel.GetCsvExportSizeInBytes() ? 2 : 1,
             DefaultExt = ".csv",
             AddExtension = true,
@@ -415,14 +438,14 @@ public partial class MainWindow : Window
             await Task.Run(() => FileListCsvExporter.Export(filePath, items, columns, sizeInBytes));
 
             MessageBox.Show(
-                $"Exported {items.Count} item(s) to:\n{filePath}",
-                "Export CSV",
+                UiText.Format("Csv.Exported", items.Count, filePath),
+                UiText.Get("Csv.Caption"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not export the CSV file: {ex.Message}", "Export CSV", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("Csv.ExportFailed", ex.Message), UiText.Get("Csv.Caption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -510,7 +533,7 @@ public partial class MainWindow : Window
 
         var scanMenuItem = new MenuItem
         {
-            Header = "Scan everything under this folder",
+            Header = UiText.Get("Context.ScanSubtree"),
             DataContext = folderItem,
             IsEnabled = !folderItem.IsScanning
         };
@@ -528,7 +551,7 @@ public partial class MainWindow : Window
             var isFavorite = _viewModel.IsFavorite(folderItem.Path);
             var favoriteMenuItem = new MenuItem
             {
-                Header = isFavorite ? "☆  Remove from Favorites" : "★  Add to Favorites",
+                Header = UiText.Get(isFavorite ? "Context.RemoveFavorite" : "Context.AddFavorite"),
                 DataContext = folderItem
             };
             favoriteMenuItem.Click += ToggleFavoriteMenuItem_Click;
@@ -636,7 +659,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not open the file: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("File.OpenFailed", ex.Message), UiText.Get("Dialog.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
     // 右クリックされた行を選択状態にしてからコンテキストメニューを表示する
@@ -780,7 +803,7 @@ public partial class MainWindow : Window
             // explorer.exe は既定フォルダを開くだけでエラーにならないため、事前に存在確認する
             if (!File.Exists(item.FullPath) && !Directory.Exists(item.FullPath))
             {
-                MessageBox.Show("The item no longer exists.", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show(UiText.Get("ParentFolder.Missing"), UiText.Get("ParentFolder.Caption"), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -793,7 +816,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not open the parent folder: {ex.Message}", "Open Parent Folder", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("ParentFolder.OpenFailed", ex.Message), UiText.Get("ParentFolder.Caption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -806,7 +829,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Could not copy to the clipboard: {ex.Message}", "Copy Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("Clipboard.Failed", ex.Message), UiText.Get("Clipboard.Caption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -950,7 +973,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        MessageBox.Show("Could not navigate to the specified folder. Please check the path.", "Navigation Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+        MessageBox.Show(UiText.Get("Navigation.Failed"), UiText.Get("Navigation.Caption"), MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     // 設定画面の「保存してフルスキャン」から呼ばれる、完了メッセージ付きのフルスキャン
@@ -976,14 +999,14 @@ public partial class MainWindow : Window
             }
 
             MessageBox.Show(
-                $"Scan completed. Updated cache for {scannedFolderCount} folder(s).",
-                "Folder Scan",
+                UiText.Format("Scan.Folder.Completed", scannedFolderCount),
+                UiText.Get("Scan.Folder.Caption"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Scan failed: {ex.Message}", "Folder Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(UiText.Format("Scan.Folder.Failed", ex.Message), UiText.Get("Scan.Folder.ErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
         {
@@ -1038,8 +1061,8 @@ public partial class MainWindow : Window
             if (showCompletionMessage)
             {
                 MessageBox.Show(
-                    $"Full scan completed. Updated cache for {scannedFolderCount} folder(s).",
-                    "Full Scan",
+                    UiText.Format("Scan.Full.Completed", scannedFolderCount),
+                    UiText.Get("Scan.Full.Caption"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
             }
@@ -1048,14 +1071,14 @@ public partial class MainWindow : Window
         {
             if (showCompletionMessage)
             {
-                MessageBox.Show("Full scan was canceled.", "Full Scan Canceled", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(UiText.Get("Scan.Full.Canceled"), UiText.Get("Scan.Full.CanceledCaption"), MessageBoxButton.OK, MessageBoxImage.Information);
             }
         }
         catch (Exception ex)
         {
             if (showCompletionMessage)
             {
-                MessageBox.Show($"Full scan failed: {ex.Message}", "Full Scan Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(UiText.Format("Scan.Full.Failed", ex.Message), UiText.Get("Scan.Full.ErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
         finally

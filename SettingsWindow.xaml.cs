@@ -17,8 +17,9 @@ public partial class SettingsWindow : Window
     // ファイル一覧の列（Nameを含む）。一覧の並びがそのまま列の並び順になる
     private readonly ObservableCollection<ColumnOptionViewModel> _columnOptions;
     private readonly StoreLicenseService _storeLicenseService;
-    // テーマはSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
+    // テーマ・言語はSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
     private readonly Action<AppThemeSetting> _applyTheme;
+    private readonly Action<AppLanguageSetting> _applyLanguage;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -40,16 +41,16 @@ public partial class SettingsWindow : Window
     public IReadOnlyList<string> ResultColumnOrder =>
         _columnOptions.Select(option => option.Key).ToList();
 
-    // 設定画面に出す列名。ファイル一覧のヘッダーだけでは分かりにくい列は補足を付ける
-    private static readonly Dictionary<string, string> ColumnDisplayNames = new(StringComparer.OrdinalIgnoreCase)
+    // 設定画面に出す列名の対訳表キー。ファイル一覧のヘッダーだけでは分かりにくい列は補足付きの専用キーを使う
+    private static readonly Dictionary<string, string> ColumnDisplayNameKeys = new(StringComparer.OrdinalIgnoreCase)
     {
-        [FileListColumns.Name] = "Name (always shown)",
-        [FileListColumns.Location] = "Location (parent folder path)",
-        [FileListColumns.Type] = "Type",
-        [FileListColumns.Size] = "Size",
-        [FileListColumns.Modified] = "Modified",
-        [FileListColumns.Created] = "Created",
-        [FileListColumns.Attributes] = "Attributes (R/H/S/A)"
+        [FileListColumns.Name] = "Settings.Column.Name",
+        [FileListColumns.Location] = "Settings.Column.Location",
+        [FileListColumns.Type] = "Column.Type",
+        [FileListColumns.Size] = "Column.Size",
+        [FileListColumns.Modified] = "Column.Modified",
+        [FileListColumns.Created] = "Column.Created",
+        [FileListColumns.Attributes] = "Settings.Column.Attributes"
     };
 
     // 現在の設定値でダイアログの初期状態を構築する
@@ -61,12 +62,15 @@ public partial class SettingsWindow : Window
         IEnumerable<string> currentColumnOrder,
         AppThemeSetting currentTheme,
         Action<AppThemeSetting> applyTheme,
+        AppLanguageSetting currentLanguage,
+        Action<AppLanguageSetting> applyLanguage,
         StoreLicenseService storeLicenseService,
         bool startOnSubscriptionPage = false)
     {
         InitializeComponent();
 
         _applyTheme = applyTheme;
+        _applyLanguage = applyLanguage;
         _storeLicenseService = storeLicenseService;
         ApplyPlusLicenseState();
 
@@ -85,6 +89,19 @@ public partial class SettingsWindow : Window
         };
         themeRadioButton.IsChecked = true;
 
+        // 現在の言語のラジオを立てる。テーマと同じくここでCheckedハンドラが走るが、同値のため呼び出し先で無視される
+        var languageRadioButton = currentLanguage switch
+        {
+            AppLanguageSetting.English => EnglishLanguageRadioButton,
+            AppLanguageSetting.Japanese => JapaneseLanguageRadioButton,
+            _ => SystemLanguageRadioButton
+        };
+        languageRadioButton.IsChecked = true;
+
+        // 言語を切り替えると、この画面で組み立て済みの文字列（列名・購入ボタンの金額）も貼り替える
+        AppLanguage.Changed += AppLanguage_Changed;
+        Closed += (_, _) => AppLanguage.Changed -= AppLanguage_Changed;
+
         _rootPaths = new ObservableCollection<string>(currentRootPaths);
         _excludedPaths = new ObservableCollection<string>(currentExcludedPaths);
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(currentFullScanIntervalHours);
@@ -98,6 +115,17 @@ public partial class SettingsWindow : Window
         ColumnOrderListBox.ItemsSource = _columnOptions;
     }
 
+    // 言語切り替え時、XAMLのバインディングでは追従しない箇所を貼り替える
+    private void AppLanguage_Changed(object? sender, EventArgs e)
+    {
+        foreach (var option in _columnOptions)
+        {
+            option.RefreshDisplayName();
+        }
+
+        ApplySubscribeButtonText();
+    }
+
     // 指定された並び順・表示列から一覧の項目を組み立てる
     private static IEnumerable<ColumnOptionViewModel> BuildColumnOptions(
         IEnumerable<string> columnOrder,
@@ -107,7 +135,7 @@ public partial class SettingsWindow : Window
 
         return OrderColumns(columnOrder).Select(column => new ColumnOptionViewModel(
             column,
-            ColumnDisplayNames[column],
+            ColumnDisplayNameKeys[column],
             // Name列は常に表示。チェックを外せないよう、チェック済み・操作不可で出す
             isVisible: column == FileListColumns.Name || visibleColumnSet.Contains(column),
             canToggleVisibility: column != FileListColumns.Name));
@@ -192,14 +220,22 @@ public partial class SettingsWindow : Window
         }
     }
 
-    // ストアから実際の表示価格（通貨ローカライズ済み）を取得してボタンに反映する。取得できなければ汎用表記のまま
+    // ストアから取得した表示価格（通貨ローカライズ済み）。取得できていなければnull
+    private string? _plusFormattedPrice;
+
+    // ストアから実際の表示価格を取得してボタンに反映する。取得できなければ金額なしの表記のまま
     private async Task LoadPlusPriceAsync()
     {
-        var price = await _storeLicenseService.GetPlusFormattedPriceAsync();
-        if (!string.IsNullOrEmpty(price))
-        {
-            SubscribePlusButton.Content = $"🔓 Subscribe to Plus ({price} / month)";
-        }
+        _plusFormattedPrice = await _storeLicenseService.GetPlusFormattedPriceAsync();
+        ApplySubscribeButtonText();
+    }
+
+    // 購入ボタンの文言を現在の言語・取得済みの価格で組み立てる
+    private void ApplySubscribeButtonText()
+    {
+        SubscribePlusButton.Content = string.IsNullOrEmpty(_plusFormattedPrice)
+            ? UiText.Get("Settings.Subscription.Subscribe")
+            : UiText.Format("Settings.Subscription.SubscribeWithPrice", _plusFormattedPrice);
     }
 
     // 購入ダイアログを表示し、購読が成立したらチェックボックス群を有効化する
@@ -207,7 +243,7 @@ public partial class SettingsWindow : Window
     {
         if (!_storeLicenseService.IsStoreAvailable)
         {
-            PlusStatusTextBlock.Text = "The Microsoft Store is not available. Please install this app from the Microsoft Store to subscribe.";
+            PlusStatusTextBlock.Text = UiText.Get("Settings.Subscription.StoreUnavailable");
             PlusStatusTextBlock.Visibility = Visibility.Visible;
             return;
         }
@@ -224,7 +260,7 @@ public partial class SettingsWindow : Window
             }
             else
             {
-                PlusStatusTextBlock.Text = "The purchase was not completed.";
+                PlusStatusTextBlock.Text = UiText.Get("Settings.Subscription.PurchaseNotCompleted");
                 PlusStatusTextBlock.Visibility = Visibility.Visible;
             }
         }
@@ -244,7 +280,7 @@ public partial class SettingsWindow : Window
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
         if (RootSettingsPanel is null || ColumnSettingsPanel is null || ThemePanel is null
-            || SubscriptionPanel is null || SupportPanel is null)
+            || LanguagePanel is null || SubscriptionPanel is null || SupportPanel is null)
         {
             return;
         }
@@ -252,16 +288,18 @@ public partial class SettingsWindow : Window
         var selectedMenuItem = SettingsMenuListBox.SelectedItem;
         var showColumns = ReferenceEquals(selectedMenuItem, ColumnsMenuItem);
         var showTheme = ReferenceEquals(selectedMenuItem, ThemeMenuItem);
+        var showLanguage = ReferenceEquals(selectedMenuItem, LanguageMenuItem);
         var showSubscription = ReferenceEquals(selectedMenuItem, SubscriptionMenuItem);
         var showSupport = ReferenceEquals(selectedMenuItem, SupportMenuItem);
-        var showRoot = !showColumns && !showTheme && !showSubscription && !showSupport;
+        var showRoot = !showColumns && !showTheme && !showLanguage && !showSubscription && !showSupport;
         RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
         ThemePanel.Visibility = showTheme ? Visibility.Visible : Visibility.Collapsed;
+        LanguagePanel.Visibility = showLanguage ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
         SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
         SaveAndFullScanButton.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
-        // Theme/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、Save/Cancelボタンも非表示にする
+        // Theme/Language/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、Save/Cancelボタンも非表示にする
         var hasSaveTarget = showRoot || showColumns;
         SaveButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
         CancelButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
@@ -278,6 +316,17 @@ public partial class SettingsWindow : Window
         _applyTheme(AppTheme.Parse(themeName));
     }
 
+    // 表示言語の切り替え。テーマと同じく、Saveボタンを待たずに即座に適用・保存する
+    private void LanguageRadioButton_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender is not RadioButton radioButton || radioButton.Tag is not string languageName)
+        {
+            return;
+        }
+
+        _applyLanguage(AppLanguage.Parse(languageName));
+    }
+
     // Display ColumnsページのアンロックからSubscriptionページへ遷移する
     private void GoToSubscriptionButton_Click(object sender, RoutedEventArgs e)
     {
@@ -287,7 +336,7 @@ public partial class SettingsWindow : Window
     // Microsoftアカウントのサブスクリプション管理（解約）ページをブラウザで開く
     private void ManageSubscriptionButton_Click(object sender, RoutedEventArgs e)
     {
-        OpenSupportUrl(_manageSubscriptionUrl, "Manage subscription");
+        OpenSupportUrl(_manageSubscriptionUrl, UiText.Get("Settings.Subscription.ManageCaption"));
     }
 
     // 開発者への寄付ページ（Ko-fi）をブラウザで開く
@@ -334,14 +383,14 @@ public partial class SettingsWindow : Window
         }
         catch
         {
-            MessageBox.Show("The path format is invalid.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.InvalidPath"), UiText.Get("Settings.InputErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         // 応答の遅いNASパスでも設定画面を固めない（タイムアウト時は存在する扱いで受け付ける）
         if (!DirectoryAvailabilityChecker.ExistsOrTimedOut(normalized))
         {
-            MessageBox.Show("The specified folder does not exist.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.FolderNotFound"), UiText.Get("Settings.InputErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -408,14 +457,14 @@ public partial class SettingsWindow : Window
         }
         catch
         {
-            MessageBox.Show("The path format is invalid.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.InvalidPath"), UiText.Get("Settings.InputErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
         // 応答の遅いNASパスでも設定画面を固めない（タイムアウト時は存在する扱いで受け付ける）
         if (!DirectoryAvailabilityChecker.ExistsOrTimedOut(normalized))
         {
-            MessageBox.Show("The specified folder does not exist.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.FolderNotFound"), UiText.Get("Settings.InputErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -471,13 +520,13 @@ public partial class SettingsWindow : Window
     {
         if (_rootPaths.Count == 0)
         {
-            MessageBox.Show("Please add at least one target root folder.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.NoRootFolder"), UiText.Get("Settings.SaveErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 
         if (!int.TryParse(FullScanIntervalHoursTextBox.Text?.Trim(), out var parsedHours) || parsedHours <= 0)
         {
-            MessageBox.Show("Enter the auto full scan interval as a positive number of hours.", "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(UiText.Get("Settings.InvalidInterval"), UiText.Get("Settings.SaveErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Warning);
             return false;
         }
 

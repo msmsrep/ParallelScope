@@ -33,6 +33,9 @@ public sealed class AppSettings
     /// <summary>配色テーマ（AppThemeSettingの名前）。nullは未設定＝Windowsの設定に追従。</summary>
     public string? Theme { get; set; }
 
+    /// <summary>表示言語（AppLanguageSettingの名前）。nullは未設定＝Windowsの表示言語に追従。</summary>
+    public string? Language { get; set; }
+
     /// <summary>
     /// 開発者専用: Plus機能をStoreの購読なしで解放するためのキー。通常はnull。
     /// 正しいキーかどうかはStoreLicenseServiceが埋め込みハッシュとの照合で判定する。

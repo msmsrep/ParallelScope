@@ -45,6 +45,17 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
+    /// 言語切り替え後に、ツリー上の言語依存の表示名（仮想ノード・遅延読み込み中のダミー）を引き直す。
+    /// TreeRootsに出ていない（未購読時の）お気に入り・よく使うノードも含めて更新する。
+    /// </summary>
+    private void RefreshLocalizedTreeNames()
+    {
+        AllRootsNode.RefreshLocalizedDisplayName();
+        _favoritesNode.RefreshLocalizedDisplayName();
+        _frequentNode.RefreshLocalizedDisplayName();
+    }
+
+    /// <summary>
     /// Plus機能（お気に入り・よく使う）の有効/無効を切り替える。
     /// 起動直後はライセンス未取得のため無効で、購読が確認できた時点で呼び直される。
     /// </summary>

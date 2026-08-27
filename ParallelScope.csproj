@@ -15,8 +15,8 @@
     <SelfContained>true</SelfContained>
     <!-- アプリのアイコンをMSIXにも設定 -->
     <ApplicationIcon>Assets/logo.ico</ApplicationIcon>
-    <!-- 自己完結発行だとWPFの各国語リソースまで同梱される。アプリUIは英語なので、
-         TextBoxの右クリックメニュー等がWindowsの言語に追従する ja だけ残して他は落とす -->
+    <!-- 自己完結発行だとWPFの各国語リソースまで同梱される。アプリUIは英語と日本語のみなので、
+         TextBoxの右クリックメニュー等が表示言語に追従する en/ja だけ残して他は落とす -->
     <SatelliteResourceLanguages>en;ja</SatelliteResourceLanguages>
     <!-- Tests/ 配下はテストプロジェクトの持ち物。本体は .cs を再帰的に拾うため、明示的に除外する -->
     <DefaultItemExcludes>$(DefaultItemExcludes);Tests\**</DefaultItemExcludes>

@@ -1,7 +1,9 @@
-﻿using ParallelScope.Utilities;
+﻿using ParallelScope.Tests.TestSupport;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.Tests.Utilities;
 
+[Collection(LanguageCollection.Name)]
 public class VirtualFoldersTests
 {
     [Theory]
@@ -42,13 +44,27 @@ public class VirtualFoldersTests
     }
 
     [Theory]
-    [InlineData(VirtualFolderKind.Favorites, VirtualFolders.FavoritesDisplayName)]
-    [InlineData(VirtualFolderKind.Frequent, VirtualFolders.FrequentDisplayName)]
-    [InlineData(VirtualFolderKind.AllRoots, VirtualFolders.AllRootsDisplayName)]
-    [InlineData(VirtualFolderKind.None, VirtualFolders.AllRootsDisplayName)]
-    public void GetDisplayName_ReturnsNodeLabel(VirtualFolderKind kind, string expected)
+    [InlineData(VirtualFolderKind.Favorites, VirtualFolders.FavoritesDisplayNameKey)]
+    [InlineData(VirtualFolderKind.Frequent, VirtualFolders.FrequentDisplayNameKey)]
+    [InlineData(VirtualFolderKind.AllRoots, VirtualFolders.AllRootsDisplayNameKey)]
+    [InlineData(VirtualFolderKind.None, VirtualFolders.AllRootsDisplayNameKey)]
+    public void GetDisplayNameKey_ReturnsNodeLabelKey(VirtualFolderKind kind, string expected)
     {
-        Assert.Equal(expected, VirtualFolders.GetDisplayName(kind));
+        Assert.Equal(expected, VirtualFolders.GetDisplayNameKey(kind));
+    }
+
+    [Fact]
+    public void GetDisplayName_FollowsTheCurrentLanguage()
+    {
+        using (new LanguageScope(AppLanguageSetting.English))
+        {
+            Assert.Equal("★ Favorites", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
+        }
+
+        using (new LanguageScope(AppLanguageSetting.Japanese))
+        {
+            Assert.Equal("★ お気に入り", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
+        }
     }
 
     [Fact]

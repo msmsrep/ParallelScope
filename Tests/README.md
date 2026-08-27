@@ -34,8 +34,9 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | --- | --- | --- |
 | `Utilities/PathNormalizerTests` | `PathNormalizer` | 末尾区切りの除去、ドライブルート（`C:\`）は区切りを残す、仮想パスの正規形、`C:\Temp` が `C:\Temporary` の祖先と誤判定されないこと |
 | `Utilities/FileSizeFormatterTests` | `FileSizeFormatter` | 単位の繰り上げ、小数第2位への丸め、TBで打ち止め |
-| `Utilities/VirtualFoldersTests` | `VirtualFolders` | 仮想ノードの種類判定（大文字小文字を無視）、正規形、表示名、実在パスと衝突しない文字を含むこと |
+| `Utilities/VirtualFoldersTests` | `VirtualFolders` | 仮想ノードの種類判定（大文字小文字を無視）、正規形、表示名（対訳表キーと、言語に追従した文字列）、実在パスと衝突しない文字を含むこと |
 | `Utilities/AppThemeTests` | `AppTheme.Parse` | 未設定・不正値をOS追従（System）へ丸めること。`Apply` は `Application` が要るため対象外 |
+| `Utilities/LocalizationTests` | `UiText` / `UiTextResources` / `AppLanguage` | 英日でキーとプレースホルダーが揃っていること、空文字の文言が無いこと、現在の言語での引き当てと未知キーのフォールバック、言語切り替え時のインデクサー変更通知、`Parse` の丸めと `CurrentUICulture` の切り替え |
 | `Utilities/FileListColumnsTests` | `FileListColumns` | 列キー定義の整合性（`AllColumns` = Name + `OptionalColumns`、重複なし）。キーは settings.json に保存されるため崩すと既存設定が壊れる |
 | `Utilities/SingleFlightCoalescerTests` | `SingleFlightCoalescer<T>` | 実行中のリクエストが最新1件へ統合されること、ハンドラが直列に走ること、ハンドラが例外を投げた後も後続を処理できること |
 | `Utilities/FileListCsvExporterTests` | `FileListCsvExporter` | 選択列どおりの見出し・行、生バイト出力時の `Size (bytes)` 見出し、RFC 4180のエスケープ（必要な場合だけ引用符で囲む）、UTF-8 BOM、キャンセル |
@@ -43,9 +44,14 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Data/FileCacheRepositoryTests` | `FileCacheRepository` | 一覧の並び順（フォルダ先・名前昇順）、全列のラウンドトリップ、差分書き込みの戻り値、配下ファイルの再帰列挙、検索のLIKEエスケープ、子フォルダ合計サイズ、`DeleteStaleEntries` の各分岐 |
 | `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック |
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
+| `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
 | `ViewModels/PlusFeatureGatingTests` | 無料版とPlusの機能分け | お気に入り・よく使うノードのツリーへの出し入れ、非表示ノードからの退避、購読が切れても保存済みデータを消さないこと、列カスタマイズの既定列へのフォールバック |
 
 ## テストを書くときの決まりごと
+
+### 表示言語を切り替えるテストは直列に走らせる
+
+`AppLanguage` はプロセス全体で1つの静的な状態なので、切り替えるテストクラスには `[Collection(LanguageCollection.Name)]` を付けて（同一コレクション内は並列実行されません）、切り替えは `TestSupport/LanguageScope` で囲んで元の言語へ戻してください。
 
 ### 実際のアプリデータを絶対に触らない
 

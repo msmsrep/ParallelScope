@@ -17,6 +17,9 @@ public class FolderItemViewModel : ObservableObject
         AttributesToSkip = FileAttributes.ReparsePoint
     };
 
+    // 遅延読み込み中のダミーノードの表示名（対訳表のキー）
+    private const string LoadingDisplayNameKey = "Tree.Loading";
+
     private readonly string _path;
     private readonly Func<string, bool>? _isExcludedPath;
     private readonly bool _isShortcut;
@@ -26,8 +29,16 @@ public class FolderItemViewModel : ObservableObject
     private bool _hasSubFolders = true;
     private bool _isExpanded;
     private ImageSource? _iconSource;
+    private string _displayName = string.Empty;
+    // 仮想ノード・遅延読み込み中のダミーは表示名が言語で変わるため、対訳表のキーを控えて言語切り替え時に引き直す
+    private string? _displayNameKey;
 
-    public string DisplayName { get; set; }
+    /// <summary>ツリーに表示する名前。言語切り替えで変わりうるため変更通知を出す。</summary>
+    public string DisplayName
+    {
+        get => _displayName;
+        set => SetProperty(ref _displayName, value);
+    }
 
     public string Path => _path;
 
@@ -90,7 +101,7 @@ public class FolderItemViewModel : ObservableObject
             HasSubFolders = true;
             _subFolders = new ObservableCollection<FolderItemViewModel>();
             var dummy = new FolderItemViewModel(string.Empty, null);
-            dummy.DisplayName = "読み込み中...";
+            dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
             _subFolders.Add(dummy);
         }
     }
@@ -121,7 +132,7 @@ public class FolderItemViewModel : ObservableObject
             _ => VirtualFolders.AllRootsPath
         };
         _isExcludedPath = null;
-        DisplayName = VirtualFolders.GetDisplayName(kind);
+        SetLocalizedDisplayName(VirtualFolders.GetDisplayNameKey(kind));
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
         _subFolders = children;
         _isLoaded = true;
@@ -201,5 +212,35 @@ public class FolderItemViewModel : ObservableObject
     {
         var displayName = System.IO.Path.GetFileName(path);
         return string.IsNullOrWhiteSpace(displayName) ? path : displayName;
+    }
+
+    /// <summary>対訳表のキーで表示名を設定する（言語切り替え時に引き直せるようキーを控える）。</summary>
+    private void SetLocalizedDisplayName(string key)
+    {
+        _displayNameKey = key;
+        DisplayName = UiText.Get(key);
+    }
+
+    /// <summary>
+    /// 言語切り替え後に、対訳表から引いている表示名（仮想ノード・読み込み中のダミー）を引き直す。
+    /// 実フォルダのノードはフォルダ名がそのまま表示名なので何もしない。
+    /// </summary>
+    public void RefreshLocalizedDisplayName()
+    {
+        if (_displayNameKey is { } key)
+        {
+            DisplayName = UiText.Get(key);
+        }
+
+        // 未展開のノードがぶら下げているダミー（「読み込み中...」）も辿って更新する
+        if (_subFolders is null)
+        {
+            return;
+        }
+
+        foreach (var subFolder in _subFolders)
+        {
+            subFolder.RefreshLocalizedDisplayName();
+        }
     }
 }

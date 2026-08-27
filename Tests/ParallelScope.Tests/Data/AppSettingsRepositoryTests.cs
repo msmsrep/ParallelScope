@@ -25,6 +25,7 @@ public class AppSettingsRepositoryTests
         Assert.Null(settings.ColumnOrder);
         Assert.Null(settings.ColumnWidths);
         Assert.Null(settings.Theme);
+        Assert.Null(settings.Language);
     }
 
     [Fact]
@@ -48,6 +49,7 @@ public class AppSettingsRepositoryTests
                 new FolderUsageEntry { Path = @"C:\Root\Fav", Count = 7, LastAccessedAt = new DateTime(2026, 5, 6, 7, 8, 9) }
             },
             Theme = nameof(AppThemeSetting.Dark),
+            Language = nameof(AppLanguageSetting.Japanese),
             DeveloperUnlockKey = "unlock"
         };
 
@@ -64,6 +66,7 @@ public class AppSettingsRepositoryTests
         Assert.True(loaded.CsvExportSizeInBytes);
         Assert.Equal(saved.FavoritePaths, loaded.FavoritePaths);
         Assert.Equal(nameof(AppThemeSetting.Dark), loaded.Theme);
+        Assert.Equal(nameof(AppLanguageSetting.Japanese), loaded.Language);
         Assert.Equal("unlock", loaded.DeveloperUnlockKey);
 
         var usage = Assert.Single(loaded.FolderUsages);

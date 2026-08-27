@@ -17,12 +17,14 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 - "All Files" mode: list every file under the current folder as one flat list
 - Double-click in the list to navigate into folders or open files with the default app
 - Color theme (System / Light / Dark)
+- Display language (System / English / Japanese; defaults to your Windows display language, available in the free version)
 - Plus features: "★ Favorites" and "🕒 Frequently Used" folders in the tree, file list column
   customization (which columns, their order, and their widths), and CSV export of the current list
 
 ## Release
 
 - Unreleased
+  - Added an English / Japanese display language setting (defaults to your Windows display language)
   - Added "★ Favorites" and "🕒 Frequently Used" nodes to the folder tree (Plus)
   - Added "Export CSV..." for the currently displayed list (Plus)
   - Reworked "Display Columns" so column order and widths are saved as well (Plus)
@@ -92,7 +94,7 @@ See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 It is saved in the folder under `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`.
 Saved data will also be deleted when the app is uninstalled.
 
-- `settings.json`: root/excluded folders, scan interval, theme, file list column layout, favorites, and folder access counts
+- `settings.json`: root/excluded folders, scan interval, theme, display language, file list column layout, favorites, and folder access counts
 - `ParallelScope.sqlite`: file list cache
 
 ## Development Notes
@@ -110,7 +112,7 @@ dotnet ef database update
 ### Main Structure
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: main window
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / display columns / theme / subscription / support)
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / display columns / theme / language / subscription / support)
 - `ViewModels/`: UI logic (`MainWindowViewModel` is split into partial classes by responsibility)
 - `Data/`: settings/cache/DbContext
 - `Utilities/`: shared helpers (path normalization, CSV export, column definitions, virtual folders, etc.)
