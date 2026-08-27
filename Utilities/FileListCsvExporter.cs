@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.IO;
 using System.Text;
 using ParallelScope.ViewModels;
@@ -6,7 +7,8 @@ namespace ParallelScope.Utilities;
 
 /// <summary>
 /// ファイル一覧の表示内容をCSVへ書き出す。
-/// 出力する列・行順・各値は画面の表示内容に合わせる（サイズや日時も表示中の文字列のまま出力する）。
+/// 出力する列・行順は画面の表示に合わせる。値も表示中の文字列のままだが、
+/// サイズだけは表計算ソフトで集計・並べ替えできるよう生のバイト数を選べる。
 /// </summary>
 public static class FileListCsvExporter
 {
@@ -19,10 +21,14 @@ public static class FileListCsvExporter
     /// <param name="filePath">出力先のファイルパス。</param>
     /// <param name="items">出力する行（画面の表示順のスナップショット）。</param>
     /// <param name="optionalColumns">Name以外に出力する列キー（<see cref="FileListColumns"/>）。</param>
+    /// <param name="sizeInBytes">
+    /// trueならSize列を生のバイト数（例: 12345678）で、falseなら表示中の文字列（例: 11.8 MB）で出力する。
+    /// </param>
     public static void Export(
         string filePath,
         IReadOnlyList<FileItemViewModel> items,
         IReadOnlyList<string> optionalColumns,
+        bool sizeInBytes,
         CancellationToken token = default)
     {
         using var writer = new StreamWriter(filePath, append: false, Utf8WithBom);
@@ -31,7 +37,9 @@ public static class FileListCsvExporter
         AppendField(builder, "Name", isFirst: true);
         foreach (var column in optionalColumns)
         {
-            AppendField(builder, column, isFirst: false);
+            // 単位付きの表示と区別できるよう、生バイト数のときは見出しにも単位を書く
+            var header = sizeInBytes && column == FileListColumns.Size ? "Size (bytes)" : column;
+            AppendField(builder, header, isFirst: false);
         }
 
         writer.WriteLine(builder);
@@ -44,7 +52,7 @@ public static class FileListCsvExporter
             AppendField(builder, item.Name, isFirst: true);
             foreach (var column in optionalColumns)
             {
-                AppendField(builder, GetColumnText(item, column), isFirst: false);
+                AppendField(builder, GetColumnText(item, column, sizeInBytes), isFirst: false);
             }
 
             writer.WriteLine(builder);
@@ -52,11 +60,14 @@ public static class FileListCsvExporter
     }
 
     // 表示中の列に対応する値を取り出す（表示用の文字列はViewModel側で生成される）
-    private static string GetColumnText(FileItemViewModel item, string column) => column switch
+    private static string GetColumnText(FileItemViewModel item, string column, bool sizeInBytes) => column switch
     {
         FileListColumns.Location => item.Location,
         FileListColumns.Type => item.TypeText,
-        FileListColumns.Size => item.SizeText,
+        // 生バイト数は桁区切りを付けず、ロケールに依存しない表記で出す（表計算ソフトが数値として読めるように）
+        FileListColumns.Size => sizeInBytes
+            ? item.SizeBytes?.ToString(CultureInfo.InvariantCulture) ?? string.Empty
+            : item.SizeText,
         FileListColumns.Modified => item.ModifiedTime,
         FileListColumns.Created => item.CreatedTime,
         FileListColumns.Attributes => item.AttributesText,

@@ -261,10 +261,12 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Size列の書式は保存ダイアログの「ファイルの種類」で選ばせる（選んだ書式は次回の既定になる）
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Title = "Export CSV",
-            Filter = "CSV file (*.csv)|*.csv|All files (*.*)|*.*",
+            Filter = "CSV - sizes as displayed (*.csv)|*.csv|CSV - sizes in bytes (*.csv)|*.csv",
+            FilterIndex = _viewModel.GetCsvExportSizeInBytes() ? 2 : 1,
             DefaultExt = ".csv",
             AddExtension = true,
             FileName = BuildCsvFileName()
@@ -277,13 +279,15 @@ public partial class MainWindow : Window
 
         var filePath = dialog.FileName;
         var columns = GetEffectiveVisibleColumns();
+        var sizeInBytes = dialog.FilterIndex == 2;
+        _viewModel.SetCsvExportSizeInBytes(sizeInBytes);
 
         Cursor = Cursors.Wait;
         try
         {
             // 数十万行になり得るため、書き出しはバックグラウンドで行う
             // （FileItemViewModelは取得済みのスナップショットを読むだけなのでUIスレッド外から触って問題ない）
-            await Task.Run(() => FileListCsvExporter.Export(filePath, items, columns));
+            await Task.Run(() => FileListCsvExporter.Export(filePath, items, columns, sizeInBytes));
 
             MessageBox.Show(
                 $"Exported {items.Count} item(s) to:\n{filePath}",

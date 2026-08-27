@@ -16,6 +16,7 @@ public partial class MainWindowViewModel
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
         _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
+        _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
@@ -45,6 +46,24 @@ public partial class MainWindowViewModel
     public IReadOnlyList<string> GetVisibleColumns()
     {
         return FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList();
+    }
+
+    /// <summary>CSV出力でSize列を生のバイト数で書き出す設定か（保存ダイアログの既定選択に使う）。</summary>
+    public bool GetCsvExportSizeInBytes()
+    {
+        return _csvExportSizeInBytes;
+    }
+
+    /// <summary>CSV出力のSize列の書式を記憶する（次回の保存ダイアログの既定選択になる）。</summary>
+    public void SetCsvExportSizeInBytes(bool sizeInBytes)
+    {
+        if (_csvExportSizeInBytes == sizeInBytes)
+        {
+            return;
+        }
+
+        _csvExportSizeInBytes = sizeInBytes;
+        SaveSettings(RootFolders.Select(x => x.Path));
     }
 
     /// <summary>settings.jsonに書かれた開発者専用のPlus解放キーを取得する（未設定ならnull）。</summary>
@@ -199,6 +218,7 @@ public partial class MainWindowViewModel
             FullScanIntervalHours = _fullScanIntervalHours,
             IsFlatFileViewEnabled = _isFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
+            CsvExportSizeInBytes = _csvExportSizeInBytes,
             Theme = _theme.ToString(),
             FavoritePaths = _favoritePaths.ToList(),
             FolderUsages = _folderUsages.Values.ToList(),

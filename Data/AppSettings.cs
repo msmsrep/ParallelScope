@@ -12,6 +12,9 @@ public sealed class AppSettings
     /// <summary>ファイル一覧に表示する列のキー一覧（FileListColumns参照）。nullは未設定＝デフォルト列を表示。</summary>
     public List<string>? VisibleColumns { get; set; }
 
+    /// <summary>CSV出力でSize列を生のバイト数で書き出すか（falseなら "11.8 MB" のような表示中の文字列）。</summary>
+    public bool CsvExportSizeInBytes { get; set; }
+
     /// <summary>お気に入りに登録されたフォルダのパス一覧（登録順）。</summary>
     public List<string> FavoritePaths { get; set; } = new();
 

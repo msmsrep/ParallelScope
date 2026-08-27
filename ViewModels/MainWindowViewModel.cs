@@ -69,6 +69,9 @@ public partial class MainWindowViewModel : ObservableObject
         return false;
     }
 
+    // CSV出力でSize列を生のバイト数で書き出すか（保存ダイアログのファイル種類で選ばれた前回の値）
+    private bool _csvExportSizeInBytes;
+
     // ファイル一覧に表示する列キー（FileListColumns参照。Name列は常時表示のため含まない）
     private HashSet<string> _visibleColumns = FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
