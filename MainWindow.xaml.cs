@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
     private bool _isFullScanRunning;
+    // 右クリックで押されたツリーノード（マウスを離す時点でカーソル直下が変わっても対象を保つため）
+    private TreeViewItem? _rightClickedTreeViewItem;
     // XAML定義の既定の列幅。設定画面の「Reset column widths」で戻すため、保存済み幅を反映する前に控えておく
     private readonly Dictionary<string, DataGridLength> _defaultFileListColumnWidths;
     public MainWindow()
@@ -511,31 +513,37 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 選択・フォーカスでツリーがスクロールすると、マウスを離す時点のカーソル直下が
+        // 別ノード（あるいは余白）になりうる。メニューの対象は押した時点のノードで固定する
+        _rightClickedTreeViewItem = treeViewItem;
+
         treeViewItem.IsSelected = true;
         treeViewItem.Focus();
     }
 
-    // 選択中のフォルダに対する「配下を全てスキャン」メニューを動的に構築する
-    private void FolderTreeItem_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    // 選択中のフォルダに対するコンテキストメニューを動的に構築して開く
+    private void FolderTreeView_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem } treeViewItem)
+        // 組み立てたメニューは自前で開く。WPFの自動表示に任せると、
+        // この時点ではまだ割り当てられていないため「1回目は出ず2回目で出る」ことがある
+        e.Handled = true;
+
+        // キーボード（アプリケーションキー）からの表示ではカーソル位置が-1で、直前の右クリック位置は無関係
+        var isKeyboardInvoked = e.CursorLeft < 0 && e.CursorTop < 0;
+        var treeViewItem = isKeyboardInvoked
+            ? GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)
+            : _rightClickedTreeViewItem;
+        _rightClickedTreeViewItem = null;
+
+        if (treeViewItem is not { DataContext: FolderItemViewModel folderItem })
         {
             return;
         }
 
-        // ContextMenuOpeningはバブリングするので祖先のTreeViewItemでも発火する。
-        // 右クリックされた最内側のノード以外は、e.Handledを触らずに抜けること
-        // （ここで打ち切ると内側のノードが構築したメニューの自動表示まで止まってしまう）
-        var sourceTreeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
-        if (!ReferenceEquals(sourceTreeViewItem, treeViewItem))
-        {
-            return;
-        }
-
-        // 仮想ノード（Folders / Favorites / Frequently Used）は実パスを持たず個別スキャンできないため、メニューを表示しない
+        // 仮想ノード（Folders / Favorites / Recent / Frequently Used）は実パスを持たず個別スキャンできないため、メニューを表示しない
         if (VirtualFolders.IsVirtual(folderItem.Path))
         {
-            e.Handled = true;
+            treeViewItem.ContextMenu = null;
             return;
         }
 
@@ -549,7 +557,8 @@ public partial class MainWindow : Window
 
         var contextMenu = new ContextMenu
         {
-            DataContext = folderItem
+            DataContext = folderItem,
+            PlacementTarget = treeViewItem
         };
         contextMenu.Items.Add(scanMenuItem);
 
@@ -568,7 +577,14 @@ public partial class MainWindow : Window
             contextMenu.Items.Add(favoriteMenuItem);
         }
 
+        if (isKeyboardInvoked)
+        {
+            contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        }
+
+        // テーマ・言語のリソースを引けるよう、開く前に論理ツリーへ繋いでおく
         treeViewItem.ContextMenu = contextMenu;
+        contextMenu.IsOpen = true;
     }
 
     // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える

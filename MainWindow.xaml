@@ -98,6 +98,7 @@
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
+                      ContextMenuOpening="FolderTreeView_ContextMenuOpening"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
                 <TreeView.ItemContainerStyle>
                     <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
@@ -117,7 +118,6 @@
                                 </ItemsPanelTemplate>
                             </Setter.Value>
                         </Setter>
-                        <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
