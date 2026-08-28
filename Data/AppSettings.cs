@@ -15,6 +15,12 @@ public sealed class AppSettings
     /// <summary>ファイル一覧の列の並び順（列キー。Nameを含む）。nullは未設定＝既定の並び順。</summary>
     public List<string>? ColumnOrder { get; set; }
 
+    /// <summary>ツリー最上位に表示するノードのキー一覧（TreeNodes参照）。nullは未設定＝既定のノードを表示。</summary>
+    public List<string>? VisibleTreeNodes { get; set; }
+
+    /// <summary>ツリー最上位のノードの並び順（ノードキー。常に表示のFoldersを含む）。nullは未設定＝既定の並び順。</summary>
+    public List<string>? TreeNodeOrder { get; set; }
+
     /// <summary>
     /// ファイル一覧の列幅（列キー→ピクセル幅）。
     /// 未収録の列は既定の幅で表示する（残り幅いっぱいのName列は、ユーザーが幅を変えるまで収録されない）。

@@ -37,6 +37,7 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Utilities/VirtualFoldersTests` | `VirtualFolders` | 仮想ノードの種類判定（大文字小文字を無視）、正規形、表示名（対訳表キーと、言語に追従した文字列）、実在パスと衝突しない文字を含むこと |
 | `Utilities/AppThemeTests` | `AppTheme.Parse` | 未設定・不正値をOS追従（System）へ丸めること。`Apply` は `Application` が要るため対象外 |
 | `Utilities/LocalizationTests` | `UiText` / `UiTextResources` / `AppLanguage` | 英日でキーとプレースホルダーが揃っていること、空文字の文言が無いこと、現在の言語での引き当てと未知キーのフォールバック、言語切り替え時のインデクサー変更通知、`Parse` の丸めと `CurrentUICulture` の切り替え |
+| `Utilities/TreeNodesTests` | `TreeNodes` | ノードキー定義の整合性（`AllNodes` = `OptionalNodes` + Folders、重複なし）、キーと `VirtualFolderKind` の相互変換、未購読時は1つも表示しないこと。キーは settings.json に保存されるため崩すと既存設定が壊れる |
 | `Utilities/FileListColumnsTests` | `FileListColumns` | 列キー定義の整合性（`AllColumns` = Name + `OptionalColumns`、重複なし）。キーは settings.json に保存されるため崩すと既存設定が壊れる |
 | `Utilities/SingleFlightCoalescerTests` | `SingleFlightCoalescer<T>` | 実行中のリクエストが最新1件へ統合されること、ハンドラが直列に走ること、ハンドラが例外を投げた後も後続を処理できること |
 | `Utilities/FileListCsvExporterTests` | `FileListCsvExporter` | 選択列どおりの見出し・行、生バイト出力時の `Size (bytes)` 見出し、RFC 4180のエスケープ（必要な場合だけ引用符で囲む）、UTF-8 BOM、キャンセル |
@@ -45,6 +46,7 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック |
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
 | `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
+| `ViewModels/TreeNodeSettingsTests` | ツリー最上位ノードの表示/非表示・並び順 | 既定値、非表示にしたノードがツリーから消えること、Foldersは全て隠しても残ること、並び替えの反映、表示中のノードを隠したときの退避、保存と復元、旧設定・未知キーの補完 |
 | `ViewModels/PlusFeatureGatingTests` | 無料版とPlusの機能分け | お気に入り・最近・よく使うノードのツリーへの出し入れ、非表示ノードからの退避、同じアクセス実績から「最近」（最終アクセス順）と「よく使う」（回数順）が別々に並ぶこと、購読が切れても保存済みデータを消さないこと、列カスタマイズの既定列へのフォールバック |
 
 ## テストを書くときの決まりごと

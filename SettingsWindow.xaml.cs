@@ -16,6 +16,8 @@ public partial class SettingsWindow : Window
     private readonly ObservableCollection<string> _excludedPaths;
     // ファイル一覧の列（Nameを含む）。一覧の並びがそのまま列の並び順になる
     private readonly ObservableCollection<ColumnOptionViewModel> _columnOptions;
+    // ツリー最上位のノード（常に表示のFoldersを含む）。一覧の並びがそのままツリーの並び順になる
+    private readonly ObservableCollection<ColumnOptionViewModel> _treeNodeOptions;
     private readonly StoreLicenseService _storeLicenseService;
     // テーマ・言語はSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
     private readonly Action<AppThemeSetting> _applyTheme;
@@ -41,6 +43,17 @@ public partial class SettingsWindow : Window
     public IReadOnlyList<string> ResultColumnOrder =>
         _columnOptions.Select(option => option.Key).ToList();
 
+    /// <summary>チェックされたツリー最上位ノードのキー一覧（常に表示のFoldersは含まない）。</summary>
+    public IReadOnlyList<string> ResultVisibleTreeNodes =>
+        _treeNodeOptions
+            .Where(option => option.CanToggleVisibility && option.IsVisible)
+            .Select(option => option.Key)
+            .ToList();
+
+    /// <summary>ツリー最上位のノードの並び順（Foldersを含む全てのノードキー）。</summary>
+    public IReadOnlyList<string> ResultTreeNodeOrder =>
+        _treeNodeOptions.Select(option => option.Key).ToList();
+
     // 設定画面に出す列名の対訳表キー。ファイル一覧のヘッダーだけでは分かりにくい列は補足付きの専用キーを使う
     private static readonly Dictionary<string, string> ColumnDisplayNameKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -53,6 +66,15 @@ public partial class SettingsWindow : Window
         [FileListColumns.Attributes] = "Settings.Column.Attributes"
     };
 
+    // 設定画面に出すツリー最上位ノードの名前。ツリー上の表示名（絵文字つき）をそのまま使い、
+    // 非表示にできないFoldersだけ補足を付ける
+    private static string GetTreeNodeDisplayNameKey(string nodeKey)
+    {
+        return string.Equals(nodeKey, TreeNodes.AllRoots, StringComparison.OrdinalIgnoreCase)
+            ? "Settings.TreeNode.AllRoots"
+            : TreeNodes.GetDisplayNameKey(nodeKey);
+    }
+
     // 現在の設定値でダイアログの初期状態を構築する
     public SettingsWindow(
         IEnumerable<string> currentRootPaths,
@@ -60,6 +82,8 @@ public partial class SettingsWindow : Window
         int currentFullScanIntervalHours,
         IEnumerable<string> currentVisibleColumns,
         IEnumerable<string> currentColumnOrder,
+        IEnumerable<string> currentVisibleTreeNodes,
+        IEnumerable<string> currentTreeNodeOrder,
         AppThemeSetting currentTheme,
         Action<AppThemeSetting> applyTheme,
         AppLanguageSetting currentLanguage,
@@ -113,12 +137,17 @@ public partial class SettingsWindow : Window
             BuildColumnOptions(currentColumnOrder, currentVisibleColumns));
 
         ColumnOrderListBox.ItemsSource = _columnOptions;
+
+        _treeNodeOptions = new ObservableCollection<ColumnOptionViewModel>(
+            BuildTreeNodeOptions(currentTreeNodeOrder, currentVisibleTreeNodes));
+
+        TreeNodeOrderListBox.ItemsSource = _treeNodeOptions;
     }
 
     // 言語切り替え時、XAMLのバインディングでは追従しない箇所を貼り替える
     private void AppLanguage_Changed(object? sender, EventArgs e)
     {
-        foreach (var option in _columnOptions)
+        foreach (var option in _columnOptions.Concat(_treeNodeOptions))
         {
             option.RefreshDisplayName();
         }
@@ -141,23 +170,50 @@ public partial class SettingsWindow : Window
             canToggleVisibility: column != FileListColumns.Name));
     }
 
+    // 指定された並び順・表示ノードから一覧の項目を組み立てる
+    private static IEnumerable<ColumnOptionViewModel> BuildTreeNodeOptions(
+        IEnumerable<string> treeNodeOrder,
+        IEnumerable<string> visibleTreeNodes)
+    {
+        var visibleNodeSet = visibleTreeNodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return OrderTreeNodes(treeNodeOrder).Select(node => new ColumnOptionViewModel(
+            node,
+            GetTreeNodeDisplayNameKey(node),
+            // Foldersは常に表示（全て隠すとツリーが空になるため）。チェック済み・操作不可で出す
+            isVisible: string.Equals(node, TreeNodes.AllRoots, StringComparison.OrdinalIgnoreCase) || visibleNodeSet.Contains(node),
+            canToggleVisibility: !string.Equals(node, TreeNodes.AllRoots, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>指定された並び順に沿って全てのツリーノードを並べる（未知のキー・重複を除き、欠けたノードは既定の順で末尾に補う）。</summary>
+    private static IEnumerable<string> OrderTreeNodes(IEnumerable<string> treeNodeOrder)
+    {
+        return OrderKeys(treeNodeOrder, TreeNodes.AllNodes);
+    }
+
     /// <summary>指定された並び順に沿って全ての列を並べる（未知のキー・重複を除き、欠けた列は既定の順で末尾に補う）。</summary>
     private static IEnumerable<string> OrderColumns(IEnumerable<string> columnOrder)
     {
+        return OrderKeys(columnOrder, FileListColumns.AllColumns);
+    }
+
+    // 指定された並び順を既知のキーだけに整える。未知のキー・重複は落とし、欠けたキーは既定の順で末尾に補う
+    private static IEnumerable<string> OrderKeys(IEnumerable<string> order, IReadOnlyList<string> allKeys)
+    {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var column in columnOrder)
+        foreach (var key in order)
         {
-            var known = FileListColumns.AllColumns.FirstOrDefault(x => string.Equals(x, column, StringComparison.OrdinalIgnoreCase));
+            var known = allKeys.FirstOrDefault(x => string.Equals(x, key, StringComparison.OrdinalIgnoreCase));
             if (known is not null && seen.Add(known))
             {
                 yield return known;
             }
         }
 
-        foreach (var column in FileListColumns.AllColumns.Where(column => !seen.Contains(column)))
+        foreach (var key in allKeys.Where(key => !seen.Contains(key)))
         {
-            yield return column;
+            yield return key;
         }
     }
 
@@ -175,16 +231,33 @@ public partial class SettingsWindow : Window
 
     private void MoveSelectedColumn(int offset)
     {
-        var index = ColumnOrderListBox.SelectedIndex;
+        MoveSelectedItem(ColumnOrderListBox, _columnOptions, offset);
+    }
+
+    // 選択中のツリーノードを1つ上へ移動する
+    private void MoveTreeNodeUpButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedItem(TreeNodeOrderListBox, _treeNodeOptions, -1);
+    }
+
+    // 選択中のツリーノードを1つ下へ移動する
+    private void MoveTreeNodeDownButton_Click(object sender, RoutedEventArgs e)
+    {
+        MoveSelectedItem(TreeNodeOrderListBox, _treeNodeOptions, 1);
+    }
+
+    private static void MoveSelectedItem(ListBox listBox, ObservableCollection<ColumnOptionViewModel> options, int offset)
+    {
+        var index = listBox.SelectedIndex;
         var newIndex = index + offset;
-        if (index < 0 || newIndex < 0 || newIndex >= _columnOptions.Count)
+        if (index < 0 || newIndex < 0 || newIndex >= options.Count)
         {
             return;
         }
 
-        _columnOptions.Move(index, newIndex);
-        ColumnOrderListBox.SelectedIndex = newIndex;
-        ColumnOrderListBox.ScrollIntoView(ColumnOrderListBox.SelectedItem);
+        options.Move(index, newIndex);
+        listBox.SelectedIndex = newIndex;
+        listBox.ScrollIntoView(listBox.SelectedItem);
     }
 
     // 表示列・並び順・列幅をまとめて既定に戻す。表示列と並び順はその場で一覧へ反映し、
@@ -202,6 +275,18 @@ public partial class SettingsWindow : Window
         ResetColumnsHintTextBlock.Visibility = Visibility.Visible;
     }
 
+    // 表示するツリーノードと並び順を既定に戻す。Saveで確定する（Cancelで閉じれば取り消せる）
+    private void ResetTreeNodesButton_Click(object sender, RoutedEventArgs e)
+    {
+        _treeNodeOptions.Clear();
+        foreach (var option in BuildTreeNodeOptions(TreeNodes.AllNodes, TreeNodes.DefaultVisibleNodes))
+        {
+            _treeNodeOptions.Add(option);
+        }
+
+        ResetTreeNodesHintTextBlock.Visibility = Visibility.Visible;
+    }
+
     // Plusの購読状態をDisplay Columns/Subscriptionページへ反映する。
     // 未購読時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
     private void ApplyPlusLicenseState()
@@ -209,6 +294,8 @@ public partial class SettingsWindow : Window
         var isActive = _storeLicenseService.IsPlusActive;
         ColumnCheckBoxesPanel.IsEnabled = isActive;
         PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        TreeNodeCheckBoxesPanel.IsEnabled = isActive;
+        TreeNodesPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
 
         // Subscriptionページ: 購読済みなら状態表示のみ、未購読なら購入ボタンを表示する
         PlusActiveTextBlock.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
@@ -279,7 +366,7 @@ public partial class SettingsWindow : Window
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null || ThemePanel is null
+        if (RootSettingsPanel is null || ColumnSettingsPanel is null || TreeNodeSettingsPanel is null || ThemePanel is null
             || LanguagePanel is null || SubscriptionPanel is null || SupportPanel is null)
         {
             return;
@@ -287,20 +374,22 @@ public partial class SettingsWindow : Window
 
         var selectedMenuItem = SettingsMenuListBox.SelectedItem;
         var showColumns = ReferenceEquals(selectedMenuItem, ColumnsMenuItem);
+        var showTreeNodes = ReferenceEquals(selectedMenuItem, TreeNodesMenuItem);
         var showTheme = ReferenceEquals(selectedMenuItem, ThemeMenuItem);
         var showLanguage = ReferenceEquals(selectedMenuItem, LanguageMenuItem);
         var showSubscription = ReferenceEquals(selectedMenuItem, SubscriptionMenuItem);
         var showSupport = ReferenceEquals(selectedMenuItem, SupportMenuItem);
-        var showRoot = !showColumns && !showTheme && !showLanguage && !showSubscription && !showSupport;
+        var showRoot = !showColumns && !showTreeNodes && !showTheme && !showLanguage && !showSubscription && !showSupport;
         RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
+        TreeNodeSettingsPanel.Visibility = showTreeNodes ? Visibility.Visible : Visibility.Collapsed;
         ThemePanel.Visibility = showTheme ? Visibility.Visible : Visibility.Collapsed;
         LanguagePanel.Visibility = showLanguage ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
         SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
         SaveAndFullScanButton.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         // Theme/Language/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、Save/Cancelボタンも非表示にする
-        var hasSaveTarget = showRoot || showColumns;
+        var hasSaveTarget = showRoot || showColumns || showTreeNodes;
         SaveButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
         CancelButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
     }

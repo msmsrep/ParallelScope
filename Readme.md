@@ -18,12 +18,13 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 - Double-click in the list to navigate into folders or open files with the default app
 - Color theme (System / Light / Dark)
 - Display language (System / English / Japanese; defaults to your Windows display language, available in the free version)
-- Plus features: "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" folders in the tree, file list column
+- Plus features: "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" folders in the tree (which of them to show and in what order), file list column
   customization (which columns, their order, and their widths), and CSV export of the current list
 
 ## Release
 
 - Unreleased
+  - Added a "Folder Tree" settings page to show/hide and reorder the top-level tree nodes (Plus)
   - Added a "🕘 Recent" node to the folder tree (Plus)
   - Added an English / Japanese display language setting (defaults to your Windows display language)
   - Added "★ Favorites" and "🕒 Frequently Used" nodes to the folder tree (Plus)
@@ -95,7 +96,7 @@ See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 It is saved in the folder under `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`.
 Saved data will also be deleted when the app is uninstalled.
 
-- `settings.json`: root/excluded folders, scan interval, theme, display language, file list column layout, favorites, and folder access counts
+- `settings.json`: root/excluded folders, scan interval, theme, display language, tree node layout, file list column layout, favorites, and folder access counts
 - `ParallelScope.sqlite`: file list cache
 
 ## Development Notes
@@ -113,7 +114,7 @@ dotnet ef database update
 ### Main Structure
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: main window
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / display columns / theme / language / subscription / support)
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / folder tree / display columns / theme / language / subscription / support)
 - `ViewModels/`: UI logic (`MainWindowViewModel` is split into partial classes by responsibility)
 - `Data/`: settings/cache/DbContext
 - `Utilities/`: shared helpers (path normalization, CSV export, column definitions, virtual folders, etc.)
@@ -127,7 +128,7 @@ dotnet ef database update
 Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
 
 - **Plus features**:
-  - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree (hidden entirely without a subscription)
+  - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree, and "Folder Tree" in the settings window for choosing which of them to show and in what order (hidden entirely without a subscription)
   - "Display Columns" in the settings window (which columns the file list shows, their order, and their widths)
   - "Menu > Export CSV..." (exporting the displayed list)
 - All other features remain free without a subscription. Locked features are either shown grayed out with only their controls disabled, or offer to open the Subscription page when used

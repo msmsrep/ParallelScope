@@ -18,12 +18,13 @@ WPF で UI を構築し、ローカル SQLite キャッシュを使って表示�
 - 一覧のダブルクリックでフォルダ移動/ファイルを既定アプリで起動
 - 配色テーマ（System / Light / Dark）
 - 表示言語（System / English / 日本語。既定はWindowsの表示言語に追従。無料版でも利用可）
-- Plus機能: ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」、ファイル一覧の列カスタマイズ
+- Plus機能: ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（表示するノードと並び順を選択可）、ファイル一覧の列カスタマイズ
   （表示列・並び順・列幅）、表示中の一覧のCSV出力
 
 ## リリース
 
 - 未リリース
+  - 設定に「フォルダツリー」ページを追加し、ツリー最上位のノードの表示/非表示と並び順を変更できるように（Plus機能）
   - ツリーに「🕘 Recent」（最近開いたフォルダー）を追加（Plus機能）
   - 英語/日本語の表示言語切り替えを追加（既定はWindowsの表示言語に追従）
   - ツリーに「★ Favorites」「🕒 Frequently Used」を追加（Plus機能）
@@ -95,7 +96,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
 `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`以下のフォルダへ保存します。
 アプリのアンインストール時に保存されたデータも削除されます。
 
-- `settings.json`: ルート/除外フォルダ・スキャン間隔・テーマ・表示言語・ファイル一覧の列レイアウト・お気に入り・フォルダごとのアクセス回数
+- `settings.json`: ルート/除外フォルダ・スキャン間隔・テーマ・表示言語・ツリー最上位ノードのレイアウト・ファイル一覧の列レイアウト・お気に入り・フォルダごとのアクセス回数
 - `ParallelScope.sqlite`: ファイル一覧キャッシュ
 
 ## 開発メモ
@@ -113,7 +114,7 @@ dotnet ef database update
 ### 主な構成
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/表示列/テーマ/言語/購読/支援）
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/フォルダツリー/表示列/テーマ/言語/購読/支援）
 - `ViewModels/`: 画面ロジック（`MainWindowViewModel` は責務ごとにpartialクラスへ分割）
 - `Data/`: 設定/キャッシュ/DbContext
 - `Utilities/`: 共通ユーティリティ（パス正規化・CSV出力・列定義・仮想フォルダなど）
@@ -127,7 +128,7 @@ dotnet ef database update
 一部の機能は、Microsoft Store のアドオン「ParallelScope Plus」（月額サブスクリプション）として提供しています。
 
 - **対象機能**:
-  - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（未購読の間はツリーに表示されません）
+  - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」と、その表示/非表示・並び順を選ぶ設定画面の「フォルダツリー」ページ（未購読の間はツリーに表示されません）
   - 設定画面の「Display Columns」（ファイル一覧の表示列・並び順・列幅のカスタマイズ）
   - 「Menu > Export CSV...」（表示中の一覧のCSV出力）
 - 未購読でも、その他のすべての機能は引き続き無料で利用できます。対象機能は設定画面に薄字で表示されて操作のみ制限されるか、実行時に購読ページへの案内が表示されます

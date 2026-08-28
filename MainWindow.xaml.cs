@@ -305,6 +305,8 @@ public partial class MainWindow : Window
             _viewModel.GetFullScanIntervalHours(),
             _viewModel.GetVisibleColumns(),
             _viewModel.GetColumnOrder(),
+            _viewModel.GetVisibleTreeNodes(),
+            _viewModel.GetTreeNodeOrder(),
             _viewModel.GetTheme(),
             _viewModel.ApplyTheme,
             _viewModel.GetLanguage(),
@@ -330,7 +332,9 @@ public partial class MainWindow : Window
             dialog.ResultExcludedPaths,
             dialog.ResultFullScanIntervalHours,
             dialog.ResultVisibleColumns,
-            dialog.ResultColumnOrder);
+            dialog.ResultColumnOrder,
+            dialog.ResultVisibleTreeNodes,
+            dialog.ResultTreeNodeOrder);
         // 保存済み幅を消してから並び順・列幅を反映し直す（消し忘れると直後のApplyで元の幅に戻ってしまう）
         if (dialog.ShouldResetColumnWidths)
         {

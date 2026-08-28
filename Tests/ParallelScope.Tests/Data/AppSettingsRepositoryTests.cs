@@ -26,6 +26,8 @@ public class AppSettingsRepositoryTests
         Assert.Null(settings.ColumnWidths);
         Assert.Null(settings.Theme);
         Assert.Null(settings.Language);
+        Assert.Null(settings.VisibleTreeNodes);
+        Assert.Null(settings.TreeNodeOrder);
     }
 
     [Fact]
@@ -41,6 +43,8 @@ public class AppSettingsRepositoryTests
             IsFlatFileViewEnabled = true,
             VisibleColumns = new List<string> { FileListColumns.Size, FileListColumns.Modified },
             ColumnOrder = new List<string> { FileListColumns.Name, FileListColumns.Size },
+            VisibleTreeNodes = new List<string> { TreeNodes.Recent },
+            TreeNodeOrder = new List<string> { TreeNodes.AllRoots, TreeNodes.Recent },
             ColumnWidths = new Dictionary<string, double> { [FileListColumns.Size] = 120.5 },
             CsvExportSizeInBytes = true,
             FavoritePaths = { @"C:\Root\Fav" },
@@ -62,6 +66,8 @@ public class AppSettingsRepositoryTests
         Assert.True(loaded.IsFlatFileViewEnabled);
         Assert.Equal(saved.VisibleColumns, loaded.VisibleColumns);
         Assert.Equal(saved.ColumnOrder, loaded.ColumnOrder);
+        Assert.Equal(saved.VisibleTreeNodes, loaded.VisibleTreeNodes);
+        Assert.Equal(saved.TreeNodeOrder, loaded.TreeNodeOrder);
         Assert.Equal(120.5, loaded.ColumnWidths![FileListColumns.Size]);
         Assert.True(loaded.CsvExportSizeInBytes);
         Assert.Equal(saved.FavoritePaths, loaded.FavoritePaths);
@@ -123,5 +129,6 @@ public class AppSettingsRepositoryTests
         Assert.Equal(new[] { @"C:\Root" }, settings.RootPaths);
         Assert.Equal(AppSettings.DefaultFullScanIntervalHours, settings.FullScanIntervalHours);
         Assert.Null(settings.VisibleColumns);
+        Assert.Null(settings.VisibleTreeNodes);
     }
 }

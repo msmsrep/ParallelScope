@@ -85,6 +85,7 @@ internal static class UiTextResources
         // 設定画面: 左メニュー
         ["Settings.Menu.RootFolders"] = "Root Folders",
         ["Settings.Menu.Columns"] = "Display Columns",
+        ["Settings.Menu.TreeNodes"] = "Folder Tree",
         ["Settings.Menu.Theme"] = "Theme",
         ["Settings.Menu.Language"] = "Language",
         ["Settings.Menu.Subscription"] = "Subscription",
@@ -112,6 +113,15 @@ internal static class UiTextResources
         ["Settings.Column.Name"] = "Name (always shown)",
         ["Settings.Column.Location"] = "Location (parent folder path)",
         ["Settings.Column.Attributes"] = "Attributes (R/H/S/A)",
+
+        // 設定画面: ツリー最上位のノード
+        ["Settings.TreeNodes.Header"] = "Folder Tree",
+        ["Settings.TreeNodes.PlusUpsell"] = "Customizing the top-level tree nodes is a Plus feature. Subscribe to unlock it.",
+        ["Settings.TreeNodes.Description"] = "Select the shortcut nodes to show at the top of the folder tree, and put them in the order you want.",
+        ["Settings.TreeNodes.Note"] = "The Folders node is always shown, but you can move it. \"Recent\" and \"Frequently Used\" are both built from the folders you open; hiding one does not stop the other from filling up.",
+        ["Settings.TreeNodes.Reset"] = "Reset the tree nodes to defaults",
+        ["Settings.TreeNodes.ResetHint"] = "The selected nodes and their order are back to the defaults. They are applied when you save.",
+        ["Settings.TreeNode.AllRoots"] = "Folders (always shown)",
 
         // 設定画面: 配色テーマ
         ["Settings.Theme.Header"] = "Theme",
@@ -230,6 +240,7 @@ internal static class UiTextResources
         // 設定画面: 左メニュー
         ["Settings.Menu.RootFolders"] = "ルートフォルダー",
         ["Settings.Menu.Columns"] = "表示する列",
+        ["Settings.Menu.TreeNodes"] = "フォルダツリー",
         ["Settings.Menu.Theme"] = "配色テーマ",
         ["Settings.Menu.Language"] = "言語",
         ["Settings.Menu.Subscription"] = "サブスクリプション",
@@ -257,6 +268,15 @@ internal static class UiTextResources
         ["Settings.Column.Name"] = "名前（常に表示）",
         ["Settings.Column.Location"] = "場所（親フォルダーのパス）",
         ["Settings.Column.Attributes"] = "属性（R/H/S/A）",
+
+        // 設定画面: ツリー最上位のノード
+        ["Settings.TreeNodes.Header"] = "フォルダツリー",
+        ["Settings.TreeNodes.PlusUpsell"] = "ツリー最上位のノードのカスタマイズは Plus の機能です。サブスクリプションに登録すると使えます。",
+        ["Settings.TreeNodes.Description"] = "フォルダツリーの最上位に表示するショートカットのノードを選び、好きな順番に並べ替えられます。",
+        ["Settings.TreeNodes.Note"] = "「Folders」は常に表示されますが、位置は入れ替えられます。「Recent」と「Frequently Used」はどちらも開いたフォルダの記録から作られるので、片方を非表示にしてももう片方には並び続けます。",
+        ["Settings.TreeNodes.Reset"] = "ツリーのノードを既定に戻す",
+        ["Settings.TreeNodes.ResetHint"] = "表示するノードと並び順を既定に戻しました。保存すると反映されます。",
+        ["Settings.TreeNode.AllRoots"] = "Folders（常に表示）",
 
         // 設定画面: 配色テーマ
         ["Settings.Theme.Header"] = "配色テーマ",

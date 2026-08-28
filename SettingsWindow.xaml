@@ -24,6 +24,7 @@
                 <ListBox Name="SettingsMenuListBox" BorderThickness="0" Background="Transparent"
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
                     <ListBoxItem Name="RootFoldersMenuItem" Content="{loc:Loc Settings.Menu.RootFolders}" IsSelected="True" Padding="8,6"/>
+                    <ListBoxItem Name="TreeNodesMenuItem" Content="{loc:Loc Settings.Menu.TreeNodes}" Padding="8,6"/>
                     <ListBoxItem Name="ColumnsMenuItem" Content="{loc:Loc Settings.Menu.Columns}" Padding="8,6"/>
                     <ListBoxItem Name="ThemeMenuItem" Content="{loc:Loc Settings.Menu.Theme}" Padding="8,6"/>
                     <ListBoxItem Name="LanguageMenuItem" Content="{loc:Loc Settings.Menu.Language}" Padding="8,6"/>
@@ -101,6 +102,67 @@
                         <Button Grid.Column="1" Content="{loc:Loc Common.Add}" MinWidth="72" Padding="8,0" Margin="8,0,0,0" Click="AddExcludedPathButton_Click"/>
                         <Button Grid.Column="2" Content="{loc:Loc Common.Remove}" MinWidth="72" Padding="8,0" Margin="8,0,0,0" Click="RemoveExcludedPathButton_Click"/>
                     </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 右側: フォルダツリー最上位のノードのカスタマイズのページ -->
+            <Grid Grid.Column="1" Name="TreeNodeSettingsPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{loc:Loc Settings.TreeNodes.Header}" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
+                <Border Grid.Row="1" Name="TreeNodesPlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="{loc:Loc Settings.TreeNodes.PlusUpsell}"/>
+                        <Button Name="GoToSubscriptionFromTreeNodesButton" Content="{loc:Loc Settings.GoToSubscription}" HorizontalAlignment="Left"
+                                Padding="8,6" Click="GoToSubscriptionButton_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
+                <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                    <StackPanel Name="TreeNodeCheckBoxesPanel">
+                        <TextBlock Text="{loc:Loc Settings.TreeNodes.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                        <TextBlock Text="{loc:Loc Settings.TreeNodes.Note}"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 並びがそのままツリー最上位の並び順になる（項目は表示列と同じ ColumnOptionViewModel） -->
+                            <ListBox Grid.Column="0" Name="TreeNodeOrderListBox" Height="160">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Content="{Binding DisplayName}"
+                                                  IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                  IsEnabled="{Binding CanToggleVisibility}"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top">
+                                <Button Content="{loc:Loc Common.Up}" MinWidth="80" Padding="8,6" Click="MoveTreeNodeUpButton_Click"/>
+                                <Button Content="{loc:Loc Common.Down}" MinWidth="80" Margin="0,8,0,0" Padding="8,6" Click="MoveTreeNodeDownButton_Click"/>
+                            </StackPanel>
+                        </Grid>
+
+                        <Button Name="ResetTreeNodesButton" Content="{loc:Loc Settings.TreeNodes.Reset}" HorizontalAlignment="Left"
+                                Margin="0,12,0,0" Padding="8,6" Click="ResetTreeNodesButton_Click"/>
+                        <TextBlock Name="ResetTreeNodesHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
+                                   Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   Text="{loc:Loc Settings.TreeNodes.ResetHint}"/>
+                    </StackPanel>
                 </Border>
             </Grid>
 

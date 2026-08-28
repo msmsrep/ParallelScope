@@ -22,6 +22,8 @@ public partial class MainWindowViewModel
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
         _language = AppLanguage.Parse(settings.Language);
+        _visibleTreeNodes = NormalizeVisibleTreeNodes(settings.VisibleTreeNodes);
+        _treeNodeOrder = NormalizeTreeNodeOrder(settings.TreeNodeOrder);
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
         LoadFavoritesAndUsage(settings);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
@@ -183,12 +185,19 @@ public partial class MainWindowViewModel
         IEnumerable<string> excludedPaths,
         int fullScanIntervalHours,
         IEnumerable<string>? visibleColumns,
-        IEnumerable<string>? columnOrder)
+        IEnumerable<string>? columnOrder,
+        IEnumerable<string>? visibleTreeNodes,
+        IEnumerable<string>? treeNodeOrder)
     {
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
         _columnOrder = NormalizeColumnOrder(columnOrder?.ToList());
+        _visibleTreeNodes = NormalizeVisibleTreeNodes(visibleTreeNodes?.ToList());
+        _treeNodeOrder = NormalizeTreeNodeOrder(treeNodeOrder?.ToList());
+        // ルートの反映（＝設定ファイルへの保存）より先にツリーを組み直す。
+        // 非表示にしたノードを開いていた場合はここで「Folders」へ退避される
+        RebuildTreeRoots();
         ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
     }
 
@@ -308,10 +317,55 @@ public partial class MainWindowViewModel
             CsvExportSizeInBytes = _csvExportSizeInBytes,
             Theme = _theme.ToString(),
             Language = _language.ToString(),
+            VisibleTreeNodes = _treeNodeOrder.Where(_visibleTreeNodes.Contains).ToList(),
+            TreeNodeOrder = _treeNodeOrder.ToList(),
             FavoritePaths = _favoritePaths.ToList(),
             FolderUsages = _folderUsages.Values.ToList(),
             DeveloperUnlockKey = _developerUnlockKey
         });
+    }
+
+    /// <summary>
+    /// 表示するツリーノードのキーを既知のノードに絞り込んで正規化する。null（設定ファイルに項目が無い
+    /// ＝旧バージョンからの移行時）は既定（全て表示）を返す。空リストは「Folders以外を全て非表示」として尊重する。
+    /// </summary>
+    private static HashSet<string> NormalizeVisibleTreeNodes(IReadOnlyCollection<string>? visibleTreeNodes)
+    {
+        if (visibleTreeNodes is null)
+        {
+            return TreeNodes.DefaultVisibleNodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
+
+        return TreeNodes.OptionalNodes
+            .Where(node => visibleTreeNodes.Contains(node, StringComparer.OrdinalIgnoreCase))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// ツリー最上位のノードの並び順を正規化する。未知のキー・重複を除き、指定に無いノードは
+    /// 既定の並び順で末尾に補う（設定ファイルが古いバージョンで書かれていてノードが増えている場合など）。
+    /// </summary>
+    private static List<string> NormalizeTreeNodeOrder(IReadOnlyCollection<string>? treeNodeOrder)
+    {
+        if (treeNodeOrder is null)
+        {
+            return TreeNodes.AllNodes.ToList();
+        }
+
+        var normalized = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in treeNodeOrder)
+        {
+            var known = TreeNodes.AllNodes.FirstOrDefault(x => string.Equals(x, node, StringComparison.OrdinalIgnoreCase));
+            if (known is not null && seen.Add(known))
+            {
+                normalized.Add(known);
+            }
+        }
+
+        normalized.AddRange(TreeNodes.AllNodes.Where(node => !seen.Contains(node)));
+        return normalized;
     }
 
     /// <summary>
