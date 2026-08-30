@@ -50,10 +50,10 @@ public partial class MainWindowViewModel
     private void InitializeTreeNodes()
     {
         AllRootsNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.AllRoots, _rootFolders, isExpanded: true);
-        // お気に入り・最近・よく使うは件数が少なく一覧性が高いので、最初から展開しておく
-        _favoritesNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Favorites, _favoriteFolders, isExpanded: true);
-        _frequentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Frequent, _frequentFolders, isExpanded: true);
-        _recentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Recent, _recentFolders, isExpanded: true);
+        // お気に入り・最近・よく使うは、ルートフォルダの一覧（Folders）を見渡しやすくするため既定では閉じておく
+        _favoritesNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Favorites, _favoriteFolders, isExpanded: false);
+        _frequentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Frequent, _frequentFolders, isExpanded: false);
+        _recentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Recent, _recentFolders, isExpanded: false);
 
         RebuildTreeRoots();
     }
