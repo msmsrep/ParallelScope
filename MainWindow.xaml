@@ -128,7 +128,31 @@
                         <!-- ToolTipTextは、同名フォルダが並びうるお気に入り／よく使い配下のノードのみ値を持つ
                              （nullの通常ノードではツールチップ自体が出ない） -->
                         <StackPanel Orientation="Horizontal" ToolTip="{Binding ToolTipText}">
-                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
+                            <!-- 仮想ノード（Favorites等）はフォルダアイコンの代わりに記号を出す。
+                                 IconSource と GlyphIcon はどちらか一方だけが値を持つ -->
+                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0">
+                                <Image.Style>
+                                    <Style TargetType="Image">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IconSource}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Image.Style>
+                            </Image>
+                            <TextBlock Text="{Binding GlyphIcon}" Width="16" Margin="0,0,6,0"
+                                       TextAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GlyphIcon}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <TextBlock Style="{StaticResource ScanningIndicatorStyle}">
                                 <TextBlock.RenderTransform>
                                     <RotateTransform Angle="0"/>

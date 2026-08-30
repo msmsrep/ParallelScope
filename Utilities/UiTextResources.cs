@@ -38,9 +38,9 @@ internal static class UiTextResources
 
         // フォルダツリーの仮想ノード
         ["Tree.Folders"] = "Folders",
-        ["Tree.Favorites"] = "★ Favorites",
-        ["Tree.Frequent"] = "🕒 Frequently Used",
-        ["Tree.Recent"] = "🕘 Recent",
+        ["Tree.Favorites"] = "Favorites",
+        ["Tree.Frequent"] = "Frequently Used",
+        ["Tree.Recent"] = "Recent",
         ["Tree.Loading"] = "Loading...",
 
         // メインウィンドウのメッセージ
@@ -193,9 +193,9 @@ internal static class UiTextResources
 
         // フォルダツリーの仮想ノード
         ["Tree.Folders"] = "フォルダー",
-        ["Tree.Favorites"] = "★ お気に入り",
-        ["Tree.Frequent"] = "🕒 よく使うフォルダー",
-        ["Tree.Recent"] = "🕘 最近開いたフォルダー",
+        ["Tree.Favorites"] = "お気に入り",
+        ["Tree.Frequent"] = "よく使うフォルダー",
+        ["Tree.Recent"] = "最近開いたフォルダー",
         ["Tree.Loading"] = "読み込み中...",
 
         // メインウィンドウのメッセージ

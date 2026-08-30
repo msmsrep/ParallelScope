@@ -60,13 +60,31 @@ public class VirtualFoldersTests
     {
         using (new LanguageScope(AppLanguageSetting.English))
         {
-            Assert.Equal("★ Favorites", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
+            Assert.Equal("Favorites", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
         }
 
         using (new LanguageScope(AppLanguageSetting.Japanese))
         {
-            Assert.Equal("★ お気に入り", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
+            Assert.Equal("お気に入り", VirtualFolders.GetDisplayName(VirtualFolderKind.Favorites));
         }
+    }
+
+    [Theory]
+    [InlineData(VirtualFolderKind.Favorites, "★")]
+    [InlineData(VirtualFolderKind.Frequent, "🕒")]
+    [InlineData(VirtualFolderKind.Recent, "🕘")]
+    public void GetGlyph_ReturnsTheNodeSymbol(VirtualFolderKind kind, string expected)
+    {
+        Assert.Equal(expected, VirtualFolders.GetGlyph(kind));
+    }
+
+    [Theory]
+    [InlineData(VirtualFolderKind.AllRoots)]
+    [InlineData(VirtualFolderKind.None)]
+    public void GetGlyph_ReturnsNullForNodesThatKeepTheFolderIcon(VirtualFolderKind kind)
+    {
+        // Foldersは実フォルダと同じアイコンのまま
+        Assert.Null(VirtualFolders.GetGlyph(kind));
     }
 
     [Fact]

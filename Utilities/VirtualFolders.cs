@@ -31,8 +31,7 @@ public static class VirtualFolders
     public const string FrequentPath = "::Frequent::";
     public const string RecentPath = "::Recent::";
 
-    // 表示名は言語設定で変わるため、対訳表（UiTextResources）のキーだけを持つ。
-    // アイコンは実フォルダと共通のため、種類の区別は表示名の絵文字で付ける
+    // 表示名は言語設定で変わるため、対訳表（UiTextResources）のキーだけを持つ
     public const string AllRootsDisplayNameKey = "Tree.Folders";
     public const string FavoritesDisplayNameKey = "Tree.Favorites";
     public const string FrequentDisplayNameKey = "Tree.Frequent";
@@ -84,6 +83,18 @@ public static class VirtualFolders
 
     /// <summary>現在の表示言語での仮想ノードの表示名を返す。</summary>
     public static string GetDisplayName(VirtualFolderKind kind) => UiText.Get(GetDisplayNameKey(kind));
+
+    /// <summary>
+    /// ツリーでフォルダアイコンの代わりに表示する記号を返す（記号を持たないノードはnull）。
+    /// 実フォルダと同じアイコンに絵文字付きの表示名を重ねると二重表示に見えるため、種類の区別はこの記号だけで付ける。
+    /// </summary>
+    public static string? GetGlyph(VirtualFolderKind kind) => kind switch
+    {
+        VirtualFolderKind.Favorites => "★",
+        VirtualFolderKind.Frequent => "🕒",
+        VirtualFolderKind.Recent => "🕘",
+        _ => null
+    };
 
     /// <summary>仮想ノードの表示名の対訳表キーを返す。</summary>
     public static string GetDisplayNameKey(VirtualFolderKind kind) => kind switch

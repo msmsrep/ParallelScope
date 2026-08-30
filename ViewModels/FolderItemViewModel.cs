@@ -58,6 +58,9 @@ public class FolderItemViewModel : ObservableObject
         set => SetProperty(ref _iconSource, value);
     }
 
+    /// <summary>フォルダアイコンの代わりにツリーへ表示する記号（★ など）。持たないノードはnullでアイコンを出す。</summary>
+    public string? GlyphIcon { get; }
+
     public bool IsScanning
     {
         get => _isScanning;
@@ -128,7 +131,9 @@ public class FolderItemViewModel : ObservableObject
         _path = VirtualFolders.GetPath(kind) ?? VirtualFolders.AllRootsPath;
         _isExcludedPath = null;
         SetLocalizedDisplayName(VirtualFolders.GetDisplayNameKey(kind));
-        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
+        GlyphIcon = VirtualFolders.GetGlyph(kind);
+        // 記号を持つノード（Favorites等）はアイコンを出さず、記号だけで種類を区別する
+        IconSource = GlyphIcon is null ? WindowsShellIconProvider.GetFolderSmallIcon() : null;
         _subFolders = children;
         _isLoaded = true;
         _isExpanded = isExpanded;
