@@ -24,7 +24,7 @@ public static class TreeNodes
 
     /// <summary>並び順の指定対象となる全てのノード（既定の並び順）。</summary>
     public static readonly IReadOnlyList<string> AllNodes =
-        new[] { Favorites, Recent, Frequent, AllRoots };
+        new[] { AllRoots, Favorites, Recent, Frequent };
 
     /// <summary>
     /// 実際にツリーへ表示するオプションノードを、既定の並び順で返す。

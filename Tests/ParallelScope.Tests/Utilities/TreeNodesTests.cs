@@ -5,11 +5,11 @@ namespace ParallelScope.Tests.Utilities;
 public class TreeNodesTests
 {
     [Fact]
-    public void AllNodes_IsOptionalNodesFollowedByAllRoots()
+    public void AllNodes_IsAllRootsFollowedByOptionalNodes()
     {
-        // 既定の並び順は「Plusのショートカット3つ → Folders」
+        // 既定の並び順は「Folders → Plusのショートカット3つ」
         Assert.Equal(
-            TreeNodes.OptionalNodes.Concat(new[] { TreeNodes.AllRoots }),
+            new[] { TreeNodes.AllRoots }.Concat(TreeNodes.OptionalNodes),
             TreeNodes.AllNodes);
     }
 

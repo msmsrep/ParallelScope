@@ -67,7 +67,7 @@ public class PlusFeatureGatingTests : IDisposable
     }
 
     [Fact]
-    public void PlusVersion_AddsFavoritesRecentAndFrequentNodesAboveFolders()
+    public void PlusVersion_AddsFavoritesRecentAndFrequentNodesBelowFolders()
     {
         var viewModel = CreateViewModel();
 
@@ -75,7 +75,7 @@ public class PlusFeatureGatingTests : IDisposable
 
         Assert.True(viewModel.ArePlusFeaturesEnabled);
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.AllRootsPath, VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath },
             TreeRootPaths(viewModel));
     }
 
@@ -102,7 +102,7 @@ public class PlusFeatureGatingTests : IDisposable
         viewModel.SetPlusFeaturesEnabled(true);
 
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.AllRootsPath, VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath },
             TreeRootPaths(viewModel));
     }
 

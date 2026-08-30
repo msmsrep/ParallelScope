@@ -59,7 +59,7 @@ public class TreeNodeSettingsTests : IDisposable
         Assert.Equal(TreeNodes.AllNodes, viewModel.GetTreeNodeOrder());
         Assert.Equal(TreeNodes.DefaultVisibleNodes, viewModel.GetVisibleTreeNodes());
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.AllRootsPath, VirtualFolders.FavoritesPath, VirtualFolders.RecentPath, VirtualFolders.FrequentPath },
             TreeRootPaths(viewModel));
     }
 
@@ -72,7 +72,7 @@ public class TreeNodeSettingsTests : IDisposable
         ApplyTreeNodes(viewModel, new[] { TreeNodes.Favorites }, TreeNodes.AllNodes);
 
         Assert.Equal(
-            new[] { VirtualFolders.FavoritesPath, VirtualFolders.AllRootsPath },
+            new[] { VirtualFolders.AllRootsPath, VirtualFolders.FavoritesPath },
             TreeRootPaths(viewModel));
     }
 
@@ -162,7 +162,7 @@ public class TreeNodeSettingsTests : IDisposable
         ApplyTreeNodes(viewModel, TreeNodes.DefaultVisibleNodes, new[] { "RemovedNode", TreeNodes.Frequent });
 
         Assert.Equal(
-            new[] { TreeNodes.Frequent, TreeNodes.Favorites, TreeNodes.Recent, TreeNodes.AllRoots },
+            new[] { TreeNodes.Frequent, TreeNodes.AllRoots, TreeNodes.Favorites, TreeNodes.Recent },
             viewModel.GetTreeNodeOrder());
     }
 
