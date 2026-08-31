@@ -41,7 +41,10 @@ WIDTH, HEIGHT = 1920, 1080
 BACKGROUND = (245, 246, 251)
 CIRCLE = (223, 227, 244)
 HEADLINE = (24, 25, 63)
-BODY = (74, 78, 120)
+# 説明文は見出しより一段淡くするが、淡くしすぎると小さな画面（ストアの一覧やスマホ）で
+# 読めなくなる。地色との比が11:1ほど残る濃さに留め、日本語は線の細い游ゴシックRegularではなく
+# Mediumで組む
+BODY = (45, 48, 90)
 
 # 左の文章の位置。右のアプリ画面と重ならない幅に収める
 TEXT_LEFT = 120
@@ -50,16 +53,18 @@ TEXT_WIDTH = 580
 WINDOW_LEFT = 740
 WINDOW_WIDTH = 1120
 
+BADGE_TOP = HEIGHT - 260
+
 # 言語ごとの組み方。日本語は字面が詰まっているぶん行間を広く取る。
 # 英語は語で折り返し、同じ幅に収まるよう見出しを1段小さくする
 LAYOUTS = {
     "ja": {
         "bold": r"C:\Windows\Fonts\YuGothB.ttc",
-        "regular": r"C:\Windows\Fonts\YuGothR.ttc",
+        "regular": r"C:\Windows\Fonts\YuGothM.ttc",
         "headline_size": 62,
         "headline_step": 88,
-        "body_size": 25,
-        "body_step": 48,
+        "body_size": 27,
+        "body_step": 52,
         "word_wrap": False,
     },
     "en": {
@@ -67,8 +72,8 @@ LAYOUTS = {
         "regular": r"C:\Windows\Fonts\segoeui.ttf",
         "headline_size": 58,
         "headline_step": 80,
-        "body_size": 26,
-        "body_step": 42,
+        "body_size": 28,
+        "body_step": 46,
         "word_wrap": True,
     },
 }
@@ -93,7 +98,7 @@ SHOTS = [
         "raw": "02-search.png",
         "out": "02-search.png",
         "ja": {
-            "headline": ["打つそばから", "候補が絞られる"],
+            "headline": ["打ってすぐ", "候補が絞られる"],
             "body": "検索ボタンはありません。文字を入れるたびに、いま開いているフォルダの下が"
                     "キャッシュから絞り込まれます。空にすれば元の一覧に戻ります。",
         },
@@ -265,7 +270,11 @@ def compose(shot: dict, language: str, badge: Image.Image) -> Image.Image:
         draw.text((TEXT_LEFT, y), line, font=body_font, fill=BODY)
         y += layout["body_step"]
 
-    canvas.paste(badge, (TEXT_LEFT, HEIGHT - 260), badge)
+    # 説明文が伸びて左下のアイコンにぶつかったら、そこで気付けるようにする
+    if y > BADGE_TOP - 24:
+        sys.exit(f"説明文がアイコンに掛かります（{language} / {shot['out']}）")
+
+    canvas.paste(badge, (TEXT_LEFT, BADGE_TOP), badge)
 
     # アプリの画面。角を丸めて影を落とし、右側に浮かせる
     with Image.open(RAW / language / shot["raw"]) as raw:

@@ -26,7 +26,7 @@ Partner Center へ上げる画像と、その作り方をまとめる。
 | 地色 | `#F5F6FB` | アイコンの藤色 `#9FA8DA` を薄く延ばしたもの |
 | 左下の円 | `#DFE3F4` | 地色より一段濃い藤色 |
 | 見出し | `#18193F` | アイコンの線の色そのまま |
-| 本文 | `#4A4E78` | 見出しを地の上で読める濃さまで起こしたもの |
+| 本文 | `#2D305A` | 小さく表示されても読める濃さ（地色との比で約11:1）まで見出しに寄せたもの |
 | 特徴の印 | `#5A63B0` | アイコンの藤色を濃くしたもの（`generate-store-art.py` のみ） |
 | 掲載ロゴのタイル | `#DCE0F2` | 藤色 `#9FA8DA` の面が沈まない明るさ |
 
@@ -39,7 +39,7 @@ Partner Center へ上げる画像と、その作り方をまとめる。
 - Python（Pillow）… 画像の合成
 - Inkscape … SVG のラスタライズ（`C:\Program Files\Inkscape\bin\inkscape.com` か PATH）
 - PowerShell 7（`pwsh`）… スクリーンショットの撮影
-- 游ゴシック（`YuGothB.ttc` / `YuGothR.ttc`）と Segoe UI … 見出しと本文
+- 游ゴシック（`YuGothB.ttc` / `YuGothM.ttc` / `YuGothR.ttc`）と Segoe UI … 見出しと本文
 
 ## 1. スクリーンショット
 
