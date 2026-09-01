@@ -132,7 +132,8 @@ python store/assets/generate-store-art.py en         # 英語だけ
 - [ ] アプリ内購入（ParallelScope Plus）の有無が、掲載情報・製品の申告・IARC の回答で一致している
 - [ ] プライバシーポリシーの URL が開ける
 
-## まだここに無いもの
+## 掲載文
 
-掲載文（製品名・説明・機能一覧・キーワード）は、いまのところ `Readme.md` /
-`Readme.ja.md` の内容を Partner Center へ手で入れている。
+製品名・概要・説明・製品の機能・検索用語は `store/listing.md` に日本語と英語の両方を置いてある。
+Partner Center へは、そこから該当する見出しの中身をそのまま貼る（説明欄は書式なしのテキスト扱い）。
+機能を足したら `Readme.md` / `Readme.ja.md` のリリース欄と合わせて更新すること。
