@@ -1,0 +1,309 @@
+﻿using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using ParallelScope.Utilities;
+using ParallelScope.ViewModels;
+
+namespace ParallelScope;
+
+/// <summary>フォルダツリーの操作（選択の同期・展開・コンテキストメニュー）に関する処理。</summary>
+public partial class MainWindow
+{
+    // 右クリックで押されたツリーノード（マウスを離す時点でカーソル直下が変わっても対象を保つため）
+    private TreeViewItem? _rightClickedTreeViewItem;
+
+    // Plus機能（ツリーのお気に入り・最近・よく使うノードと、一覧のCSV書き出し）を購読状態に合わせて出し分ける
+    private void ApplyPlusFeatures()
+    {
+        var isActive = _storeLicenseService.IsPlusActive;
+
+        _viewModel.SetPlusFeaturesEnabled(isActive);
+        ExportCsvMenuItem.IsEnabled = isActive;
+    }
+
+    private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
+
+    // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
+    private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
+    {
+        // お気に入り／よく使い配下は実体ツリーの複製なので登録しない
+        // （同じパスで上書きされると、実体ツリーで選択したつもりが複製側へ飛んでしまう）
+        if (sender is TreeViewItem tvi && tvi.DataContext is FolderItemViewModel { IsShortcut: false } vm)
+        {
+            _treeItemMap[vm.Path] = tvi;
+        }
+    }
+
+    // ツリーから外れたTreeViewItem（設定変更でのルート再構築・子の再読み込みで破棄されたもの）への
+    // 参照をマップに残さない（残すと配下のビジュアルツリーごと解放されず、メモリが増え続ける）。
+    // 同一パスに新しいインスタンスが登録済みの場合は消さない（Loaded→古い方のUnloadedの順で届くことがあるため）
+    private void FolderTreeViewItem_Unloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TreeViewItem tvi)
+        {
+            return;
+        }
+
+        if (tvi.DataContext is FolderItemViewModel vm)
+        {
+            if (_treeItemMap.TryGetValue(vm.Path, out var mapped) && ReferenceEquals(mapped, tvi))
+            {
+                _treeItemMap.Remove(vm.Path);
+            }
+
+            return;
+        }
+
+        // DataContextが既に外れている場合は、値側から一致するエントリを探して除去する
+        foreach (var pair in _treeItemMap)
+        {
+            if (ReferenceEquals(pair.Value, tvi))
+            {
+                _treeItemMap.Remove(pair.Key);
+                return;
+            }
+        }
+    }
+
+    // ツリーで選択されたフォルダのファイル一覧を読み込む
+    private void FolderTreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+    {
+        if (e.NewValue is FolderItemViewModel folderItem)
+        {
+            _viewModel.LoadFiles(folderItem.Path);
+        }
+    }
+
+    private async void FolderTreeItem_Expanded(object sender, RoutedEventArgs e)
+    {
+        if (sender is not TreeViewItem { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        // 「最近」「よく使う」は展開のタイミングでだけ並べ直す（移動のたびに並べ替えるとツリーが目の前で動いてしまう）
+        switch (VirtualFolders.GetKind(folderItem.Path))
+        {
+            case VirtualFolderKind.Frequent:
+                _viewModel.RefreshFrequentFolders();
+                return;
+            case VirtualFolderKind.Recent:
+                _viewModel.RefreshRecentFolders();
+                return;
+        }
+
+        // TreeViewItemが展開される時に、子フォルダを遅延読み込み（非同期）
+        await folderItem.EnsureLoadedAsync();
+    }
+
+    // 右クリックされたTreeViewItemを選択状態にしてからコンテキストメニューを表示する
+    private void FolderTreeView_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var treeViewItem = GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject);
+        if (treeViewItem is null)
+        {
+            return;
+        }
+
+        // 選択・フォーカスでツリーがスクロールすると、マウスを離す時点のカーソル直下が
+        // 別ノード（あるいは余白）になりうる。メニューの対象は押した時点のノードで固定する
+        _rightClickedTreeViewItem = treeViewItem;
+
+        treeViewItem.IsSelected = true;
+        treeViewItem.Focus();
+    }
+
+    // 選択中のフォルダに対するコンテキストメニューを動的に構築して開く
+    private void FolderTreeView_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        // 組み立てたメニューは自前で開く。WPFの自動表示に任せると、
+        // この時点ではまだ割り当てられていないため「1回目は出ず2回目で出る」ことがある
+        e.Handled = true;
+
+        // キーボード（アプリケーションキー）からの表示ではカーソル位置が-1で、直前の右クリック位置は無関係
+        var isKeyboardInvoked = e.CursorLeft < 0 && e.CursorTop < 0;
+        var treeViewItem = isKeyboardInvoked
+            ? GetAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)
+            : _rightClickedTreeViewItem;
+        _rightClickedTreeViewItem = null;
+
+        if (treeViewItem is not { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        // 仮想ノード（Folders / Favorites / Recent / Frequently Used）は実パスを持たず個別スキャンできないため、メニューを表示しない
+        if (VirtualFolders.IsVirtual(folderItem.Path))
+        {
+            treeViewItem.ContextMenu = null;
+            return;
+        }
+
+        var scanMenuItem = new MenuItem
+        {
+            Header = UiText.Get("Context.ScanSubtree"),
+            DataContext = folderItem,
+            IsEnabled = !folderItem.IsScanning
+        };
+        scanMenuItem.Click += ScanFolderMenuItem_Click;
+
+        var contextMenu = new ContextMenu
+        {
+            DataContext = folderItem,
+            PlacementTarget = treeViewItem
+        };
+        contextMenu.Items.Add(scanMenuItem);
+
+        // お気に入りはPlus機能のため、未購読の間はメニューにも出さない
+        if (_viewModel.ArePlusFeaturesEnabled)
+        {
+            var isFavorite = _viewModel.IsFavorite(folderItem.Path);
+            var favoriteMenuItem = new MenuItem
+            {
+                Header = UiText.Get(isFavorite ? "Context.RemoveFavorite" : "Context.AddFavorite"),
+                DataContext = folderItem
+            };
+            favoriteMenuItem.Click += ToggleFavoriteMenuItem_Click;
+
+            contextMenu.Items.Add(new Separator());
+            contextMenu.Items.Add(favoriteMenuItem);
+        }
+
+        if (isKeyboardInvoked)
+        {
+            contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+        }
+
+        // テーマ・言語のリソースを引けるよう、開く前に論理ツリーへ繋いでおく
+        treeViewItem.ContextMenu = contextMenu;
+        contextMenu.IsOpen = true;
+    }
+
+    // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える
+    private void ToggleFavoriteMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            _viewModel.ToggleFavorite(folderItem.Path);
+        }
+    }
+
+    // 指定アイテムの祖先TreeViewItemをすべて展開する
+    private void ExpandParents(TreeViewItem item)
+    {
+        // 展開するアイテムをすべて収集してからバッチで展開
+        var itemsToExpand = new List<TreeViewItem>();
+        DependencyObject parent = VisualTreeHelper.GetParent(item);
+
+        while (parent is TreeViewItem parentItem)
+        {
+            itemsToExpand.Add(parentItem);
+            parent = VisualTreeHelper.GetParent(parentItem);
+        }
+
+        // バッチ展開（複数の IsExpanded 設定をまとめる）
+        foreach (var parentItem in itemsToExpand)
+        {
+            parentItem.IsExpanded = true;
+        }
+
+        // 最後に一度だけレイアウト更新
+        if (itemsToExpand.Count > 0)
+        {
+            item.UpdateLayout();
+        }
+    }
+
+    // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
+    private void SyncTreeSelectionToCurrentPath()
+    {
+        var path = PathNormalizer.Normalize(_viewModel.CurrentPath);
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        if (_treeItemMap.TryGetValue(path, out var tvi))
+        {
+            ExpandParents(tvi);
+            tvi.IsSelected = true;
+            tvi.BringIntoView();
+            return;
+        }
+
+        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
+        if (rootFolder is null)
+        {
+            return;
+        }
+
+        var normalizedRootPath = PathNormalizer.Normalize(rootFolder.Path);
+        var relativePath = path.StartsWith(normalizedRootPath, StringComparison.OrdinalIgnoreCase)
+            ? path[normalizedRootPath.Length..]
+            : string.Empty;
+
+        var pathComponents = relativePath
+            .Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries)
+            .ToList();
+
+        // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
+        // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_viewModel.AllRootsNode) is not TreeViewItem allRootsItem)
+        {
+            return;
+        }
+
+        allRootsItem.IsExpanded = true;
+
+        ExpandAndSelectByPath(allRootsItem, rootFolder, pathComponents, 0);
+        if (_treeItemMap.TryGetValue(path, out tvi))
+        {
+            ExpandParents(tvi);
+        }
+    }
+
+    // パス構成要素を1つずつ辿りながらツリーを再帰的に展開し、目的のノードを選択する
+    private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
+        List<string> pathComponents, int componentIndex)
+    {
+        // 初回呼び出しのみレイアウト更新を行う
+        if (componentIndex == 0)
+        {
+            parentControl.UpdateLayout();
+        }
+
+        if (parentControl.ItemContainerGenerator.ContainerFromItem(folderItem) is not TreeViewItem treeViewItem)
+        {
+            return false;
+        }
+
+        // ターゲットに到達した
+        if (componentIndex >= pathComponents.Count)
+        {
+            treeViewItem.IsSelected = true;
+            treeViewItem.BringIntoView();
+            // 最終更新のみ一度実行
+            treeViewItem.UpdateLayout();
+            return true;
+        }
+
+        // 遅延読み込みを実行（次のディレクトリを探すために）
+        folderItem.EnsureLoaded();
+        treeViewItem.IsExpanded = true;
+        // 中間のUpdateLayout()は削除（最後の更新のみで十分）
+
+        // 次のディレクトリ成分を探す
+        var nextComponent = pathComponents[componentIndex];
+        var matchingChild = folderItem.SubFolders.FirstOrDefault(child =>
+            string.Equals(child.DisplayName, nextComponent, StringComparison.OrdinalIgnoreCase));
+
+        if (matchingChild is not null)
+        {
+            return ExpandAndSelectByPath(treeViewItem, matchingChild, pathComponents, componentIndex + 1);
+        }
+
+        return false;
+    }
+}

@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
@@ -33,9 +33,9 @@ public partial class MainWindowViewModel
         {
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             results = await Task.Run(() =>
-                GetFlatViewFiles(folderPath)
-                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
-                    .Select(ToViewModel)
+                ToViewModels(
+                    GetFlatViewFiles(folderPath)
+                        .Where(x => !IsExcludedNormalizedPath(x.FullPath)))
                     .ToList());
         }
         catch
@@ -59,21 +59,22 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>起点が仮想「Folders」の場合は全ルート横断で、それ以外は単一パス配下の全ファイルを列挙する。</summary>
+    /// <summary>起点が仮想ノードの場合は対象フォルダ群を横断し、それ以外は単一パス配下の全ファイルを列挙する。</summary>
     /// <remarks>数十万件規模のため List 化せず、リポジトリの逐次読み出しをそのまま流す（ピークメモリ削減）。</remarks>
     private IEnumerable<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
     {
-        if (!AllRootsVirtualFolder.Matches(folderPath))
+        var traversalPaths = GetTraversalPaths(folderPath);
+        if (traversalPaths.Count == 1)
         {
-            return _fileCacheRepository.EnumerateFilesUnderPath(folderPath);
+            return _fileCacheRepository.EnumerateFilesUnderPath(traversalPaths[0]);
         }
 
-        var files = _rootPathsSnapshot
+        var files = traversalPaths
             .SelectMany(root => _fileCacheRepository.EnumerateFilesUnderPath(root));
 
-        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
+        // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成で全ファイル分の FullPath 文字列を判定セットに同時保持しないため）
-        return HasOverlappingRootPaths()
+        return HasOverlappingPaths(traversalPaths)
             ? files.DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase)
             : files;
     }

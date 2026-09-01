@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Data;
@@ -31,6 +31,7 @@ public partial class MainWindowViewModel : ObservableObject
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
     private AppThemeSetting _theme = AppThemeSetting.System;
+    private AppLanguageSetting _language = AppLanguageSetting.System;
     private List<FileItemViewModel> _currentDirectoryItems = new();
 
     // バックグラウンド処理（横断検索・フラット表示・Roots一覧）から参照するルートパスの不変スナップショット。
@@ -38,17 +39,28 @@ public partial class MainWindowViewModel : ObservableObject
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
     /// <summary>
-    /// ルート同士が入れ子（例: D:\ と D:\Sub）になっている構成かどうか。
-    /// 全ルート横断の列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
+    /// 横断列挙（All Files・横断検索）の起点となるパス群を返す。
+    /// 仮想ノード（Folders / Favorites / Frequently Used）なら対応するフォルダ群、実パスならそのパス自身。
     /// </summary>
-    private bool HasOverlappingRootPaths()
+    private IReadOnlyList<string> GetTraversalPaths(string path)
     {
-        var roots = _rootPathsSnapshot;
-        for (var i = 0; i < roots.Count; i++)
+        var kind = VirtualFolders.GetKind(path);
+        return kind == VirtualFolderKind.None
+            ? new[] { path }
+            : GetVirtualFolderPaths(kind);
+    }
+
+    /// <summary>
+    /// 対象パス同士が入れ子（例: D:\ と D:\Sub）になっているかどうか。
+    /// 横断列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
+    /// </summary>
+    private static bool HasOverlappingPaths(IReadOnlyList<string> paths)
+    {
+        for (var i = 0; i < paths.Count; i++)
         {
-            for (var j = 0; j < roots.Count; j++)
+            for (var j = 0; j < paths.Count; j++)
             {
-                if (i != j && PathNormalizer.IsAncestorOrSame(roots[i], roots[j]))
+                if (i != j && PathNormalizer.IsAncestorOrSame(paths[i], paths[j]))
                 {
                     return true;
                 }
@@ -58,8 +70,20 @@ public partial class MainWindowViewModel : ObservableObject
         return false;
     }
 
+    // ファイル一覧の列の並び順（列キー。Nameを含む）と、ユーザーが変更した列幅（列キー→ピクセル幅）。
+    // どちらもPlus機能のため、反映するかどうかはコードビハインド側が購読状態で判断する
+    private List<string> _columnOrder = FileListColumns.AllColumns.ToList();
+    private Dictionary<string, double> _columnWidths = new(StringComparer.OrdinalIgnoreCase);
+
+    // CSV出力でSize列を生のバイト数で書き出すか（保存ダイアログのファイル種類で選ばれた前回の値）
+    private bool _csvExportSizeInBytes;
+
     // ファイル一覧に表示する列キー（FileListColumns参照。Name列は常時表示のため含まない）
     private HashSet<string> _visibleColumns = FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    // 隠し属性・システム属性のファイル/フォルダを出すか（既定は表示。この設定を入れる前と同じ見え方）
+    private bool _showHiddenItems = true;
+    private bool _showSystemItems = true;
 
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
@@ -77,7 +101,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Folders」ノード1件のみを含み、
     /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
     /// </summary>
-    public ObservableCollection<FolderItemViewModel> TreeRoots { get; }
+    public ObservableCollection<FolderItemViewModel> TreeRoots { get; } = new();
 
     public ObservableCollection<FileItemViewModel> FileItems
     {
@@ -162,15 +186,21 @@ public partial class MainWindowViewModel : ObservableObject
     public bool CanGoUp => GetParentPath(CurrentPath) is not null;
 
     public MainWindowViewModel()
+        : this(new FileCacheRepository(), new AppSettingsRepository())
+    {
+    }
+
+    /// <summary>
+    /// 保存先を差し替えたリポジトリを渡して生成する（単体テスト用）。
+    /// アプリ本体は引数なしのコンストラクタを使い、リポジトリはここで直接newする。
+    /// </summary>
+    internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository)
     {
         _rootFolders = new ObservableCollection<FolderItemViewModel>();
-        TreeRoots = new ObservableCollection<FolderItemViewModel>
-        {
-            FolderItemViewModel.CreateAllRootsNode(_rootFolders)
-        };
+        InitializeTreeNodes();
         _fileItems = new ObservableCollection<FileItemViewModel>();
-        _fileCacheRepository = new FileCacheRepository();
-        _appSettingsRepository = new AppSettingsRepository();
+        _fileCacheRepository = fileCacheRepository;
+        _appSettingsRepository = appSettingsRepository;
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(

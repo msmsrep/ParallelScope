@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
@@ -61,10 +61,10 @@ public partial class MainWindowViewModel
         {
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cacheResults = await Task.Run(() =>
-                SearchCacheEntries(rootPath, query)
-                    .Where(x => !(filesOnly && x.IsFolder))
-                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
-                    .Select(ToViewModel)
+                ToViewModels(
+                    SearchCacheEntries(rootPath, query)
+                        .Where(x => !(filesOnly && x.IsFolder))
+                        .Where(x => !IsExcludedNormalizedPath(x.FullPath)))
                     .ToList());
         }
         catch
@@ -92,21 +92,22 @@ public partial class MainWindowViewModel
         }, null);
     }
 
-    /// <summary>検索起点が仮想「Folders」の場合は全ルートを横断検索し、それ以外は単一パス配下を検索する。</summary>
+    /// <summary>検索起点が仮想ノードの場合は対象フォルダ群を横断検索し、それ以外は単一パス配下を検索する。</summary>
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
     private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
     {
-        if (!AllRootsVirtualFolder.Matches(rootPath))
+        var traversalPaths = GetTraversalPaths(rootPath);
+        if (traversalPaths.Count == 1)
         {
-            return _fileCacheRepository.EnumerateSearchEntriesUnderPath(rootPath, query);
+            return _fileCacheRepository.EnumerateSearchEntriesUnderPath(traversalPaths[0], query);
         }
 
-        var results = _rootPathsSnapshot
+        var results = traversalPaths
             .SelectMany(root => _fileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
 
-        // ルート同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
+        // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成でヒット全件分の FullPath 文字列を判定セットに同時保持しないため）
-        if (HasOverlappingRootPaths())
+        if (HasOverlappingPaths(traversalPaths))
         {
             results = results.DistinctBy(x => x.FullPath, StringComparer.OrdinalIgnoreCase);
         }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope User Guide</title>
-<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, and how scanning and the cache work — with screenshots.">
+<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites, Recent and Frequently Used folders, CSV export, the English / Japanese display language, hidden and system items, and how scanning and the cache work — with screenshots.">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -32,11 +32,13 @@
     <li><a href="#screen">The main window</a></li>
     <li><a href="#setup">First run: add your root folders</a></li>
     <li><a href="#browse">Browsing and navigating</a></li>
+    <li><a href="#favorites">Favorites, Recent and Frequently Used</a></li>
     <li><a href="#search">Searching</a></li>
     <li><a href="#allfiles">All Files mode</a></li>
     <li><a href="#contextmenu">Right-click menus</a></li>
     <li><a href="#scan">Scanning and the cache</a></li>
     <li><a href="#customize">Customizing the view</a></li>
+    <li><a href="#csv">Exporting the list to CSV</a></li>
     <li><a href="#plus">ParallelScope Plus</a></li>
     <li><a href="#data">Where your data is stored</a></li>
     <li><a href="#tips">Troubleshooting</a></li>
@@ -73,12 +75,12 @@
     <span class="pin" style="left:60%;   top:85%">7</span>
   </figure>
   <ol class="legend">
-    <li><span><strong>Menu</strong> — opens the settings window.</span></li>
+    <li><span><strong>Menu</strong> — opens the settings window, exports the current list to CSV, and links to this user guide.</span></li>
     <li><span><strong>← Back / Forward → / ↑ Up</strong> — move through your navigation history, or go to the parent folder.</span></li>
     <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
     <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
     <li><span><strong>All Files toggle</strong> — lists every file under the current folder as one flat list.</span></li>
-    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node.</span></li>
+    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node. With a Plus subscription, "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" appear above it.</span></li>
     <li><span><strong>File list</strong> — the contents of the selected folder. Click a column header to sort.</span></li>
   </ol>
 </section>
@@ -129,12 +131,51 @@
     shows <code>::Folders::</code> in the address bar and lists one row per root. Searching from here
     <strong>searches across every registered root at once</strong>.
   </p>
+  <p>
+    With a Plus subscription three more virtual nodes sit above it — "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" — and they
+    behave the same way: the address bar shows <code>::Favorites::</code>, <code>::Recent::</code> or <code>::Frequent::</code>, the
+    list shows one row per folder, and searching from there covers every folder gathered under the node.
+    See <a href="#favorites">Favorites, Recent and Frequently Used</a>.
+  </p>
 
   <h3>Folder sizes</h3>
   <p>
     The size shown on a folder row is the total size of its contents, aggregated from the cache. Folders that have not been
     scanned yet show a blank size until a scan reaches them.
   </p>
+</section>
+
+<section id="favorites">
+  <h2>Favorites, Recent and Frequently Used</h2>
+  <p>
+    Registering a root folder for every folder you care about quickly gets unwieldy. Three extra nodes at the top of the tree give
+    you shortcuts instead — one you curate by hand, two the app fills in for you. All three are
+    <strong><a href="#plus">ParallelScope Plus</a> features</strong> and are hidden entirely without a subscription.
+  </p>
+
+  <h3>★ Favorites</h3>
+  <ul>
+    <li>Right-click any folder in the tree and choose <strong>"★ Add to Favorites"</strong>. Right-click a registered one and the item reads <strong>"☆ Remove from Favorites"</strong> instead.</li>
+    <li>Favorites are listed in the order you added them, and each one expands into its own subtree just like a root folder does.</li>
+    <li>Selecting the "★ Favorites" node itself lists every favorite in one place, and searching from there covers all of them.</li>
+    <li>The list is saved in <code>settings.json</code>, so it survives restarts. A favorite on a disconnected NAS is kept rather than dropped.</li>
+  </ul>
+
+  <h3>🕘 Recent</h3>
+  <ul>
+    <li>The folders you opened most recently, newest first, up to <strong>20</strong>.</li>
+    <li>It draws on the same record as "Frequently Used" — only navigation you perform yourself counts — but sorts by when you last opened each folder instead of how often.</li>
+    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
+    <li>The order is refreshed when the app starts and when you expand the node, not after every move. Selecting the node itself always lists the newest order.</li>
+  </ul>
+
+  <h3>🕒 Frequently Used</h3>
+  <ul>
+    <li>The app counts how often you open each folder and lists the <strong>top 10</strong>, most-visited first (ties broken by the most recent visit).</li>
+    <li>Only navigation you perform yourself is counted — tree clicks, double-clicks, Back / Forward / Up, and the address bar. Folders the app opens for you at startup do not count.</li>
+    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
+    <li>The order is refreshed when the app starts and when you expand the node, not after every move — so the tree does not rearrange itself while you are clicking through it.</li>
+  </ul>
 </section>
 
 <section id="search">
@@ -191,6 +232,7 @@
         <tr><td>Copy Full Path</td><td>Copies the full path as text.</td></tr>
         <tr><td>Open Parent Folder</td><td>Opens the parent folder in Explorer with the item selected.</td></tr>
         <tr><td>Scan everything under this folder</td><td>(tree) Scans just that subtree and refreshes its cache.</td></tr>
+        <tr><td>★ Add to Favorites / ☆ Remove from Favorites</td><td>(tree) Adds the folder to "★ Favorites", or takes it out again. A Plus feature — the item is not shown without a subscription.</td></tr>
       </tbody>
     </table>
   </div>
@@ -228,16 +270,73 @@
     </figure>
   </div>
 
-  <h3>Display columns (a ParallelScope Plus feature)</h3>
+  <h3>Display language</h3>
+  <p>
+    "Settings &gt; Language" switches the app's own text between English and Japanese. The default, "System (follow Windows)",
+    follows your Windows display language. Like the theme, the choice applies and is saved the moment you pick it — there is no
+    "Save" to press — and it works without a subscription.
+  </p>
+  <ul>
+    <li>The whole window swaps over straight away: the menu, the settings window, the file list headers, and the tree's "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" nodes.</li>
+    <li>The <strong>Type</strong> column is the exception. Those names come from Windows itself, so they follow the language of the OS rather than this setting.</li>
+    <li>CSV exports keep their English headers, so a file exported in one language can still be read by the same script or spreadsheet.</li>
+  </ul>
+
+  <h3>Folder tree (a ParallelScope Plus feature)</h3>
+  <p>
+    "Settings &gt; Folder Tree" controls <strong>which of the top-level shortcut nodes the tree shows and the order they appear
+    in</strong>. Tick "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" to show them, and move any of them with the
+    "↑ Up" / "↓ Down" buttons. The "Folders" node cannot be hidden — otherwise the tree could end up empty — but it can be moved,
+    so you can put it at the very top if you would rather have your roots first.
+  </p>
+  <ul>
+    <li>The change takes effect when you save. If you hide the node you are currently looking at, the list moves back to "Folders".</li>
+    <li>Hiding a node does not throw anything away: "Recent" and "Frequently Used" keep being built from the folders you open, and your favorites are untouched.</li>
+    <li>Like the nodes themselves, this is a paid Plus feature. Without a subscription none of the three appear, but the settings are kept for when you subscribe.</li>
+  </ul>
+
+  <h3>Columns (a ParallelScope Plus feature)</h3>
   <figure>
     <a href="images/07-settings-columns.png"><img src="images/07-settings-columns.png" alt="The Display Columns page of the settings window"></a>
-    <figcaption>Without a subscription the checkboxes are shown greyed out and cannot be changed.</figcaption>
+    <figcaption>Without a subscription the page is shown greyed out and cannot be changed.</figcaption>
   </figure>
   <p>
-    "Settings &gt; Display Columns" chooses which columns the file list shows: Location (the parent folder path), Type, Size,
-    Modified, Created, and Attributes. The Name column is always shown. Column customization is a paid Plus feature; without a
-    subscription the list uses the default Name / Type / Size / Modified.
+    "Settings &gt; Display Columns" controls both <strong>which columns the file list shows and the order they appear in</strong>.
+    Tick a column to show it, and move it with the "↑ Up" / "↓ Down" buttons. The columns on offer are Location (the parent folder
+    path), Type, Size, Modified, Created, and Attributes; the Name column is always shown, but it can still be moved.
   </p>
+  <ul>
+    <li><strong>Header drags are saved too.</strong> Reordering columns by dragging their headers in the file list, and resizing them by dragging the edges, are stored when you close the app and restored the next time you start it.</li>
+    <li><strong>"Reset columns to defaults"</strong> puts the selection, the order, and the widths back to Name / Type / Size / Modified. The widths are cleared when you save.</li>
+    <li>All of this is a paid Plus feature. Without a subscription the file list uses the default Name / Type / Size / Modified in the default order — but your settings are kept, so subscribing brings your layout straight back.</li>
+  </ul>
+
+  <h3>Hidden and system items</h3>
+  <p>
+    Below the column list, the same "Settings &gt; Display Columns" page has <strong>"Hidden and system items"</strong>, with one
+    checkbox for hidden files and folders and one for system files and folders. <strong>Both are ticked by default</strong>, so
+    those items are shown; clear a box to leave them out of the file list and the folder tree alike. Unlike the columns above it,
+    this part of the page works without a subscription.
+  </p>
+  <ul>
+    <li>The change takes effect when you save the settings. No rescan is needed — the cache records every item whatever its attributes are, and the filtering happens as the list is drawn.</li>
+    <li>This is the opposite of Explorer's default. ParallelScope shows hidden and system items unless you say otherwise, so files you could already see do not quietly disappear.</li>
+  </ul>
+</section>
+
+<section id="csv">
+  <h2>Exporting the list to CSV</h2>
+  <p>
+    "Menu" → <strong>"📄 Export CSV..."</strong> writes the list you are currently looking at to a CSV file. It is a
+    <strong><a href="#plus">ParallelScope Plus</a> feature</strong>; without a subscription the menu item is still there but is
+    greyed out and cannot be clicked.
+  </p>
+  <ul>
+    <li><strong>What you get is what you see</strong> — the same rows in the same sort order, with the same columns. That includes search results and All Files mode, so you can narrow the list down first and export only that.</li>
+    <li>In the save dialog, the <strong>"Save as type"</strong> box picks how the Size column is written: <em>sizes as displayed</em> (<code>11.8 MB</code>) or <em>sizes in bytes</em> (<code>12345678</code>, under the header "Size (bytes)"). Pick the byte form when you want to total or sort sizes in a spreadsheet. Your choice becomes the default next time.</li>
+    <li>The file name defaults to <code>ParallelScope_&lt;folder&gt;_&lt;date&gt;_&lt;time&gt;.csv</code>.</li>
+    <li>The file is written as UTF-8 with a BOM, so Excel opens non-ASCII names and paths without garbling them.</li>
+  </ul>
 </section>
 
 <section id="plus">
@@ -247,7 +346,15 @@
     <figcaption>"Settings &gt; Subscription" is where subscribing and cancelling start.</figcaption>
   </figure>
   <ul>
-    <li>The Plus feature today is "Display Columns" (customizing the file list columns). Everything else is free.</li>
+    <li>The Plus features today are:
+      <ul>
+        <li><a href="#favorites">"★ Favorites", "🕘 Recent" and "🕒 Frequently Used"</a> in the folder tree</li>
+        <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
+        <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
+        <li><a href="#customize">Customizing the file list columns</a> — which columns, their order, and their widths</li>
+        <li><a href="#csv">Exporting the file list to CSV</a></li>
+      </ul>
+      Everything else is free.</li>
     <li>Purchase, billing, and cancellation are handled entirely by the Microsoft Store. "Manage / Cancel subscription" opens the subscriptions page of your Microsoft account.</li>
     <li>The subscription state is checked against your Microsoft Store license, so this only applies to the Microsoft Store build.</li>
   </ul>
@@ -260,7 +367,7 @@
     <table>
       <thead><tr><th>File</th><th>Contents</th></tr></thead>
       <tbody>
-        <tr><td><code>settings.json</code></td><td>Root folders, excluded folders, scan interval, theme, and other settings</td></tr>
+        <tr><td><code>settings.json</code></td><td>Root folders, excluded folders, scan interval, theme, column layout, favorites, and how often you open each folder</td></tr>
         <tr><td><code>ParallelScope.sqlite</code></td><td>Cached folder structure and file listings</td></tr>
       </tbody>
     </table>
@@ -277,6 +384,9 @@
   <h3>A file I just added does not show up in search</h3>
   <p>Search reads the cache. Right-click that folder in the tree and run "Scan everything under this folder", or wait for the next automatic full scan.</p>
 
+  <h3>A file I can see in Explorer is missing from the list</h3>
+  <p>Check "Settings &gt; Display Columns" and look at "Hidden and system items". If either box is cleared, files and folders with that attribute are left out of both the list and the tree.</p>
+
   <h3>A folder is missing from the tree</h3>
   <p>Check "Settings &gt; Root Folders" and look at Excluded Folders — an excluded path and everything under it is hidden from the tree, the list, and search.</p>
 
@@ -287,7 +397,22 @@
   <p>Folder totals are aggregated from scanned cache entries, so folders that have not been scanned yet show a blank size.</p>
 
   <h3>I want different columns</h3>
-  <p>Adding or removing columns is a Plus feature. "Settings &gt; Display Columns" links through to the subscription page.</p>
+  <p>Adding, removing, and reordering columns is a Plus feature. "Settings &gt; Display Columns" links through to the subscription page.</p>
+
+  <h3>My column widths went back to the defaults</h3>
+  <p>Widths and the header order are written out when the app closes, so a forced shutdown loses the last change. They are also ignored while you have no Plus subscription — the saved layout returns once it is active again.</p>
+
+  <h3>"Favorites", "Recent" and "Frequently Used" are missing from the tree</h3>
+  <p>All three are Plus features. They appear as soon as the subscription is confirmed, which can take a moment after the app starts.</p>
+
+  <h3>A folder I just opened is not in "Recent"</h3>
+  <p>The node is re-sorted when the app starts and when you expand it, not after every move, so the tree does not rearrange itself while you are clicking through it. Collapse and expand it to bring it up to date — or select the node itself, which always lists the newest order. Folders already in "★ Favorites" are deliberately left out.</p>
+
+  <h3>A folder I use constantly is not in "Frequently Used"</h3>
+  <p>Folders already in "★ Favorites" are deliberately left out, and the list holds the top 10 only. It is also re-sorted when the app starts and when you expand the node, not after every move.</p>
+
+  <h3>The sizes in my exported CSV are text, not numbers</h3>
+  <p>Choose "CSV - sizes in bytes" in the "Save as type" box of the export dialog. That writes plain byte counts a spreadsheet can total.</p>
 </section>
 
 </div>
@@ -301,7 +426,7 @@
       <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
       <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
     </ul>
-    <p>Screenshots were taken with ver1.4.4.0. Later versions may look slightly different.</p>
+    <p>Screenshots were taken with ver1.4.4.0, before Favorites, Recent, Frequently Used, CSV export, and the reworked Display Columns page were added, so those do not appear in them. Later versions may look slightly different.</p>
   </div>
 </footer>
 

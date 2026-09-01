@@ -9,21 +9,32 @@ WPF で UI を構築し、ローカル SQLite キャッシュを使って表示�
 
 ## 主な機能
 
-- 複数ルートフォルダの登録（設定画面から追加/削除）
+- 複数ルートフォルダの登録（設定画面から追加/削除/並び替え）と除外フォルダの指定
 - ツリー + 一覧によるファイルブラウズ
 - 戻る/進む/上へ のナビゲーション
 - アドレスバーへのパス直接入力
-- 現在フォルダ配下の検索
-  - まずキャッシュ検索
-  - ヒットなし時は実ファイルシステムを走査
+- 現在フォルダ配下のインクリメンタルサーチ（入力の都度、キャッシュに対して検索）
+- 「All Files」モード（現在フォルダ配下の全ファイルをフラットに一覧表示）
 - 一覧のダブルクリックでフォルダ移動/ファイルを既定アプリで起動
+- 配色テーマ（System / Light / Dark）
+- 表示言語（System / English / 日本語。既定はWindowsの表示言語に追従。無料版でも利用可）
+- Plus機能: ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（表示するノードと並び順を選択可）、ファイル一覧の列カスタマイズ
+  （表示列・並び順・列幅）、表示中の一覧のCSV出力
 
 ## リリース
 
+- 未リリース
+  - 設定に「フォルダツリー」ページを追加し、ツリー最上位のノードの表示/非表示と並び順を変更できるように（Plus機能）
+  - ツリーに「🕘 Recent」（最近開いたフォルダー）を追加（Plus機能）
+  - 英語/日本語の表示言語切り替えを追加（既定はWindowsの表示言語に追従）
+  - ツリーに「★ Favorites」「🕒 Frequently Used」を追加（Plus機能）
+  - 表示中の一覧の「Export CSV...」を追加（Plus機能）
+  - 「Display Columns」を刷新し、列の並び順と列幅も保存するよう変更（Plus機能）
+- Ver 1.4.5.0 メニューに「User Guide」を追加
 - Ver1.4.0.0 Monthly Subscription機能を追加
 - Ver 1.3.0.0 機能変更
   - 「All Files」モードの追加
-- 検索をインクリメンタルサーチへ変更
+  - 検索をインクリメンタルサーチへ変更
 - Ver 1.2.0.0 調整
   - 検索UIの表示修正
   - ファイルスキャンロジックの高速化
@@ -58,6 +69,14 @@ dotnet build ParallelScope.csproj
 dotnet publish -c Release
 ```
 
+## テスト
+
+```powershell
+dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
+```
+
+単体テスト（xUnit）はUIに依存しない層を対象にしています。カバー範囲とテストの書き方は [Tests/README.md](./Tests/README.md) を参照してください。
+
 ## 使い方
 
 1. 起動後、「Menu > Settings」をクリック
@@ -67,6 +86,8 @@ dotnet publish -c Release
 5. 一覧項目をダブルクリック
    - フォルダ: そのフォルダへ移動
    - ファイル: 既定アプリで開く
+6. 「All Files」をONにすると、現在フォルダ配下の全ファイルを階層に関係なく一覧表示
+7. 「Menu > Export CSV...」で、表示中の一覧をCSVへ書き出し（Plus機能）
 
 詳しくは[使い方ガイド](https://msmsrep.github.io/ParallelScope/index.ja.html)を参照してください。
 
@@ -75,7 +96,7 @@ dotnet publish -c Release
 `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`以下のフォルダへ保存します。
 アプリのアンインストール時に保存されたデータも削除されます。
 
-- `settings.json`: ルートフォルダ設定
+- `settings.json`: ルート/除外フォルダ・スキャン間隔・テーマ・表示言語・ツリー最上位ノードのレイアウト・ファイル一覧の列レイアウト・お気に入り・フォルダごとのアクセス回数
 - `ParallelScope.sqlite`: ファイル一覧キャッシュ
 
 ## 開発メモ
@@ -93,18 +114,25 @@ dotnet ef database update
 ### 主な構成
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: ルート設定ダイアログ
-- `ViewModels/`: 画面ロジック
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/フォルダツリー/表示列/テーマ/言語/購読/支援）
+- `ViewModels/`: 画面ロジック（`MainWindowViewModel` は責務ごとにpartialクラスへ分割）
 - `Data/`: 設定/キャッシュ/DbContext
+- `Utilities/`: 共通ユーティリティ（パス正規化・CSV出力・列定義・仮想フォルダなど）
+- `Services/`: Microsoft Store のライセンス判定
 - `Migrations/`: EF Core マイグレーション
+- `Tests/ParallelScope.Tests/`: 単体テスト
+- `docs/`: 公開している使い方ガイド
 
 ## ParallelScope Plus（月額サブスクリプション）
 
 一部の機能は、Microsoft Store のアドオン「ParallelScope Plus」（月額サブスクリプション）として提供しています。
 
-- **対象機能**: 設定画面の「Display Columns」（ファイル一覧の表示列カスタマイズ）
-- 未購読でも、その他のすべての機能は引き続き無料で利用できます。対象機能は設定画面に薄字で表示され、操作のみ制限されます
-- 購読は、Microsoft Store 版アプリの「Settings > Display Columns」ページにある「Subscribe to Plus」ボタンから行えます
+- **対象機能**:
+  - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」と、その表示/非表示・並び順を選ぶ設定画面の「フォルダツリー」ページ（未購読の間はツリーに表示されません）
+  - 設定画面の「Display Columns」（ファイル一覧の表示列・並び順・列幅のカスタマイズ）
+  - 「Menu > Export CSV...」（表示中の一覧のCSV出力）
+- 未購読でも、その他のすべての機能は引き続き無料で利用できます。対象機能は設定画面に薄字で表示されて操作のみ制限されるか、実行時に購読ページへの案内が表示されます
+- 購読は、Microsoft Store 版アプリの「Settings > Subscription」ページにある「Subscribe to Plus」ボタンから行えます
 - 決済・請求・解約はすべて Microsoft Store が処理します。
 
 ### OSS と課金の関係

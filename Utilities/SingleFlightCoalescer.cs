@@ -19,6 +19,21 @@ public sealed class SingleFlightCoalescer<TRequest>
         _handleAsync = handleAsync;
     }
 
+    /// <summary>
+    /// 実行中、または実行待ちのリクエストがあるか。
+    /// 「実行中なら重ねて要求しない」タイプの呼び出し元（定期実行など）が投入前に見るためのもの。
+    /// </summary>
+    public bool IsBusy
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _isRunning || _hasPendingRequest;
+            }
+        }
+    }
+
     /// <summary>リクエストを投入する。既に実行中なら最新のリクエストで上書きするだけで即座に返る。</summary>
     public void Request(TRequest request)
     {

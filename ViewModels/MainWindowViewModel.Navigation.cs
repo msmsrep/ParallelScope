@@ -29,6 +29,11 @@ public partial class MainWindowViewModel
         }
 
         var success = LoadFilesInternal(targetPath);
+        if (success)
+        {
+            RecordFolderUsage(targetPath);
+        }
+
         NotifyNavigationStateChanged();
         return success;
     }
@@ -49,6 +54,11 @@ public partial class MainWindowViewModel
         }
 
         var success = LoadFilesInternal(targetPath);
+        if (success)
+        {
+            RecordFolderUsage(targetPath);
+        }
+
         NotifyNavigationStateChanged();
         return success;
     }
@@ -100,10 +110,17 @@ public partial class MainWindowViewModel
         var previousPath = CurrentPath;
         var success = LoadFilesInternal(normalizedTargetPath);
 
-        if (success && addToHistory && !string.IsNullOrEmpty(previousPath))
+        if (success && addToHistory)
         {
-            _backHistory.Push(previousPath);
-            _forwardHistory.Clear();
+            // 「よく使う」の集計対象はユーザー操作による移動のみ。
+            // 起動時やルート設定変更時の自動移動は addToHistory=false で呼ばれるため数えない
+            RecordFolderUsage(normalizedTargetPath);
+
+            if (!string.IsNullOrEmpty(previousPath))
+            {
+                _backHistory.Push(previousPath);
+                _forwardHistory.Clear();
+            }
         }
 
         NotifyNavigationStateChanged();
@@ -113,16 +130,18 @@ public partial class MainWindowViewModel
     /// <summary>現在地・アドレス表示・検索状態を更新し、キャッシュ読込とバックグラウンド更新を開始する。</summary>
     private bool LoadFilesInternal(string folderPath)
     {
-        // 仮想「Folders」ノード: 実パスではないため存在確認・ライブFS更新は行わず、
-        // 各ルートをフォルダ行として一覧表示する（サイズはキャッシュから集計）
-        if (AllRootsVirtualFolder.Matches(folderPath))
+        // 仮想ノード（Folders / Favorites / Frequently Used）: 実パスではないため存在確認・ライブFS更新は
+        // 行わず、対応するフォルダ群をフォルダ行として一覧表示する（サイズはキャッシュから集計）
+        var virtualKind = VirtualFolders.GetKind(folderPath);
+        if (virtualKind != VirtualFolderKind.None)
         {
-            CurrentPath = AllRootsVirtualFolder.Path;
-            AddressInput = AllRootsVirtualFolder.Path;
+            var canonicalPath = VirtualFolders.GetCanonicalPath(folderPath)!;
+            CurrentPath = canonicalPath;
+            AddressInput = canonicalPath;
             SearchQuery = string.Empty;
 
-            var allRootsNavigationVersion = Interlocked.Increment(ref _navigationVersion);
-            _ = LoadAllRootsListingAsync(allRootsNavigationVersion);
+            var virtualNavigationVersion = Interlocked.Increment(ref _navigationVersion);
+            _ = LoadVirtualFolderListingAsync(canonicalPath, virtualNavigationVersion);
 
             if (IsFlatFileViewEnabled)
             {
@@ -181,10 +200,10 @@ public partial class MainWindowViewModel
 
         var navigationVersion = Interlocked.Increment(ref _navigationVersion);
 
-        if (AllRootsVirtualFolder.Matches(folderPath))
+        if (VirtualFolders.IsVirtual(folderPath))
         {
-            // 仮想ノードにはキャッシュ行もライブFSも無いため、ルート一覧の再構築のみ行う
-            _ = LoadAllRootsListingAsync(navigationVersion);
+            // 仮想ノードにはキャッシュ行もライブFSも無いため、対象フォルダ一覧の再構築のみ行う
+            _ = LoadVirtualFolderListingAsync(folderPath, navigationVersion);
         }
         else
         {
@@ -212,8 +231,8 @@ public partial class MainWindowViewModel
             return null;
         }
 
-        // 仮想「Folders」はツリーの最上位なので親は無い（Directory.GetParent に仮想パスを渡さない）
-        if (AllRootsVirtualFolder.Matches(path))
+        // 仮想ノードはツリーの最上位なので親は無い（Directory.GetParent に仮想パスを渡さない）
+        if (VirtualFolders.IsVirtual(path))
         {
             return null;
         }

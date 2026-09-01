@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Text.Json;
 using ParallelScope.Utilities;
 
@@ -9,9 +9,13 @@ public class AppSettingsRepository
 {
     private readonly string _settingsPath;
 
-    public AppSettingsRepository()
+    /// <param name="settingsDirectory">
+    /// settings.json を置くフォルダ。null（通常の起動時）ならアプリデータフォルダを使う。
+    /// テストから一時フォルダを指定し、実際の設定ファイルを壊さずに動かすための引数。
+    /// </param>
+    public AppSettingsRepository(string? settingsDirectory = null)
     {
-        var appDataDir = AppDataPathProvider.GetOrCreateAppDataDirectory();
+        var appDataDir = settingsDirectory ?? AppDataPathProvider.GetOrCreateAppDataDirectory();
         _settingsPath = Path.Combine(appDataDir, "settings.json");
     }
 

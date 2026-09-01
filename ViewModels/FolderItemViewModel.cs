@@ -10,31 +10,70 @@ namespace ParallelScope.ViewModels;
 /// <summary>フォルダツリーの1ノードを表すViewModel。子フォルダは展開時に遅延読み込みされる。</summary>
 public class FolderItemViewModel : ObservableObject
 {
-    private static readonly EnumerationOptions NonRecursiveEnumerationOptions = new()
+    private static EnumerationOptions _nonRecursiveEnumerationOptions =
+        CreateEnumerationOptions(HiddenItemVisibility.AlwaysSkippedAttributes);
+
+    /// <summary>
+    /// 子フォルダの列挙で飛ばす属性（隠し・システムフォルダを出すかの設定を反映する）。
+    /// 設定はアプリ全体で1つなので、ノードごとに持たせず静的に共有する。
+    /// 差し替えても読み込み済みの子は入れ替わらないため、変更後は <see cref="Reload"/> を呼ぶこと。
+    /// </summary>
+    public static FileAttributes AttributesToSkip
+    {
+        get => _nonRecursiveEnumerationOptions.AttributesToSkip;
+        set => _nonRecursiveEnumerationOptions = CreateEnumerationOptions(value);
+    }
+
+    private static EnumerationOptions CreateEnumerationOptions(FileAttributes attributesToSkip) => new()
     {
         RecurseSubdirectories = false,
         IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.ReparsePoint
+        AttributesToSkip = attributesToSkip
     };
+
+    // 遅延読み込み中のダミーノードの表示名（対訳表のキー）
+    private const string LoadingDisplayNameKey = "Tree.Loading";
 
     private readonly string _path;
     private readonly Func<string, bool>? _isExcludedPath;
+    private readonly bool _isShortcut;
     private ObservableCollection<FolderItemViewModel>? _subFolders;
     private bool _isScanning;
     private bool _isLoaded;
     private bool _hasSubFolders = true;
     private bool _isExpanded;
     private ImageSource? _iconSource;
+    private string _displayName = string.Empty;
+    // 仮想ノード・遅延読み込み中のダミーは表示名が言語で変わるため、対訳表のキーを控えて言語切り替え時に引き直す
+    private string? _displayNameKey;
 
-    public string DisplayName { get; set; }
+    /// <summary>ツリーに表示する名前。言語切り替えで変わりうるため変更通知を出す。</summary>
+    public string DisplayName
+    {
+        get => _displayName;
+        set => SetProperty(ref _displayName, value);
+    }
 
     public string Path => _path;
+
+    /// <summary>
+    /// お気に入り／よく使う配下のノード（実体ツリーの複製）かどうか。
+    /// 同じパスのノードがツリー上に複数現れるため、パス→TreeViewItemのマップには実体ツリー側だけを登録する
+    /// （複製を登録すると、実体ツリーで選択したつもりが複製側へ飛んでしまう）。
+    /// </summary>
+    public bool IsShortcut => _isShortcut;
+
+    /// <summary>ツリーに表示するツールチップ。同名フォルダが並びうる複製ノードのみフルパスを出す。</summary>
+    public string? ToolTipText => _isShortcut ? _path : null;
 
     public ImageSource? IconSource
     {
         get => _iconSource;
         set => SetProperty(ref _iconSource, value);
     }
+
+    /// <summary>フォルダアイコンの代わりにツリーへ表示する記号（★ など）。持たないノードはnullでアイコンを出す。</summary>
+    public string? GlyphIcon { get; }
 
     public bool IsScanning
     {
@@ -64,10 +103,11 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null)
+    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null, bool isShortcut = false)
     {
         _path = path;
         _isExcludedPath = isExcludedPath;
+        _isShortcut = isShortcut;
         DisplayName = GetDisplayName(path);
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
 
@@ -78,30 +118,43 @@ public class FolderItemViewModel : ObservableObject
             HasSubFolders = true;
             _subFolders = new ObservableCollection<FolderItemViewModel>();
             var dummy = new FolderItemViewModel(string.Empty, null);
-            dummy.DisplayName = "読み込み中...";
+            dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
             _subFolders.Add(dummy);
         }
     }
 
-    /// <summary>全ルートフォルダを子として表示する、ツリー最上位の仮想「Folders」ノードを生成する。</summary>
-    public static FolderItemViewModel CreateAllRootsNode(ObservableCollection<FolderItemViewModel> rootFolders)
+    /// <summary>ツリー最上位の仮想ノード（Favorites / Frequently Used / Folders）を生成する。</summary>
+    /// <param name="kind">仮想ノードの種類。</param>
+    /// <param name="children">子として共有するコレクション（RootFolders本体・お気に入り一覧など）。</param>
+    /// <param name="isExpanded">初期状態で展開するか。</param>
+    public static FolderItemViewModel CreateVirtualNode(
+        VirtualFolderKind kind,
+        ObservableCollection<FolderItemViewModel> children,
+        bool isExpanded)
     {
-        return new FolderItemViewModel(rootFolders);
+        return new FolderItemViewModel(kind, children, isExpanded);
     }
 
     /// <summary>
-    /// 仮想「Folders」ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体）を共有するため、
-    /// ルート設定の差分更新がそのままツリーへ反映される。実パスを持たないため遅延読み込みは行わない。
+    /// 仮想ノード用コンストラクタ。子は渡されたコレクション（RootFolders本体・お気に入り一覧など）を
+    /// 共有するため、呼び出し側の差分更新がそのままツリーへ反映される。
+    /// 実パスを持たないため遅延読み込みは行わない。
     /// </summary>
-    private FolderItemViewModel(ObservableCollection<FolderItemViewModel> subFolders)
+    private FolderItemViewModel(VirtualFolderKind kind, ObservableCollection<FolderItemViewModel> children, bool isExpanded)
     {
-        _path = AllRootsVirtualFolder.Path;
+        _path = VirtualFolders.GetPath(kind) ?? VirtualFolders.AllRootsPath;
         _isExcludedPath = null;
-        DisplayName = AllRootsVirtualFolder.DisplayName;
-        IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
-        _subFolders = subFolders;
+        SetLocalizedDisplayName(VirtualFolders.GetDisplayNameKey(kind));
+        GlyphIcon = VirtualFolders.GetGlyph(kind);
+        // 記号を持つノード（Favorites等）はアイコンを出さず、記号だけで種類を区別する
+        IconSource = GlyphIcon is null ? WindowsShellIconProvider.GetFolderSmallIcon() : null;
+        _subFolders = children;
         _isLoaded = true;
-        _isExpanded = true;
+        _isExpanded = isExpanded;
+
+        // 子が0件のとき（お気に入り未登録など）に展開ボタンを出さないよう、共有コレクションの増減に追従する
+        HasSubFolders = children.Count > 0;
+        children.CollectionChanged += (_, _) => HasSubFolders = children.Count > 0;
     }
 
     /// <summary>遅延読み込み（同期版）: パス遡査などで即座に実行が必要な場合に使用。</summary>
@@ -134,6 +187,34 @@ public class FolderItemViewModel : ObservableObject
         await Application.Current.Dispatcher.InvokeAsync(() => ApplySubFolders(subDirs));
     }
 
+    /// <summary>
+    /// 読み込み済みの子フォルダを捨て、次の展開で読み直す（隠しフォルダの表示切り替えなど、
+    /// 列挙の条件が変わったときに使う）。展開中のノードはその場で読み直す。
+    /// 子孫の展開状態は保たれない（条件が変わった以上、下位も並び直す必要があるため）。
+    /// 子を共有している仮想ノードと、遅延読み込みのダミーは対象外。
+    /// </summary>
+    public void Reload()
+    {
+        if (string.IsNullOrEmpty(_path) || VirtualFolders.IsVirtual(_path))
+        {
+            return;
+        }
+
+        _isLoaded = false;
+        _subFolders ??= new ObservableCollection<FolderItemViewModel>();
+        _subFolders.Clear();
+
+        var dummy = new FolderItemViewModel(string.Empty, null);
+        dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
+        _subFolders.Add(dummy);
+        HasSubFolders = true;
+
+        if (IsExpanded)
+        {
+            _ = EnsureLoadedAsync();
+        }
+    }
+
     /// <summary>直下の子フォルダ一覧を取得する。アクセス不可などの場合は空リストを返す。</summary>
     private List<FolderItemViewModel> GetSubFoldersList()
     {
@@ -141,10 +222,10 @@ public class FolderItemViewModel : ObservableObject
         {
             var dirInfo = new DirectoryInfo(_path);
             return dirInfo
-                .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+                .EnumerateDirectories("*", _nonRecursiveEnumerationOptions)
                 .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
                 .OrderBy(d => d.Name)
-                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath))
+                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath, _isShortcut))
                 .ToList();
         }
         catch
@@ -173,5 +254,35 @@ public class FolderItemViewModel : ObservableObject
     {
         var displayName = System.IO.Path.GetFileName(path);
         return string.IsNullOrWhiteSpace(displayName) ? path : displayName;
+    }
+
+    /// <summary>対訳表のキーで表示名を設定する（言語切り替え時に引き直せるようキーを控える）。</summary>
+    private void SetLocalizedDisplayName(string key)
+    {
+        _displayNameKey = key;
+        DisplayName = UiText.Get(key);
+    }
+
+    /// <summary>
+    /// 言語切り替え後に、対訳表から引いている表示名（仮想ノード・読み込み中のダミー）を引き直す。
+    /// 実フォルダのノードはフォルダ名がそのまま表示名なので何もしない。
+    /// </summary>
+    public void RefreshLocalizedDisplayName()
+    {
+        if (_displayNameKey is { } key)
+        {
+            DisplayName = UiText.Get(key);
+        }
+
+        // 未展開のノードがぶら下げているダミー（「読み込み中...」）も辿って更新する
+        if (_subFolders is null)
+        {
+            return;
+        }
+
+        foreach (var subFolder in _subFolders)
+        {
+            subFolder.RefreshLocalizedDisplayName();
+        }
     }
 }

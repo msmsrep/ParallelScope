@@ -15,7 +15,11 @@
             "cwd": "${workspaceFolder}",
             // 'console' フィールドの詳細については、https://aka.ms/VSCode-CS-LaunchJson-Console を参照してください
             "console": "internalConsole",
-            "stopAtEntry": false
+            "stopAtEntry": false,
+            // デバッグ実行時はStoreライセンスを取得できないため、Plus機能を強制的に有効化する
+            "env": {
+                "PARALLELSCOPE_DEBUG_PLUS": "1"
+            }
         },
         {
             "name": ".NET Core Attach",

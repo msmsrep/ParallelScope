@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ParallelScope"
+        xmlns:loc="clr-namespace:ParallelScope.Utilities"
         mc:Ignorable="d"
         Title="ParallelScope" Height="600" Width="1000"
         Icon="Assets/logo.ico"
@@ -59,10 +60,15 @@
             </Grid.ColumnDefinitions>
 
             <Menu Grid.Column="0" HorizontalAlignment="Left">
-                <MenuItem Header="Menu">
-                    <MenuItem Header="⚙  Settings" Click="OpenSettingsMenuItem_Click"/>
+                <MenuItem Header="{loc:Loc Menu}">
+                    <MenuItem Header="{loc:Loc Menu.Settings}" Click="OpenSettingsMenuItem_Click"/>
                     <Separator/>
-                    <MenuItem Header="📖  User Guide" Click="OpenUserGuideMenuItem_Click"/>
+                    <!-- Plus機能。未購読時もメニューは出すが、薄字で押せない状態にする
+                         （購読状態が分かる前に押せてしまわないよう既定は無効） -->
+                    <MenuItem Name="ExportCsvMenuItem" Header="{loc:Loc Menu.ExportCsv}"
+                              IsEnabled="False" Click="ExportCsvMenuItem_Click"/>
+                    <Separator/>
+                    <MenuItem Header="{loc:Loc Menu.UserGuide}" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>
 
@@ -73,11 +79,12 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <Button Content="← Back" Width="80" Margin="0,0,6,0" Click="BackButton_Click"
+                    <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
+                    <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
                             IsEnabled="{Binding CanGoBack}"/>
-                    <Button Content="Forward →" Width="80" Margin="0,0,6,0" Click="ForwardButton_Click"
+                    <Button Content="{loc:Loc Nav.Forward}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="ForwardButton_Click"
                             IsEnabled="{Binding CanGoForward}"/>
-                    <Button Content="↑ Up" Width="80" Click="UpButton_Click"
+                    <Button Content="{loc:Loc Nav.Up}" MinWidth="80" Padding="8,0" Click="UpButton_Click"
                             IsEnabled="{Binding CanGoUp}"/>
                 </StackPanel>
 
@@ -93,6 +100,7 @@
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
+                      ContextMenuOpening="FolderTreeView_ContextMenuOpening"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
                 <TreeView.ItemContainerStyle>
                     <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
@@ -112,7 +120,6 @@
                                 </ItemsPanelTemplate>
                             </Setter.Value>
                         </Setter>
-                        <EventSetter Event="ContextMenuOpening" Handler="FolderTreeItem_ContextMenuOpening"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
@@ -120,8 +127,34 @@
                 </TreeView.ItemContainerStyle>
                 <TreeView.ItemTemplate>
                     <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
-                        <StackPanel Orientation="Horizontal">
-                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
+                        <!-- ToolTipTextは、同名フォルダが並びうるお気に入り／よく使い配下のノードのみ値を持つ
+                             （nullの通常ノードではツールチップ自体が出ない） -->
+                        <StackPanel Orientation="Horizontal" ToolTip="{Binding ToolTipText}">
+                            <!-- 仮想ノード（Favorites等）はフォルダアイコンの代わりに記号を出す。
+                                 IconSource と GlyphIcon はどちらか一方だけが値を持つ -->
+                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0">
+                                <Image.Style>
+                                    <Style TargetType="Image">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IconSource}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Image.Style>
+                            </Image>
+                            <TextBlock Text="{Binding GlyphIcon}" Width="16" Margin="0,0,6,0"
+                                       TextAlignment="Center" VerticalAlignment="Center">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding GlyphIcon}" Value="{x:Null}">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                             <TextBlock Style="{StaticResource ScanningIndicatorStyle}">
                                 <TextBlock.RenderTransform>
                                     <RotateTransform Angle="0"/>
@@ -158,12 +191,12 @@
                          Height="28"
                          VerticalContentAlignment="Center"/>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
-                <ToggleButton Grid.Column="1" Width="72"
+                <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
                               IsChecked="{Binding IsFlatFileViewEnabled}">
                     <!-- ON時の背景を薄くした（App.xaml参照）ので、文字色も通常の色にする。
                          テンプレート側がON時の文字色を直接指定してくるため、スタイルではなく
                          Contentに置いたTextBlockのローカル値で上書きする -->
-                    <TextBlock Text="All Files" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    <TextBlock Text="{loc:Loc FileList.AllFiles}" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
                 </ToggleButton>
             </Grid>
 
@@ -215,17 +248,19 @@
                 </DataGrid.CellStyle>
                 <DataGrid.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="Copy File" Click="CopyFileMenuItem_Click"/>
-                        <MenuItem Header="Copy File Name" Click="CopyFileNameMenuItem_Click"/>
-                        <MenuItem Header="Copy Full Path" Click="CopyFullPathMenuItem_Click"/>
+                        <MenuItem Header="{loc:Loc Context.CopyFile}" Click="CopyFileMenuItem_Click"/>
+                        <MenuItem Header="{loc:Loc Context.CopyFileName}" Click="CopyFileNameMenuItem_Click"/>
+                        <MenuItem Header="{loc:Loc Context.CopyFullPath}" Click="CopyFullPathMenuItem_Click"/>
                         <Separator/>
-                        <MenuItem Header="Open Parent Folder" Click="OpenParentFolderMenuItem_Click"/>
+                        <MenuItem Header="{loc:Loc Context.OpenParentFolder}" Click="OpenParentFolderMenuItem_Click"/>
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
+                    <!-- 列見出しの文字列は言語で変わるため、ApplyFileListColumnHeaders でコードビハインドから設定する
+                         （DataGridColumn は表示ツリーの外にあり、マークアップ拡張のバインディングを避けている） -->
                     <!-- テンプレート列は SortMemberPath が無いとヘッダークリックがソート対象にならない
                          （実際の比較はコードビハインドのカスタムソートで行う） -->
-                    <DataGridTemplateColumn x:Name="NameColumn" Header="Name" Width="*" SortMemberPath="Name">
+                    <DataGridTemplateColumn x:Name="NameColumn" Width="*" SortMemberPath="Name">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
@@ -237,12 +272,12 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
                     <!-- Name以外の列は設定（Display Columns）で表示/非表示を切り替えられる（ApplyFileListColumnVisibility参照） -->
-                    <DataGridTextColumn x:Name="LocationColumn" Header="Location" Binding="{Binding Location}" Width="220" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="TypeColumn" Header="Type" Binding="{Binding TypeText}" Width="110" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="SizeColumn" Header="Size" Binding="{Binding SizeText}" Width="100" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="ModifiedColumn" Header="Modified" Binding="{Binding ModifiedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="CreatedColumn" Header="Created" Binding="{Binding CreatedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="AttributesColumn" Header="Attributes" Binding="{Binding AttributesText}" Width="80" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="LocationColumn" Binding="{Binding Location}" Width="220" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="TypeColumn" Binding="{Binding TypeText}" Width="110" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="SizeColumn" Binding="{Binding SizeText}" Width="100" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="ModifiedColumn" Binding="{Binding ModifiedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="CreatedColumn" Binding="{Binding CreatedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
+                    <DataGridTextColumn x:Name="AttributesColumn" Binding="{Binding AttributesText}" Width="80" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
                 </DataGrid.Columns>
             </DataGrid>
             </Grid>

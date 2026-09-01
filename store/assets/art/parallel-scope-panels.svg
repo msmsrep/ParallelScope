@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  ストア掲載画像（ポスター／ボックス／スーパーヒーローアート）に使う絵柄。
+  store/assets/generate-store-art.py が Inkscape で起こして使う。
+
+  アプリの構図（左にフォルダツリー、右にファイル一覧）をそのまま2枚のパネルに
+  見立てたもの。奥のパネルは「離れた場所にある3つのルートフォルダ」、
+  手前のパネルは「それらを横断してひとつにまとめた一覧」を表す。
+
+  線は濃紺 #18193F、紙は #FCFCFF、強調はアイコンと同じ藤色 #9FA8DA。
+  いずれもアイコン（Assets/icon.svg）の色から起こしていて、掲載画像の地色
+  （generate-store-art.py / compose-screenshots.py）と同じ系統に揃えてある。
+  フォルダは黄色（#F6B93B / #E5A32B）で、Windowsのフォルダアイコンに寄せてある。
+  縦横比はスーパーヒーローアート等の配置計算が参考プロジェクトと同じになるよう
+  950x630（generate-store-art.py の SHEETS_RATIO）に合わせている。
+-->
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="950" height="630" viewBox="0 0 950 630">
+  <defs>
+    <!-- フォルダ1個ぶんの絵。tree/list の両方から使い回す -->
+    <g id="folder">
+      <path d="M 0 3 L 11 3 L 15 9 L 30 9 A 3 3 0 0 1 33 12 L 33 27 A 3 3 0 0 1 30 30 L 0 30 A 3 3 0 0 1 -3 27 L -3 6 A 3 3 0 0 1 0 3 Z"
+            fill="#F6B93B" stroke="#E5A32B" stroke-width="2" stroke-linejoin="round"/>
+    </g>
+    <!-- ファイル1個ぶんの絵（角を折った紙） -->
+    <g id="file">
+      <path d="M 0 0 L 18 0 L 27 10 L 27 32 L 0 32 Z"
+            fill="#FFFFFF" stroke="#18193F" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M 18 0 L 18 10 L 27 10" fill="none" stroke="#18193F" stroke-width="2.5" stroke-linejoin="round"/>
+    </g>
+  </defs>
+
+  <!-- 奥のパネル: フォルダツリー（3つのルート） -->
+  <g>
+    <rect x="30" y="30" width="620" height="440" rx="14" fill="#FCFCFF"
+          stroke="#18193F" stroke-width="5" stroke-linejoin="round"/>
+
+    <!-- 3本のルート。縦の連結線と、そこから伸びる枝でツリーに見せる -->
+    <g stroke="#18193F" stroke-width="3" fill="none" stroke-linecap="round">
+      <line x1="96" y1="118" x2="96" y2="404"/>
+      <line x1="96" y1="118" x2="132" y2="118"/>
+      <line x1="96" y1="214" x2="132" y2="214"/>
+      <line x1="96" y1="310" x2="132" y2="310"/>
+      <line x1="96" y1="404" x2="132" y2="404"/>
+    </g>
+
+    <!-- ルート3つ。それぞれ配下に2つの子フォルダを持たせて「別の場所」を表す -->
+    <g>
+      <use href="#folder" x="140" y="103"/>
+      <rect x="196" y="110" width="200" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <g stroke="#18193F" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <line x1="196" y1="118" x2="196" y2="166"/>
+        <line x1="196" y1="166" x2="222" y2="166"/>
+      </g>
+      <use href="#folder" x="230" y="151"/>
+      <rect x="286" y="158" width="132" height="14" rx="7" fill="#18193F" opacity="0.34"/>
+    </g>
+
+    <g>
+      <use href="#folder" x="140" y="199"/>
+      <rect x="196" y="206" width="236" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <g stroke="#18193F" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <line x1="196" y1="214" x2="196" y2="262"/>
+        <line x1="196" y1="262" x2="222" y2="262"/>
+      </g>
+      <use href="#folder" x="230" y="247"/>
+      <rect x="286" y="254" width="168" height="14" rx="7" fill="#18193F" opacity="0.34"/>
+    </g>
+
+    <g>
+      <use href="#folder" x="140" y="295"/>
+      <rect x="196" y="302" width="180" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <g stroke="#18193F" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <line x1="196" y1="310" x2="196" y2="358"/>
+        <line x1="196" y1="358" x2="222" y2="358"/>
+      </g>
+      <use href="#folder" x="230" y="343"/>
+      <rect x="286" y="350" width="112" height="14" rx="7" fill="#18193F" opacity="0.34"/>
+    </g>
+
+    <use href="#folder" x="140" y="389"/>
+    <rect x="196" y="396" width="150" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+  </g>
+
+  <!-- 手前のパネル: 横断した1枚の一覧 -->
+  <g>
+    <rect x="300" y="160" width="620" height="440" rx="14" fill="#FCFCFF"
+          stroke="#18193F" stroke-width="5" stroke-linejoin="round"/>
+
+    <!-- 検索欄。虫めがねを添えて「横断検索」を示す -->
+    <rect x="336" y="196" width="548" height="54" rx="10" fill="#FFFFFF"
+          stroke="#18193F" stroke-width="3"/>
+    <g stroke="#18193F" stroke-width="4" fill="none" stroke-linecap="round">
+      <circle cx="374" cy="219" r="13"/>
+      <line x1="384" y1="229" x2="394" y2="239"/>
+    </g>
+    <rect x="414" y="215" width="186" height="14" rx="7" fill="#18193F" opacity="0.34"/>
+
+    <!-- 一覧の行。中央2行が検索に当たったものとして藤色で塗ってある -->
+    <g>
+      <use href="#file" x="352" y="286"/>
+      <rect x="398" y="294" width="266" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <rect x="700" y="294" width="164" height="16" rx="8" fill="#18193F" opacity="0.28"/>
+    </g>
+
+    <g>
+      <rect x="330" y="342" width="560" height="66" rx="10" fill="#9FA8DA" opacity="0.45"/>
+      <use href="#file" x="352" y="358"/>
+      <rect x="398" y="366" width="222" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <rect x="700" y="366" width="132" height="16" rx="8" fill="#18193F" opacity="0.28"/>
+    </g>
+
+    <g>
+      <rect x="330" y="414" width="560" height="66" rx="10" fill="#9FA8DA" opacity="0.45"/>
+      <use href="#file" x="352" y="430"/>
+      <rect x="398" y="438" width="288" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <rect x="700" y="438" width="188" height="16" rx="8" fill="#18193F" opacity="0.28"/>
+    </g>
+
+    <g>
+      <use href="#file" x="352" y="502"/>
+      <rect x="398" y="510" width="196" height="16" rx="8" fill="#18193F" opacity="0.72"/>
+      <rect x="700" y="510" width="150" height="16" rx="8" fill="#18193F" opacity="0.28"/>
+    </g>
+  </g>
+</svg>
