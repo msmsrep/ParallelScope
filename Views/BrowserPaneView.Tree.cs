@@ -64,7 +64,7 @@ public partial class BrowserPaneView
     {
         if (e.NewValue is FolderItemViewModel folderItem)
         {
-            _viewModel.LoadFiles(folderItem.Path);
+            ActiveTab.LoadFiles(folderItem.Path);
         }
     }
 
@@ -146,6 +146,22 @@ public partial class BrowserPaneView
             DataContext = folderItem,
             PlacementTarget = treeViewItem
         };
+
+        // タブはPlus機能のため、未購読の間はメニューにも出さない
+        if (_areTabsEnabled)
+        {
+            var openInNewTabMenuItem = new MenuItem
+            {
+                Header = UiText.Get("Context.OpenInNewTab"),
+                DataContext = folderItem,
+                IsEnabled = _paneViewModel.CanAddTab
+            };
+            openInNewTabMenuItem.Click += OpenFolderInNewTabMenuItem_Click;
+
+            contextMenu.Items.Add(openInNewTabMenuItem);
+            contextMenu.Items.Add(new Separator());
+        }
+
         contextMenu.Items.Add(scanMenuItem);
 
         // お気に入りはPlus機能のため、未購読の間はメニューにも出さない
@@ -183,6 +199,15 @@ public partial class BrowserPaneView
         }
 
         await _host.RunFolderScanAsync(folderItem);
+    }
+
+    // ツリーのコンテキストメニューから、選択フォルダを新しいタブで開く
+    private void OpenFolderInNewTabMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            OpenPathInNewTab(folderItem.Path);
+        }
     }
 
     // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える
@@ -223,7 +248,7 @@ public partial class BrowserPaneView
     // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
     internal void SyncTreeSelectionToCurrentPath()
     {
-        var path = PathNormalizer.Normalize(_viewModel.CurrentPath);
+        var path = PathNormalizer.Normalize(ActiveTab.CurrentPath);
         if (string.IsNullOrWhiteSpace(path))
         {
             return;

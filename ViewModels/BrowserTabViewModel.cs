@@ -1,4 +1,5 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Data;
@@ -27,6 +28,9 @@ public partial class BrowserTabViewModel : ObservableObject
     private int _searchVersion;
     private int _flatViewVersion;
     private List<FileItemViewModel> _currentDirectoryItems = new();
+    private bool _isActive;
+    private bool _isSuspended;
+    private bool _isStale;
 
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
@@ -63,8 +67,78 @@ public partial class BrowserTabViewModel : ObservableObject
             if (SetProperty(ref _currentPath, value))
             {
                 OnPropertyChanged(nameof(CanGoUp));
+                OnPropertyChanged(nameof(DisplayName));
+                OnPropertyChanged(nameof(ToolTipText));
             }
         }
+    }
+
+    /// <summary>タブ見出しに出す名前（現在フォルダ名。仮想ノードは表示言語に応じた名前）。</summary>
+    public string DisplayName => BuildDisplayName(CurrentPath);
+
+    /// <summary>タブ見出しのツールチップ。実パスはフルパス、仮想ノードは表示名をそのまま出す。</summary>
+    public string ToolTipText => VirtualFolders.IsVirtual(CurrentPath) ? DisplayName : CurrentPath;
+
+    /// <summary>このタブが属するペインで表示中かどうか（タブ見出しの強調表示に使う）。</summary>
+    public bool IsActive
+    {
+        get => _isActive;
+        internal set => SetProperty(ref _isActive, value);
+    }
+
+    /// <summary>ドラッグ中のタブをこのタブの手前に落とす位置にいるか（挿入位置の目印の表示）。</summary>
+    public bool IsDropTargetBefore
+    {
+        get => _isDropTargetBefore;
+        internal set => SetProperty(ref _isDropTargetBefore, value);
+    }
+
+    /// <summary>ドラッグ中のタブをこのタブの後ろに落とす位置にいるか（挿入位置の目印の表示）。</summary>
+    public bool IsDropTargetAfter
+    {
+        get => _isDropTargetAfter;
+        internal set => SetProperty(ref _isDropTargetAfter, value);
+    }
+
+    private bool _isDropTargetBefore;
+    private bool _isDropTargetAfter;
+
+    /// <summary>
+    /// 一覧のソート状態（列キーと昇順かどうか）。DataGrid側の状態はタブを切り替えると失われるため、
+    /// タブごとにここへ控えて、表示し直すときにビューが復元する。nullは既定の並び（ソート指定なし）。
+    /// </summary>
+    internal string? SortColumnKey { get; set; }
+
+    internal bool IsSortAscending { get; set; } = true;
+
+    /// <summary>言語切り替え後に、仮想ノードを開いているタブの見出しを引き直す。</summary>
+    internal void RefreshLocalizedDisplayName()
+    {
+        if (!VirtualFolders.IsVirtual(CurrentPath))
+        {
+            return;
+        }
+
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(ToolTipText));
+    }
+
+    private static string BuildDisplayName(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        var kind = VirtualFolders.GetKind(path);
+        if (kind != VirtualFolderKind.None)
+        {
+            return VirtualFolders.GetDisplayName(kind);
+        }
+
+        // ドライブ直下（"D:\"）やUNC共有ルートはフォルダ名が取れないため、パスをそのまま見出しにする
+        var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        return string.IsNullOrWhiteSpace(name) ? path : name;
     }
 
     public string AddressInput
@@ -139,6 +213,80 @@ public partial class BrowserTabViewModel : ObservableObject
 
         _isFlatFileViewEnabled = isEnabled;
         OnPropertyChanged(nameof(IsFlatFileViewEnabled));
+    }
+
+    /// <summary>
+    /// 表示していない間、一覧の実体を手放してメモリを返す（フラット表示では数十万件になりうるため）。
+    /// 小さい一覧はそのまま持っておく（切り替えのたびに空表示を挟まないため）。
+    /// </summary>
+    internal void SuspendIfHeavy()
+    {
+        if (FileItems.Count < SuspendItemCountThreshold && _currentDirectoryItems.Count < SuspendItemCountThreshold)
+        {
+            return;
+        }
+
+        _isSuspended = true;
+        _currentDirectoryItems = new List<FileItemViewModel>();
+        FileItems = new ObservableCollection<FileItemViewModel>();
+    }
+
+    /// <summary>
+    /// 表示していない間にキャッシュが更新された（スキャンが走った）ことを記録する。
+    /// 全タブをその場で読み直すと数十本の再取得が同時に走るため、次に表示するときまで遅らせる。
+    /// </summary>
+    internal void MarkStale()
+    {
+        _isStale = true;
+    }
+
+    /// <summary>再び表示する際に、手放していた一覧・古くなった一覧をキャッシュから読み直す。</summary>
+    internal void OnActivated()
+    {
+        if (!_isSuspended && !_isStale)
+        {
+            return;
+        }
+
+        _isSuspended = false;
+        _isStale = false;
+        RefreshCurrentFolder();
+    }
+
+    /// <summary>この件数以上の一覧を持つタブは、非表示になった時点で一覧を手放す。</summary>
+    private const int SuspendItemCountThreshold = 5_000;
+
+    /// <summary>閉じたタブを開き直すために、復元に必要な状態を控える。</summary>
+    internal ClosedTabState CreateClosedState(int index)
+    {
+        return new ClosedTabState(
+            CurrentPath,
+            IsFlatFileViewEnabled,
+            _backHistory.ToArray(),
+            _forwardHistory.ToArray(),
+            index);
+    }
+
+    /// <summary>閉じたタブの状態（パス・モード・履歴）を復元する。</summary>
+    internal void RestoreClosedState(ClosedTabState state)
+    {
+        InitializeFlatFileViewEnabled(state.IsFlatFileViewEnabled);
+        NavigateTo(state.Path, false);
+
+        // Stack は先頭が新しい順で控えているため、逆順に積み直して元の並びに戻す
+        _backHistory.Clear();
+        foreach (var path in state.BackHistory.Reverse())
+        {
+            _backHistory.Push(path);
+        }
+
+        _forwardHistory.Clear();
+        foreach (var path in state.ForwardHistory.Reverse())
+        {
+            _forwardHistory.Push(path);
+        }
+
+        NotifyNavigationStateChanged();
     }
 
     /// <summary>表示できるルートが1つも無くなった場合に、現在地と一覧を空にする。</summary>

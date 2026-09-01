@@ -17,7 +17,8 @@ namespace ParallelScope.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     private ObservableCollection<FolderItemViewModel> _rootFolders;
-    private readonly BrowserTabViewModel _activeTab;
+    // 変更通知を画面へ中継しているタブ（アクティブなタブが切り替わるたびに繋ぎ替える）
+    private BrowserTabViewModel _observedTab;
     private readonly FileCacheRepository _fileCacheRepository;
     private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
@@ -72,40 +73,49 @@ public partial class MainWindowViewModel : ObservableObject
     public ObservableCollection<FolderItemViewModel> TreeRoots { get; } = new();
 
     /// <summary>
-    /// 現在表示中のタブ。複数タブ対応（フェーズ3）まではアプリ全体で1つだけ存在する。
+    /// 閲覧ペイン。2画面表示（フェーズ4）で2件になるまでは1件だけ存在する。
     /// </summary>
-    public BrowserTabViewModel ActiveTab => _activeTab;
+    public ObservableCollection<BrowserPaneViewModel> Panes { get; } = new();
+
+    /// <summary>操作対象のペイン（メニューやスキャンの反映先）。</summary>
+    public BrowserPaneViewModel ActivePane => Panes[0];
+
+    /// <summary>操作対象のペインで表示中のタブ。</summary>
+    public BrowserTabViewModel ActiveTab => ActivePane.ActiveTab;
+
+    /// <summary>開いているすべてのタブ（設定変更をタブ全体へ反映するために使う）。</summary>
+    private IEnumerable<BrowserTabViewModel> AllTabs => Panes.SelectMany(pane => pane.Tabs);
 
     // ここから下は、アクティブなタブの状態をそのまま見せるための委譲。
     // 画面のバインディングとコードビハインドは引き続きこのViewModelだけを見ればよい状態を保つ
-    public ObservableCollection<FileItemViewModel> FileItems => _activeTab.FileItems;
+    public ObservableCollection<FileItemViewModel> FileItems => ActiveTab.FileItems;
 
-    public string CurrentPath => _activeTab.CurrentPath;
+    public string CurrentPath => ActiveTab.CurrentPath;
 
     public string AddressInput
     {
-        get => _activeTab.AddressInput;
-        set => _activeTab.AddressInput = value;
+        get => ActiveTab.AddressInput;
+        set => ActiveTab.AddressInput = value;
     }
 
     public string SearchQuery
     {
-        get => _activeTab.SearchQuery;
-        set => _activeTab.SearchQuery = value;
+        get => ActiveTab.SearchQuery;
+        set => ActiveTab.SearchQuery = value;
     }
 
     /// <summary>trueの場合、現在フォルダ直下ではなく配下の全ファイルを再帰的に表示する。</summary>
     public bool IsFlatFileViewEnabled
     {
-        get => _activeTab.IsFlatFileViewEnabled;
-        set => _activeTab.IsFlatFileViewEnabled = value;
+        get => ActiveTab.IsFlatFileViewEnabled;
+        set => ActiveTab.IsFlatFileViewEnabled = value;
     }
 
-    public bool CanGoBack => _activeTab.CanGoBack;
+    public bool CanGoBack => ActiveTab.CanGoBack;
 
-    public bool CanGoForward => _activeTab.CanGoForward;
+    public bool CanGoForward => ActiveTab.CanGoForward;
 
-    public bool CanGoUp => _activeTab.CanGoUp;
+    public bool CanGoUp => ActiveTab.CanGoUp;
 
     public MainWindowViewModel()
         : this(new FileCacheRepository(), new AppSettingsRepository())
@@ -123,9 +133,12 @@ public partial class MainWindowViewModel : ObservableObject
         _appSettingsRepository = appSettingsRepository;
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
-        // ツリーの初期化・設定の読み込みはどちらも現在パス（＝タブの状態）を参照するため、タブを先に用意する
-        _activeTab = new BrowserTabViewModel(this);
-        _activeTab.PropertyChanged += ActiveTab_PropertyChanged;
+        // ツリーの初期化・設定の読み込みはどちらも現在パス（＝タブの状態）を参照するため、ペインとタブを先に用意する
+        var pane = new BrowserPaneViewModel(this);
+        Panes.Add(pane);
+        pane.PropertyChanged += ActivePane_PropertyChanged;
+        _observedTab = pane.ActiveTab;
+        _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
         InitializeTreeNodes();
         InitializeRootFolders();
@@ -135,5 +148,49 @@ public partial class MainWindowViewModel : ObservableObject
     private void ActiveTab_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         OnPropertyChanged(e.PropertyName);
+    }
+
+    // 表示中のタブが切り替わったら、中継先を繋ぎ替えて委譲プロパティをまとめて通知し直す
+    private void ActivePane_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(BrowserPaneViewModel.ActiveTab))
+        {
+            return;
+        }
+
+        _observedTab.PropertyChanged -= ActiveTab_PropertyChanged;
+        _observedTab = ActiveTab;
+        _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
+
+        OnPropertyChanged(nameof(ActiveTab));
+        OnPropertyChanged(nameof(FileItems));
+        OnPropertyChanged(nameof(CurrentPath));
+        OnPropertyChanged(nameof(AddressInput));
+        OnPropertyChanged(nameof(SearchQuery));
+        OnPropertyChanged(nameof(IsFlatFileViewEnabled));
+        OnPropertyChanged(nameof(CanGoBack));
+        OnPropertyChanged(nameof(CanGoForward));
+        OnPropertyChanged(nameof(CanGoUp));
+    }
+
+    /// <summary>
+    /// スキャン完了後、表示していないタブに「キャッシュが更新された」印を付ける。
+    /// 印の付いたタブは次に表示されるときに一覧を読み直す（全タブを同時に再取得しないため）。
+    /// </summary>
+    public void MarkInactiveTabsStale()
+    {
+        foreach (var tab in AllTabs.Where(tab => !tab.IsActive))
+        {
+            tab.MarkStale();
+        }
+    }
+
+    /// <summary>言語切り替え後に、仮想ノードを開いているタブの見出しを引き直す。</summary>
+    private void RefreshLocalizedTabNames()
+    {
+        foreach (var tab in AllTabs)
+        {
+            tab.RefreshLocalizedDisplayName();
+        }
     }
 }

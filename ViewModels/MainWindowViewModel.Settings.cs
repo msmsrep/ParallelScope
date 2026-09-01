@@ -14,7 +14,7 @@ public partial class MainWindowViewModel
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む
-        _activeTab.InitializeFlatFileViewEnabled(settings.IsFlatFileViewEnabled);
+        ActiveTab.InitializeFlatFileViewEnabled(settings.IsFlatFileViewEnabled);
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
         _columnOrder = NormalizeColumnOrder(settings.ColumnOrder);
         _columnWidths = NormalizeColumnWidths(settings.ColumnWidths);
@@ -188,8 +188,9 @@ public partial class MainWindowViewModel
 
         _language = language;
         AppLanguage.Apply(_language);
-        // バインディング経由で更新されないツリーの表示名（仮想ノード・読み込み中のダミー）を引き直す
+        // バインディング経由で更新されないツリー・タブ見出しの表示名（仮想ノード・読み込み中のダミー）を引き直す
         RefreshLocalizedTreeNames();
+        RefreshLocalizedTabNames();
         SaveSettings(RootFolders.Select(x => x.Path));
     }
 
@@ -198,6 +199,7 @@ public partial class MainWindowViewModel
     {
         AppLanguage.Apply(_language);
         RefreshLocalizedTreeNames();
+        RefreshLocalizedTabNames();
     }
 
     /// <summary>設定画面からの入力を適用し、設定ファイルへ保存する。</summary>
@@ -246,7 +248,10 @@ public partial class MainWindowViewModel
             folder.Reload();
         }
 
-        RefreshCurrentFolder();
+        foreach (var tab in AllTabs)
+        {
+            tab.RefreshCurrentFolder();
+        }
     }
 
     public void ApplyRootPaths(IEnumerable<string> rootPaths)
@@ -329,21 +334,29 @@ public partial class MainWindowViewModel
         var currentRoot = RootFolders.FirstOrDefault();
         if (currentRoot is null)
         {
-            _activeTab.Clear();
+            foreach (var tab in AllTabs)
+            {
+                tab.Clear();
+            }
+
             return;
         }
 
-        if (VirtualFolders.IsVirtual(CurrentPath))
+        // ルート構成の変更は開いている全タブに効く（表示していないタブも次に開いた時点で正しい内容になる）
+        foreach (var tab in AllTabs)
         {
-            // 仮想ノードを表示中はナビゲーションせず、変更後の構成で一覧を取り直す
-            RefreshCurrentFolder();
-            return;
-        }
+            if (VirtualFolders.IsVirtual(tab.CurrentPath))
+            {
+                // 仮想ノードを表示中はナビゲーションせず、変更後の構成で一覧を取り直す
+                tab.RefreshCurrentFolder();
+                continue;
+            }
 
-        if (string.IsNullOrWhiteSpace(CurrentPath)
-            || !RootFolders.Any(x => PathNormalizer.IsAncestorOrSame(x.Path, CurrentPath)))
-        {
-            NavigateTo(currentRoot.Path, false);
+            if (string.IsNullOrWhiteSpace(tab.CurrentPath)
+                || !RootFolders.Any(x => PathNormalizer.IsAncestorOrSame(x.Path, tab.CurrentPath)))
+            {
+                tab.NavigateTo(currentRoot.Path, false);
+            }
         }
     }
 
@@ -355,7 +368,7 @@ public partial class MainWindowViewModel
             RootPaths = rootPaths.ToList(),
             ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
             FullScanIntervalHours = _fullScanIntervalHours,
-            IsFlatFileViewEnabled = _activeTab.IsFlatFileViewEnabled,
+            IsFlatFileViewEnabled = ActiveTab.IsFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
             ColumnOrder = _columnOrder.ToList(),
             ColumnWidths = new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase),

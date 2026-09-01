@@ -18,6 +18,12 @@ internal static class UiTextResources
         ["Nav.Up"] = "↑ Up",
         ["FileList.AllFiles"] = "All Files",
 
+        // タブ列
+        ["Tab.New"] = "New Tab",
+        ["Tab.Close"] = "Close Tab",
+        ["Tab.Duplicate"] = "Duplicate Tab",
+        ["Tab.CloseOthers"] = "Close Other Tabs",
+
         // ファイル一覧の列見出し
         ["Column.Name"] = "Name",
         ["Column.Location"] = "Location",
@@ -32,6 +38,7 @@ internal static class UiTextResources
         ["Context.CopyFileName"] = "Copy File Name",
         ["Context.CopyFullPath"] = "Copy Full Path",
         ["Context.OpenParentFolder"] = "Open Parent Folder",
+        ["Context.OpenInNewTab"] = "Open in New Tab",
         ["Context.ScanSubtree"] = "Scan everything under this folder",
         ["Context.AddFavorite"] = "★  Add to Favorites",
         ["Context.RemoveFavorite"] = "☆  Remove from Favorites",
@@ -176,6 +183,12 @@ internal static class UiTextResources
         ["Nav.Up"] = "↑ 上へ",
         ["FileList.AllFiles"] = "All Files",
 
+        // タブ列
+        ["Tab.New"] = "新しいタブ",
+        ["Tab.Close"] = "タブを閉じる",
+        ["Tab.Duplicate"] = "タブを複製",
+        ["Tab.CloseOthers"] = "他のタブを閉じる",
+
         // ファイル一覧の列見出し
         ["Column.Name"] = "名前",
         ["Column.Location"] = "場所",
@@ -190,6 +203,7 @@ internal static class UiTextResources
         ["Context.CopyFileName"] = "ファイル名をコピー",
         ["Context.CopyFullPath"] = "フルパスをコピー",
         ["Context.OpenParentFolder"] = "親フォルダーを開く",
+        ["Context.OpenInNewTab"] = "新しいタブで開く",
         ["Context.ScanSubtree"] = "このフォルダー配下をすべてスキャン",
         ["Context.AddFavorite"] = "★  お気に入りに追加",
         ["Context.RemoveFavorite"] = "☆  お気に入りから削除",

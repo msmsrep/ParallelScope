@@ -12,26 +12,33 @@ namespace ParallelScope.Views;
 /// フォルダツリーとファイル一覧を1組にした閲覧ペイン。
 /// 2画面表示（分割）では同じコントロールが2つ並ぶため、ツリーの選択同期・
 /// ファイル一覧の列レイアウトなど「表示に紐づく状態」はすべてこのインスタンス側に持つ。
-/// 各責務（列/ツリー/一覧）は partial クラスとしてファイル分割されている。
+/// 各責務（タブ/列/ツリー/一覧）は partial クラスとしてファイル分割されている。
 /// </summary>
 public partial class BrowserPaneView : UserControl
 {
     private readonly MainWindowViewModel _viewModel;
+    private readonly BrowserPaneViewModel _paneViewModel;
     private readonly StoreLicenseService _storeLicenseService;
     private readonly IBrowserPaneHost _host;
 
-    internal BrowserPaneView(MainWindowViewModel viewModel, StoreLicenseService storeLicenseService, IBrowserPaneHost host)
+    internal BrowserPaneView(
+        MainWindowViewModel viewModel,
+        BrowserPaneViewModel paneViewModel,
+        StoreLicenseService storeLicenseService,
+        IBrowserPaneHost host)
     {
         InitializeComponent();
 
         _viewModel = viewModel;
+        _paneViewModel = paneViewModel;
         _storeLicenseService = storeLicenseService;
         _host = host;
 
         _defaultFileListColumnWidths = GetFileListColumnsByKey()
             .ToDictionary(pair => pair.Key, pair => pair.Value.Width, StringComparer.OrdinalIgnoreCase);
 
-        DataContext = _viewModel;
+        DataContext = _paneViewModel;
+        _paneViewModel.PropertyChanged += PaneViewModel_PropertyChanged;
         AppLanguage.Changed += AppLanguage_Changed;
 
         ApplyFileListColumnHeaders();
@@ -39,9 +46,13 @@ public partial class BrowserPaneView : UserControl
         SyncTreeSelectionToCurrentPath();
     }
 
-    /// <summary>ウィンドウを閉じる際に、購読しているアプリ全体のイベントから外れる。</summary>
+    /// <summary>このペインで表示中のタブ。</summary>
+    private BrowserTabViewModel ActiveTab => _paneViewModel.ActiveTab;
+
+    /// <summary>ウィンドウを閉じる際に、購読しているイベントから外れる。</summary>
     internal void Detach()
     {
+        _paneViewModel.PropertyChanged -= PaneViewModel_PropertyChanged;
         AppLanguage.Changed -= AppLanguage_Changed;
     }
 
@@ -54,7 +65,7 @@ public partial class BrowserPaneView : UserControl
     // 戻る履歴のフォルダへ移動し、ツリー選択を同期する
     private void BackButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.GoBack())
+        if (ActiveTab.GoBack())
         {
             SyncTreeSelectionToCurrentPath();
         }
@@ -63,7 +74,7 @@ public partial class BrowserPaneView : UserControl
     // 進む履歴のフォルダへ移動し、ツリー選択を同期する
     private void ForwardButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.GoForward())
+        if (ActiveTab.GoForward())
         {
             SyncTreeSelectionToCurrentPath();
         }
@@ -72,7 +83,7 @@ public partial class BrowserPaneView : UserControl
     // 親フォルダへ移動し、ツリー選択を同期する
     private void UpButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.GoUp())
+        if (ActiveTab.GoUp())
         {
             SyncTreeSelectionToCurrentPath();
         }
@@ -93,7 +104,7 @@ public partial class BrowserPaneView : UserControl
     // アドレス欄のパスへ移動する。失敗した場合はエラーメッセージを表示する
     private void NavigateByAddressInput()
     {
-        if (_viewModel.TryNavigateByAddressInput())
+        if (ActiveTab.TryNavigateByAddressInput())
         {
             SyncTreeSelectionToCurrentPath();
             return;

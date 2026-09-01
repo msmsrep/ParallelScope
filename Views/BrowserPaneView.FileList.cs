@@ -86,9 +86,9 @@ public partial class BrowserPaneView
     // 既定のファイル名を "ParallelScope_<フォルダ名>_yyyyMMdd_HHmmss.csv" で組み立てる
     private string BuildCsvFileName()
     {
-        var folderName = string.IsNullOrWhiteSpace(_viewModel.CurrentPath)
+        var folderName = string.IsNullOrWhiteSpace(ActiveTab.CurrentPath)
             ? string.Empty
-            : Path.GetFileName(_viewModel.CurrentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            : Path.GetFileName(ActiveTab.CurrentPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
         // ドライブ直下（"D:\"）などフォルダ名が取れない場合と、パスに使えない文字を除去した結果空になる場合がある
         var sanitized = new string(folderName.Where(c => !Path.GetInvalidFileNameChars().Contains(c)).ToArray());
@@ -112,7 +112,7 @@ public partial class BrowserPaneView
 
         if (item.IsFolder)
         {
-            if (_viewModel.LoadFiles(item.FullPath))
+            if (ActiveTab.LoadFiles(item.FullPath))
             {
                 SyncTreeSelectionToCurrentPath();
             }
@@ -130,6 +130,22 @@ public partial class BrowserPaneView
         catch (Exception ex)
         {
             MessageBox.Show(UiText.Format("File.OpenFailed", ex.Message), UiText.Get("Dialog.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // 中クリックされたフォルダ行を新しいタブで開く
+    private void FileListDataGrid_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.ChangedButton != MouseButton.Middle)
+        {
+            return;
+        }
+
+        var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
+        if (row?.Item is FileItemViewModel { IsFolder: true } item)
+        {
+            OpenPathInNewTab(item.FullPath);
+            e.Handled = true;
         }
     }
 
@@ -152,16 +168,108 @@ public partial class BrowserPaneView
     // 生値比較は文字列比較より速く、Size列は数値順（既定の文字列順では "9 KB" > "12 MB" となる）で並ぶ
     private void FileListDataGrid_Sorting(object sender, DataGridSortingEventArgs e)
     {
+        var columnKey = GetColumnKey(e.Column);
+        if (columnKey is null)
+        {
+            return;
+        }
+
+        var isAscending = e.Column.SortDirection != ListSortDirection.Ascending;
+
+        // 並びはタブごとの状態。DataGrid側はタブを切り替えると失われるため、タブに控えて復元できるようにする
+        ActiveTab.SortColumnKey = columnKey;
+        ActiveTab.IsSortAscending = isAscending;
+
+        if (GetSortComparison(columnKey) is null)
+        {
+            // その他の列は既定のソートに任せる。カスタムソートが残っていると
+            // SortDescriptions より優先されてしまうため解除しておく
+            if (CollectionViewSource.GetDefaultView(FileListDataGrid.ItemsSource) is ListCollectionView defaultView)
+            {
+                defaultView.CustomSort = null;
+            }
+
+            return;
+        }
+
+        e.Handled = true;
+        ApplySort(columnKey, isAscending);
+    }
+
+    /// <summary>表示中のタブに控えてあるソート順を、一覧へ反映し直す（タブ切り替え時）。</summary>
+    private void ApplyActiveTabSort()
+    {
+        var tab = ActiveTab;
+        if (tab.SortColumnKey is not { } columnKey)
+        {
+            // ソート指定の無いタブは既定の並び（取得順）に戻す
+            if (CollectionViewSource.GetDefaultView(FileListDataGrid.ItemsSource) is ListCollectionView view)
+            {
+                view.CustomSort = null;
+                view.SortDescriptions.Clear();
+            }
+
+            foreach (var column in FileListDataGrid.Columns)
+            {
+                column.SortDirection = null;
+            }
+
+            return;
+        }
+
+        ApplySort(columnKey, tab.IsSortAscending);
+    }
+
+    /// <summary>指定列でファイル一覧を並べ替え、ヘッダーの矢印表示も合わせる。</summary>
+    private void ApplySort(string columnKey, bool isAscending)
+    {
         if (CollectionViewSource.GetDefaultView(FileListDataGrid.ItemsSource) is not ListCollectionView view)
         {
             return;
         }
 
-        Comparison<FileItemViewModel>? compareAscending = null;
-        if (ReferenceEquals(e.Column, NameColumn))
+        var sortedColumn = GetFileListColumnsByKey().GetValueOrDefault(columnKey);
+        var direction = isAscending ? ListSortDirection.Ascending : ListSortDirection.Descending;
+
+        // e.Handled = true にすると既定処理によるヘッダーの矢印表示の更新も行われないため、自前で反映する
+        foreach (var column in FileListDataGrid.Columns)
+        {
+            column.SortDirection = ReferenceEquals(column, sortedColumn) ? direction : null;
+        }
+
+        var compareAscending = GetSortComparison(columnKey);
+        if (compareAscending is null)
+        {
+            // 生値比較を持たない列は、表示プロパティでの既定のソートに任せる
+            view.CustomSort = null;
+            view.SortDescriptions.Clear();
+            if (sortedColumn?.SortMemberPath is { Length: > 0 } sortMemberPath)
+            {
+                view.SortDescriptions.Add(new SortDescription(sortMemberPath, direction));
+            }
+
+            return;
+        }
+
+        // 既定ソートで積まれた SortDescriptions が残っていると意図しない並びになるため消しておく
+        view.SortDescriptions.Clear();
+        view.CustomSort = isAscending
+            ? Comparer<FileItemViewModel>.Create(compareAscending)
+            : Comparer<FileItemViewModel>.Create((a, b) => compareAscending(b, a));
+    }
+
+    /// <summary>
+    /// Name/Size/Modified/Created 列の比較関数（生値での比較）。表示文字列は保持されず表示時に生成されるため、
+    /// 既定の（表示プロパティ経由の）ソートだと比較のたびに全行分の文字列生成が走ってしまう。
+    /// 生値比較は文字列比較より速く、Size列は数値順（既定の文字列順では "9 KB" > "12 MB" となる）で並ぶ。
+    /// 対象外の列は null を返し、既定のソートに任せる。
+    /// </summary>
+    private static Comparison<FileItemViewModel>? GetSortComparison(string columnKey)
+    {
+        if (string.Equals(columnKey, FileListColumns.Name, StringComparison.OrdinalIgnoreCase))
         {
             // 初期表示と同じ「フォルダを先に、次に名前順」で並べる（降順では全体が反転してフォルダが末尾側になる）
-            compareAscending = (a, b) =>
+            return (a, b) =>
             {
                 var folderCompare = b.IsFolder.CompareTo(a.IsFolder);
                 return folderCompare != 0
@@ -169,54 +277,60 @@ public partial class BrowserPaneView
                     : string.Compare(a.Name, b.Name, StringComparison.OrdinalIgnoreCase);
             };
         }
-        else if (ReferenceEquals(e.Column, SizeColumn))
+
+        if (string.Equals(columnKey, FileListColumns.Size, StringComparison.OrdinalIgnoreCase))
         {
             // サイズ未取得（null）は最小として先頭に寄せる
-            compareAscending = (a, b) => (a.SizeBytes ?? -1L).CompareTo(b.SizeBytes ?? -1L);
+            return (a, b) => (a.SizeBytes ?? -1L).CompareTo(b.SizeBytes ?? -1L);
         }
-        else if (ReferenceEquals(e.Column, ModifiedColumn))
+
+        if (string.Equals(columnKey, FileListColumns.Modified, StringComparison.OrdinalIgnoreCase))
         {
-            compareAscending = (a, b) => a.ModifiedAt.CompareTo(b.ModifiedAt);
+            return (a, b) => a.ModifiedAt.CompareTo(b.ModifiedAt);
         }
-        else if (ReferenceEquals(e.Column, CreatedColumn))
+
+        if (string.Equals(columnKey, FileListColumns.Created, StringComparison.OrdinalIgnoreCase))
         {
-            compareAscending = (a, b) => (a.CreatedAt ?? DateTime.MinValue).CompareTo(b.CreatedAt ?? DateTime.MinValue);
+            return (a, b) => (a.CreatedAt ?? DateTime.MinValue).CompareTo(b.CreatedAt ?? DateTime.MinValue);
         }
 
-        if (compareAscending is null)
+        return null;
+    }
+
+    /// <summary>ファイル一覧の列に対応する列キーを返す（未知の列は null）。</summary>
+    private string? GetColumnKey(DataGridColumn column)
+    {
+        foreach (var (key, candidate) in GetFileListColumnsByKey())
         {
-            // その他の列は既定のソートに任せる。カスタムソートが残っていると
-            // SortDescriptions より優先されてしまうため解除しておく
-            view.CustomSort = null;
-            return;
+            if (ReferenceEquals(candidate, column))
+            {
+                return key;
+            }
         }
 
-        e.Handled = true;
-
-        var direction = e.Column.SortDirection != ListSortDirection.Ascending
-            ? ListSortDirection.Ascending
-            : ListSortDirection.Descending;
-
-        // e.Handled = true にすると既定処理によるヘッダーの矢印表示の更新も行われないため、自前で反映する
-        foreach (var column in FileListDataGrid.Columns)
-        {
-            column.SortDirection = ReferenceEquals(column, e.Column) ? direction : null;
-        }
-
-        // 既定ソートで積まれた SortDescriptions が残っていると意図しない並びになるため消しておく
-        view.SortDescriptions.Clear();
-        view.CustomSort = direction == ListSortDirection.Ascending
-            ? Comparer<FileItemViewModel>.Create(compareAscending)
-            : Comparer<FileItemViewModel>.Create((a, b) => compareAscending(b, a));
+        return null;
     }
 
     // 行以外（空白部分・列ヘッダー）ではコンテキストメニューを表示しない
     private void FileListDataGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
         var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
-        if (row is null || row.Item is not FileItemViewModel)
+        if (row is null || row.Item is not FileItemViewModel item)
         {
             e.Handled = true;
+            return;
+        }
+
+        // 「新しいタブで開く」はフォルダ行のときだけ（Plus未購読の間は常に無効）
+        OpenInNewTabMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && _paneViewModel.CanAddTab;
+    }
+
+    // 右クリックメニューから、選択中のフォルダを新しいタブで開く
+    private void OpenInNewTabMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is { IsFolder: true } item)
+        {
+            OpenPathInNewTab(item.FullPath);
         }
     }
 

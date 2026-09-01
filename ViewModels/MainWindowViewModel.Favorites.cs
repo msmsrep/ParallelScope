@@ -113,17 +113,21 @@ public partial class MainWindowViewModel
     /// <summary>ツリーから消えた仮想ノードを開いたままにしないよう、「Folders」へ退避する。</summary>
     private void LeaveHiddenVirtualFolder()
     {
-        if (!VirtualFolders.IsVirtual(CurrentPath))
+        // 表示していないタブも同じノードを開いたままにできないため、全タブを対象にする
+        foreach (var tab in AllTabs)
         {
-            return;
-        }
+            if (!VirtualFolders.IsVirtual(tab.CurrentPath))
+            {
+                continue;
+            }
 
-        if (TreeRoots.Any(node => string.Equals(node.Path, CurrentPath, StringComparison.OrdinalIgnoreCase)))
-        {
-            return;
-        }
+            if (TreeRoots.Any(node => string.Equals(node.Path, tab.CurrentPath, StringComparison.OrdinalIgnoreCase)))
+            {
+                continue;
+            }
 
-        NavigateTo(VirtualFolders.AllRootsPath, false);
+            tab.NavigateTo(VirtualFolders.AllRootsPath, false);
+        }
     }
 
     /// <summary>ツリーに表示するノードのキー一覧（並び順どおり。常に表示の「Folders」は含まない）。</summary>

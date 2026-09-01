@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Diagnostics;
+using System.Windows.Input;
 using System.Globalization;
 using System.Windows.Threading;
 using ParallelScope.Services;
@@ -38,11 +39,13 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
 
         // ペインは列レイアウトの初期化にViewModelを必要とするため、ViewModelの生成後に組み立てる
-        _pane = new BrowserPaneView(_viewModel, _storeLicenseService, this);
+        _pane = new BrowserPaneView(_viewModel, _viewModel.ActivePane, _storeLicenseService, this);
         PaneHost.Children.Add(_pane);
 
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        // タブのショートカットは、アドレス欄・検索欄に入力中でも効かせたいのでウィンドウ側で拾う
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
     }
 
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
@@ -80,6 +83,7 @@ public partial class MainWindow : Window
 
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
+        PreviewKeyDown -= MainWindow_PreviewKeyDown;
         _pane.Detach();
     }
 
@@ -91,8 +95,47 @@ public partial class MainWindow : Window
 
         _viewModel.SetPlusFeaturesEnabled(isActive);
         ExportCsvMenuItem.IsEnabled = isActive;
+        _pane.SetTabsEnabled(isActive);
         _pane.ApplyFileListColumnVisibility();
         _pane.ApplyFileListColumnLayout();
+    }
+
+    // タブ操作のキーボードショートカット（Plus機能のため、未購読の間はペイン側が受け付けない）
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            return;
+        }
+
+        var isShiftPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+
+        switch (e.Key)
+        {
+            case Key.T when isShiftPressed:
+                _pane.ReopenClosedTab();
+                break;
+            case Key.T:
+                _pane.OpenNewTab();
+                break;
+            case Key.W:
+                _pane.CloseActiveTab();
+                break;
+            case Key.Tab:
+                _pane.ActivateAdjacentTab(!isShiftPressed);
+                break;
+            case >= Key.D1 and <= Key.D8:
+                _pane.ActivateTabAt(e.Key - Key.D1);
+                break;
+            case Key.D9:
+                // ブラウザーと同じく、Ctrl+9 は位置ではなく末尾のタブ
+                _pane.ActivateLastTab();
+                break;
+            default:
+                return;
+        }
+
+        e.Handled = true;
     }
 
     // "アプリ名" を "アプリ名 vX.Y.Z.W" に組み立てる。バージョンが取得できない場合は元のタイトルのまま返す

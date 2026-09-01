@@ -7,6 +7,8 @@
              mc:Ignorable="d">
     <UserControl.Resources>
 
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
+
         <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
             <Setter Property="Text" Value="⟳"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
@@ -39,6 +41,7 @@
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -48,8 +51,125 @@
             <ColumnDefinition Width="*" MinWidth="240"/>
         </Grid.ColumnDefinitions>
 
+        <!-- タブ列（Plus機能。未購読の間はコードビハインドが非表示にする） -->
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Name="TabStripBorder" Margin="0,0,0,8" Padding="4,3"
+                Visibility="Collapsed"
+                Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- タブが増えて溢れたら横スクロールで辿れるようにする -->
+                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl Name="TabItemsControl" ItemsSource="{Binding Tabs}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- ドラッグ中の挿入位置の目印（前／後ろ） -->
+                                    <Rectangle Grid.Column="0" Width="2" Margin="0,2"
+                                               Fill="{DynamicResource TextFillColorPrimaryBrush}">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDropTargetBefore}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+
+                                    <Border Grid.Column="1" AllowDrop="True"
+                                            ToolTip="{Binding ToolTipText}"
+                                            PreviewMouseDown="TabItem_PreviewMouseDown"
+                                            MouseMove="TabItem_MouseMove"
+                                            DragOver="TabItem_DragOver"
+                                            DragLeave="TabItem_DragLeave"
+                                            Drop="TabItem_Drop">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="CornerRadius" Value="6"/>
+                                                <Setter Property="Padding" Value="8,3"/>
+                                                <Setter Property="Margin" Value="0,0,2,0"/>
+                                                <Style.Triggers>
+                                                    <!-- 表示中のタブの強調は、ホバーより後ろに置いて優先させる -->
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource ToggleButtonBackgroundCheckedPointerOver}"/>
+                                                    </Trigger>
+                                                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                        <Setter Property="Background" Value="{StaticResource ToggleButtonBackgroundChecked}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <Border.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="{loc:Loc Tab.New}" Click="NewTabMenuItem_Click"/>
+                                                <MenuItem Header="{loc:Loc Tab.Duplicate}" Click="DuplicateTabMenuItem_Click"/>
+                                                <Separator/>
+                                                <MenuItem Header="{loc:Loc Tab.Close}" Click="CloseTabMenuItem_Click"/>
+                                                <MenuItem Header="{loc:Loc Tab.CloseOthers}" Click="CloseOtherTabsMenuItem_Click"/>
+                                            </ContextMenu>
+                                        </Border.ContextMenu>
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="{Binding DisplayName}" MaxWidth="160"
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
+                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                            <!-- 最後の1つは閉じられないため、閉じるボタン自体を出さない -->
+                                            <Button Content="✕" Margin="6,0,0,0" Padding="3,0" FontSize="10"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    ToolTip="{loc:Loc Tab.Close}"
+                                                    Click="CloseTabButton_Click"
+                                                    Visibility="{Binding DataContext.CanCloseTabs, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Rectangle Grid.Column="2" Width="2" Margin="0,2"
+                                               Fill="{DynamicResource TextFillColorPrimaryBrush}">
+                                        <Rectangle.Style>
+                                            <Style TargetType="Rectangle">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsDropTargetAfter}" Value="True">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Rectangle.Style>
+                                    </Rectangle>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+
+                <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
+                        Background="Transparent" BorderThickness="0"
+                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                        ToolTip="{loc:Loc Tab.New}"
+                        IsEnabled="{Binding CanAddTab}"
+                        Click="NewTabButton_Click"/>
+            </Grid>
+        </Border>
+
         <!-- ナビゲーション: 戻る/進む/上へ とアドレス欄（ペインごとに1組持つ） -->
-        <Border Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
             <Grid VerticalAlignment="Center">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
@@ -59,20 +179,20 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
                     <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
                     <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
-                            IsEnabled="{Binding CanGoBack}"/>
+                            IsEnabled="{Binding ActiveTab.CanGoBack}"/>
                     <Button Content="{loc:Loc Nav.Forward}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="ForwardButton_Click"
-                            IsEnabled="{Binding CanGoForward}"/>
+                            IsEnabled="{Binding ActiveTab.CanGoForward}"/>
                     <Button Content="{loc:Loc Nav.Up}" MinWidth="80" Padding="8,0" Click="UpButton_Click"
-                            IsEnabled="{Binding CanGoUp}"/>
+                            IsEnabled="{Binding ActiveTab.CanGoUp}"/>
                 </StackPanel>
 
-                <TextBox Grid.Column="1" Text="{Binding AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
+                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
                          VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
             </Grid>
         </Border>
 
         <!-- 左側: フォルダツリー -->
-        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+        <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
             <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
@@ -145,11 +265,11 @@
         </Border>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+        <GridSplitter Grid.Row="2" Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                       Background="Transparent" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->
-        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
             <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -164,12 +284,12 @@
 
                 <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
                 <TextBox Grid.Column="0" Margin="0,0,8,0"
-                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding ActiveTab.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
                          VerticalContentAlignment="Center"/>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
                 <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
-                              IsChecked="{Binding IsFlatFileViewEnabled}">
+                              IsChecked="{Binding ActiveTab.IsFlatFileViewEnabled}">
                     <!-- ON時の背景を薄くした（App.xaml参照）ので、文字色も通常の色にする。
                          テンプレート側がON時の文字色を直接指定してくるため、スタイルではなく
                          Contentに置いたTextBlockのローカル値で上書きする -->
@@ -177,7 +297,7 @@
                 </ToggleButton>
             </Grid>
 
-            <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
+            <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding ActiveTab.FileItems}" Margin="0,8,0,0"
                       AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
                       GridLinesVisibility="Horizontal" HeadersVisibility="Column"
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
@@ -185,6 +305,7 @@
                       ScrollViewer.CanContentScroll="True"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
                       PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
+                      PreviewMouseDown="FileListDataGrid_PreviewMouseDown"
                       ContextMenuOpening="FileListDataGrid_ContextMenuOpening"
                       Sorting="FileListDataGrid_Sorting">
                 <!-- 選択行の背景を薄くした（App.xaml参照）ので、文字色もFluent既定の反転色ではなく通常の色にする。
@@ -230,6 +351,9 @@
                         <MenuItem Header="{loc:Loc Context.CopyFullPath}" Click="CopyFullPathMenuItem_Click"/>
                         <Separator/>
                         <MenuItem Header="{loc:Loc Context.OpenParentFolder}" Click="OpenParentFolderMenuItem_Click"/>
+                        <Separator/>
+                        <!-- フォルダ行のときだけ有効にする（ContextMenuOpeningで切り替え） -->
+                        <MenuItem Name="OpenInNewTabMenuItem" Header="{loc:Loc Context.OpenInNewTab}" Click="OpenInNewTabMenuItem_Click"/>
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>

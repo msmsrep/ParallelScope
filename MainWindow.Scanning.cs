@@ -46,6 +46,9 @@ public partial class MainWindow : IBrowserPaneHost
         {
             var scannedFolderCount = await _viewModel.ScanFolderSubtreeAsync(folderItem.Path);
 
+            // 表示していないタブは、次に表示するときにキャッシュから読み直す
+            _viewModel.MarkInactiveTabsStale();
+
             if (PathNormalizer.IsAncestorOrSame(folderItem.Path, _viewModel.CurrentPath))
             {
                 // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
@@ -113,6 +116,9 @@ public partial class MainWindow : IBrowserPaneHost
         try
         {
             var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync(token);
+
+            // 表示していないタブは、次に表示するときにキャッシュから読み直す
+            _viewModel.MarkInactiveTabsStale();
 
             if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
             {
