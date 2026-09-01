@@ -323,9 +323,9 @@ public partial class BrowserPaneView
 
         // 「新しいタブで開く」「反対側のペインで開く」はフォルダ行のときだけ（Plus未購読の間は常に無効）
         OpenInNewTabMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && _paneViewModel.CanAddTab;
-        // 反対側のペインは分割表示中しか無い
+        // 1画面のときは反対側のペインが無いが、その場合はクリック時に分割して開くので選べる状態にする
         var otherPane = _viewModel.GetOtherPane(_paneViewModel);
-        OpenInOtherPaneMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && otherPane is { CanAddTab: true };
+        OpenInOtherPaneMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && (otherPane?.CanAddTab ?? true);
     }
 
     // 右クリックメニューから、選択中のフォルダを反対側のペインで開く

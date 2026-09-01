@@ -249,6 +249,22 @@ public partial class MainWindow
 
     void IBrowserPaneHost.ActivatePane(BrowserPaneViewModel paneViewModel) => ActivatePane(paneViewModel);
 
+    BrowserPaneViewModel? IBrowserPaneHost.OpenSplitViewPane(string path)
+    {
+        // 分割はPlus機能。未購読の間は右クリックからも分割させない
+        if (!_storeLicenseService.IsPlusActive || _viewModel.IsSplitViewEnabled)
+        {
+            return null;
+        }
+
+        var pane = _viewModel.EnableSplitView();
+        // ペインのビューはこの後 ApplySplitViewState() の中で作られ、そのときのパスで
+        // ツリーの選択を合わせるため、レイアウトを組み立てる前に目的のフォルダへ移しておく
+        pane.ActiveTab.NavigateTo(path, false);
+        ApplySplitViewState();
+        return pane;
+    }
+
     private void ActivatePane(BrowserPaneViewModel paneViewModel)
     {
         _viewModel.SetActivePane(paneViewModel);

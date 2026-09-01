@@ -63,16 +63,27 @@ public partial class BrowserPaneView : UserControl
         _host.OnPaneActivated(this);
     }
 
-    /// <summary>指定パスを反対側のペインの新しいタブで開き、そちらを操作対象にする。</summary>
+    /// <summary>
+    /// 指定パスを反対側のペインの新しいタブで開き、そちらを操作対象にする。
+    /// 1画面のときはその場で画面を分割し、できた2つ目のペインで開く。
+    /// </summary>
     private void OpenPathInOtherPane(string path)
     {
         var otherPane = _viewModel.GetOtherPane(_paneViewModel);
         if (otherPane is null)
         {
-            return;
+            // 分割直後のペインはタブが1つだけなので、新しいタブは足さずそのタブで開く
+            otherPane = _host.OpenSplitViewPane(path);
+            if (otherPane is null)
+            {
+                return;
+            }
+        }
+        else
+        {
+            otherPane.OpenTab(path);
         }
 
-        otherPane.OpenTab(path);
         _host.ActivatePane(otherPane);
     }
 

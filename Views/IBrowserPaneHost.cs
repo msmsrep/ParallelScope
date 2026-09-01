@@ -17,4 +17,10 @@ internal interface IBrowserPaneHost
 
     /// <summary>指定のペインを操作対象にする（反対側のペインで開いた直後など）。</summary>
     void ActivatePane(BrowserPaneViewModel paneViewModel);
+
+    /// <summary>
+    /// 1画面のときに画面を分割し、2つ目のペインで指定パスを開いた状態にして返す
+    /// （分割はPlus機能のため、未購読の場合や既に分割中の場合は null）。
+    /// </summary>
+    BrowserPaneViewModel? OpenSplitViewPane(string path);
 }

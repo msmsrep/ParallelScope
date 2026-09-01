@@ -160,19 +160,16 @@ public partial class BrowserPaneView
 
             contextMenu.Items.Add(openInNewTabMenuItem);
 
-            // 反対側のペインは分割表示中しか無い
+            // 1画面のときは反対側のペインが無いが、その場合はクリック時に分割して開くので選べる状態にする
             var otherPane = _viewModel.GetOtherPane(_paneViewModel);
-            if (otherPane is not null)
+            var openInOtherPaneMenuItem = new MenuItem
             {
-                var openInOtherPaneMenuItem = new MenuItem
-                {
-                    Header = UiText.Get("Context.OpenInOtherPane"),
-                    DataContext = folderItem,
-                    IsEnabled = otherPane.CanAddTab
-                };
-                openInOtherPaneMenuItem.Click += OpenFolderInOtherPaneMenuItem_Click;
-                contextMenu.Items.Add(openInOtherPaneMenuItem);
-            }
+                Header = UiText.Get("Context.OpenInOtherPane"),
+                DataContext = folderItem,
+                IsEnabled = otherPane?.CanAddTab ?? true
+            };
+            openInOtherPaneMenuItem.Click += OpenFolderInOtherPaneMenuItem_Click;
+            contextMenu.Items.Add(openInOtherPaneMenuItem);
 
             contextMenu.Items.Add(new Separator());
         }
