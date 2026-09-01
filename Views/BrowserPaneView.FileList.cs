@@ -8,14 +8,14 @@ using System.Windows.Input;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
-namespace ParallelScope;
+namespace ParallelScope.Views;
 
 /// <summary>ファイル一覧（ダブルクリック・ソート・コンテキストメニュー・CSV出力）に関する処理。</summary>
-public partial class MainWindow
+public partial class BrowserPaneView
 {
     // 表示中のファイル一覧（検索結果・All Files表示・通常一覧のいずれも、ソート順と表示列のまま）をCSVへ書き出す。
     // Plus機能のため、未購読の間はメニュー項目自体を無効にしている（ここは念のための安全弁）
-    private async void ExportCsvMenuItem_Click(object sender, RoutedEventArgs e)
+    internal async Task ExportCsvAsync()
     {
         if (!_storeLicenseService.IsPlusActive)
         {
@@ -41,7 +41,8 @@ public partial class MainWindow
             FileName = BuildCsvFileName()
         };
 
-        if (dialog.ShowDialog(this) != true)
+        var window = Window.GetWindow(this);
+        if (dialog.ShowDialog(window) != true)
         {
             return;
         }
@@ -51,7 +52,12 @@ public partial class MainWindow
         var sizeInBytes = dialog.FilterIndex == 2;
         _viewModel.SetCsvExportSizeInBytes(sizeInBytes);
 
-        Cursor = Cursors.Wait;
+        // 待機カーソルはウィンドウ全体に出す（書き出し中はメニュー操作も待たせたい）
+        if (window is not null)
+        {
+            window.Cursor = Cursors.Wait;
+        }
+
         try
         {
             // 数十万行になり得るため、書き出しはバックグラウンドで行う
@@ -70,7 +76,10 @@ public partial class MainWindow
         }
         finally
         {
-            Cursor = null;
+            if (window is not null)
+            {
+                window.Cursor = null;
+            }
         }
     }
 

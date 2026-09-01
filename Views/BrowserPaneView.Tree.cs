@@ -6,23 +6,15 @@ using System.Windows.Media;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
-namespace ParallelScope;
+namespace ParallelScope.Views;
 
 /// <summary>フォルダツリーの操作（選択の同期・展開・コンテキストメニュー）に関する処理。</summary>
-public partial class MainWindow
+public partial class BrowserPaneView
 {
     // 右クリックで押されたツリーノード（マウスを離す時点でカーソル直下が変わっても対象を保つため）
     private TreeViewItem? _rightClickedTreeViewItem;
 
-    // Plus機能（ツリーのお気に入り・最近・よく使うノードと、一覧のCSV書き出し）を購読状態に合わせて出し分ける
-    private void ApplyPlusFeatures()
-    {
-        var isActive = _storeLicenseService.IsPlusActive;
-
-        _viewModel.SetPlusFeaturesEnabled(isActive);
-        ExportCsvMenuItem.IsEnabled = isActive;
-    }
-
+    // パス→TreeViewItem の対応表。ツリーはペインごとに別インスタンスなので、この表もペインごとに持つ
     private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
 
     // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
@@ -181,6 +173,18 @@ public partial class MainWindow
         contextMenu.IsOpen = true;
     }
 
+    // コンテキストメニューから、選択フォルダ配下の個別スキャンを要求する
+    // （スキャンはアプリ全体で1本に統合されているため、実行はウィンドウ側に委ねる）
+    private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        await _host.RunFolderScanAsync(folderItem);
+    }
+
     // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える
     private void ToggleFavoriteMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -217,7 +221,7 @@ public partial class MainWindow
     }
 
     // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
-    private void SyncTreeSelectionToCurrentPath()
+    internal void SyncTreeSelectionToCurrentPath()
     {
         var path = PathNormalizer.Normalize(_viewModel.CurrentPath);
         if (string.IsNullOrWhiteSpace(path))

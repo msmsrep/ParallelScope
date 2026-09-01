@@ -7,59 +7,17 @@
         xmlns:loc="clr-namespace:ParallelScope.Utilities"
         mc:Ignorable="d"
         Title="ParallelScope" Height="600" Width="1000"
+        MinWidth="560" MinHeight="400"
         Icon="Assets/logo.ico"
         FontFamily="Segoe UI Variable Text">
-    <Window.Resources>
-
-        <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
-            <Setter Property="Text" Value="⟳"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <!-- 固定色にするとダークモードで背景に埋もれるため、テーマ追従のブラシを使う -->
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Visibility" Value="Collapsed"/>
-            <Setter Property="RenderTransformOrigin" Value="0.5,0.5"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsScanning}" Value="True">
-                    <Setter Property="Visibility" Value="Visible"/>
-                    <DataTrigger.EnterActions>
-                        <BeginStoryboard>
-                            <Storyboard RepeatBehavior="Forever">
-                                <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
-                                From="0" To="360" Duration="0:0:0.8"/>
-                            </Storyboard>
-                        </BeginStoryboard>
-                    </DataTrigger.EnterActions>
-                </DataTrigger>
-            </Style.Triggers>
-        </Style>
-
-        <!-- 列幅で切れた文字列もホバーで全文読めるようにする -->
-        <Style x:Key="CellToolTipTextStyle" TargetType="TextBlock">
-            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
-        </Style>
-
-    </Window.Resources>
     <Grid Margin="5">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-        </Grid.ColumnDefinitions>
-
-        <Border Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
-            <Grid>
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-
-            <Menu Grid.Column="0" HorizontalAlignment="Left">
+        <Border Grid.Row="0" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
+            <Menu HorizontalAlignment="Left">
                 <MenuItem Header="{loc:Loc Menu}">
                     <MenuItem Header="{loc:Loc Menu.Settings}" Click="OpenSettingsMenuItem_Click"/>
                     <Separator/>
@@ -71,216 +29,10 @@
                     <MenuItem Header="{loc:Loc Menu.UserGuide}" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>
-
-            <Grid Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
-                    <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
-                            IsEnabled="{Binding CanGoBack}"/>
-                    <Button Content="{loc:Loc Nav.Forward}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="ForwardButton_Click"
-                            IsEnabled="{Binding CanGoForward}"/>
-                    <Button Content="{loc:Loc Nav.Up}" MinWidth="80" Padding="8,0" Click="UpButton_Click"
-                            IsEnabled="{Binding CanGoUp}"/>
-                </StackPanel>
-
-                <TextBox Grid.Column="1" Text="{Binding AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
-                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
-            </Grid>
-            </Grid>
         </Border>
 
-        <!-- 左側: フォルダツリー -->
-        <Border Grid.Row="1" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
-            <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
-            <TreeView Name="FolderTreeView"
-                      ItemsSource="{Binding TreeRoots}"
-                      PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
-                      ContextMenuOpening="FolderTreeView_ContextMenuOpening"
-                      SelectedItemChanged="FolderTreeView_SelectedItemChanged">
-                <TreeView.ItemContainerStyle>
-                    <!-- BasedOnを省略するとFluentテーマの暗黙スタイルが丸ごと外れ、
-                         Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
-                    <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
-                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                        <!-- 階層ごとのインデントを19px（Fluent既定）から約半分に縮める。
-                             インデント幅はFluentのTreeViewItemテンプレート内の
-                             MinWidth="19" 固定列で作られておりリソース化されていないため、
-                             テンプレートを複製する代わりに子アイテムのパネルを負のマージンで左に寄せる。
-                             注: VirtualizingPanel.IsVirtualizing をONにするとFluent側のトリガーが
-                             ItemsPanel を差し替えるため、このマージンも一緒に指定し直す必要がある -->
-                        <Setter Property="ItemsPanel">
-                            <Setter.Value>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel Margin="-9,0,0,0"/>
-                                </ItemsPanelTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
-                        <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
-                        <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
-                    </Style>
-                </TreeView.ItemContainerStyle>
-                <TreeView.ItemTemplate>
-                    <HierarchicalDataTemplate ItemsSource="{Binding SubFolders}">
-                        <!-- ToolTipTextは、同名フォルダが並びうるお気に入り／よく使い配下のノードのみ値を持つ
-                             （nullの通常ノードではツールチップ自体が出ない） -->
-                        <StackPanel Orientation="Horizontal" ToolTip="{Binding ToolTipText}">
-                            <!-- 仮想ノード（Favorites等）はフォルダアイコンの代わりに記号を出す。
-                                 IconSource と GlyphIcon はどちらか一方だけが値を持つ -->
-                            <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0">
-                                <Image.Style>
-                                    <Style TargetType="Image">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding IconSource}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </Image.Style>
-                            </Image>
-                            <TextBlock Text="{Binding GlyphIcon}" Width="16" Margin="0,0,6,0"
-                                       TextAlignment="Center" VerticalAlignment="Center">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding GlyphIcon}" Value="{x:Null}">
-                                                <Setter Property="Visibility" Value="Collapsed"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Style="{StaticResource ScanningIndicatorStyle}">
-                                <TextBlock.RenderTransform>
-                                    <RotateTransform Angle="0"/>
-                                </TextBlock.RenderTransform>
-                            </TextBlock>
-                            <TextBlock Text="{Binding DisplayName}"/>
-                            </StackPanel>
-                    </HierarchicalDataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
-        </Border>
-
-        <!-- セパレーター -->
-        <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                      Background="Transparent" Cursor="SizeWE"/>
-
-        <!-- 右側: ファイル一覧 -->
-        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
-            <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-
-                <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
-                <TextBox Grid.Column="0" Margin="0,0,8,0"
-                         Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
-                         Height="28"
-                         VerticalContentAlignment="Center"/>
-                <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
-                <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
-                              IsChecked="{Binding IsFlatFileViewEnabled}">
-                    <!-- ON時の背景を薄くした（App.xaml参照）ので、文字色も通常の色にする。
-                         テンプレート側がON時の文字色を直接指定してくるため、スタイルではなく
-                         Contentに置いたTextBlockのローカル値で上書きする -->
-                    <TextBlock Text="{loc:Loc FileList.AllFiles}" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                </ToggleButton>
-            </Grid>
-
-            <DataGrid Grid.Row="1" Name="FileListDataGrid" ItemsSource="{Binding FileItems}" Margin="0,8,0,0"
-                      AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
-                      GridLinesVisibility="Horizontal" HeadersVisibility="Column"
-                      EnableRowVirtualization="True" EnableColumnVirtualization="True"
-                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                      ScrollViewer.CanContentScroll="True"
-                      MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
-                      PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
-                      ContextMenuOpening="FileListDataGrid_ContextMenuOpening"
-                      Sorting="FileListDataGrid_Sorting">
-                <!-- 選択行の背景を薄くした（App.xaml参照）ので、文字色もFluent既定の反転色ではなく通常の色にする。
-                     FluentのDataGridCellスタイルは暗黙スタイルではなくキー付きのため、BasedOnで明示的に引き継ぐ -->
-                <DataGrid.CellStyle>
-                    <Style TargetType="DataGridCell" BasedOn="{StaticResource DefaultDataGridCellStyle}">
-                        <!-- Fluent既定のテンプレートはクリック（フォーカス）時にセルを1pxの枠で囲うが、
-                             選択色だけで十分なので枠を出さない。枠の色はテンプレート内で
-                             ComponentResourceKey経由の固定色（ダークでも黒）になっており、
-                             リソース上書きでもスタイルのセッターでも消せないため、
-                             フォーカス時のトリガーを持たない同等のテンプレートに差し替えている -->
-                        <Setter Property="Template">
-                            <Setter.Value>
-                                <ControlTemplate TargetType="DataGridCell">
-                                    <Border x:Name="Border" Background="Transparent" SnapsToDevicePixels="True"
-                                            HorizontalAlignment="{TemplateBinding HorizontalAlignment}"
-                                            VerticalAlignment="{TemplateBinding VerticalAlignment}">
-                                        <ContentPresenter Content="{TemplateBinding Content}"
-                                                          ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                          ContentStringFormat="{TemplateBinding ContentStringFormat}"
-                                                          SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsSelected" Value="True">
-                                            <Setter TargetName="Border" Property="Background"
-                                                    Value="{DynamicResource DataGridRowSelectedBackgroundThemeBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Setter.Value>
-                        </Setter>
-                        <Style.Triggers>
-                            <Trigger Property="IsSelected" Value="True">
-                                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
-                            </Trigger>
-                        </Style.Triggers>
-                    </Style>
-                </DataGrid.CellStyle>
-                <DataGrid.ContextMenu>
-                    <ContextMenu>
-                        <MenuItem Header="{loc:Loc Context.CopyFile}" Click="CopyFileMenuItem_Click"/>
-                        <MenuItem Header="{loc:Loc Context.CopyFileName}" Click="CopyFileNameMenuItem_Click"/>
-                        <MenuItem Header="{loc:Loc Context.CopyFullPath}" Click="CopyFullPathMenuItem_Click"/>
-                        <Separator/>
-                        <MenuItem Header="{loc:Loc Context.OpenParentFolder}" Click="OpenParentFolderMenuItem_Click"/>
-                    </ContextMenu>
-                </DataGrid.ContextMenu>
-                <DataGrid.Columns>
-                    <!-- 列見出しの文字列は言語で変わるため、ApplyFileListColumnHeaders でコードビハインドから設定する
-                         （DataGridColumn は表示ツリーの外にあり、マークアップ拡張のバインディングを避けている） -->
-                    <!-- テンプレート列は SortMemberPath が無いとヘッダークリックがソート対象にならない
-                         （実際の比較はコードビハインドのカスタムソートで行う） -->
-                    <DataGridTemplateColumn x:Name="NameColumn" Width="*" SortMemberPath="Name">
-                        <DataGridTemplateColumn.CellTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal">
-                                    <Image Source="{Binding IconSource}" Width="16" Height="16" Margin="0,0,6,0"/>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"
-                                               Style="{StaticResource CellToolTipTextStyle}"/>
-                                </StackPanel>
-                            </DataTemplate>
-                        </DataGridTemplateColumn.CellTemplate>
-                    </DataGridTemplateColumn>
-                    <!-- Name以外の列は設定（Display Columns）で表示/非表示を切り替えられる（ApplyFileListColumnVisibility参照） -->
-                    <DataGridTextColumn x:Name="LocationColumn" Binding="{Binding Location}" Width="220" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="TypeColumn" Binding="{Binding TypeText}" Width="110" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="SizeColumn" Binding="{Binding SizeText}" Width="100" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="ModifiedColumn" Binding="{Binding ModifiedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="CreatedColumn" Binding="{Binding CreatedTime}" Width="150" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                    <DataGridTextColumn x:Name="AttributesColumn" Binding="{Binding AttributesText}" Width="80" ElementStyle="{StaticResource CellToolTipTextStyle}"/>
-                </DataGrid.Columns>
-            </DataGrid>
-            </Grid>
-        </Border>
+        <!-- 閲覧ペイン（ツリー＋ファイル一覧）の置き場。
+             2画面表示（分割）ではここに2つ目のペインが並ぶため、XAMLに直接置かずコードから追加する -->
+        <Grid Grid.Row="1" Name="PaneHost"/>
     </Grid>
 </Window>
