@@ -145,6 +145,58 @@ public class SplitViewTests : IDisposable
     }
 
     [Fact]
+    public void ClosePane_ClosesTheGivenPaneEvenWhenItIsTheActiveOne()
+    {
+        var viewModel = CreateViewModel();
+        var firstPane = viewModel.ActivePane;
+        var secondPane = viewModel.EnableSplitView();
+        viewModel.SetActivePane(secondPane);
+
+        viewModel.ClosePane(secondPane, moveTabs: true);
+
+        Assert.Single(viewModel.Panes);
+        Assert.False(viewModel.IsSplitViewEnabled);
+        Assert.Same(firstPane, viewModel.ActivePane);
+        // 閉じた側のタブは残る側の末尾へ移る
+        Assert.Equal(2, firstPane.Tabs.Count);
+    }
+
+    [Fact]
+    public void ClosePane_WithoutMovingTabs_DropsTheClosedPaneTabs()
+    {
+        var viewModel = CreateViewModel();
+        var firstPane = viewModel.ActivePane;
+        var secondPane = viewModel.EnableSplitView();
+        var discardedTab = secondPane.ActiveTab;
+
+        viewModel.ClosePane(secondPane, moveTabs: false);
+
+        Assert.Single(viewModel.Panes);
+        Assert.Single(firstPane.Tabs);
+        Assert.DoesNotContain(discardedTab, firstPane.Tabs);
+    }
+
+    [Fact]
+    public void ShowsTabCloseButton_IsOnForTheLastTabOnlyWhileSplit()
+    {
+        var viewModel = CreateViewModel();
+        var firstPane = viewModel.ActivePane;
+
+        // 1画面では最後の1つを閉じられないので✕も出さない
+        Assert.False(firstPane.ShowsTabCloseButton);
+
+        var secondPane = viewModel.EnableSplitView();
+
+        // 2画面では最後の1つも閉じられる（そのペインごと畳む）
+        Assert.True(firstPane.ShowsTabCloseButton);
+        Assert.True(secondPane.ShowsTabCloseButton);
+
+        viewModel.ClosePane(secondPane, moveTabs: false);
+
+        Assert.False(firstPane.ShowsTabCloseButton);
+    }
+
+    [Fact]
     public void MoveTabToPane_MovesTheInstanceWithItsState()
     {
         var viewModel = CreateViewModel();

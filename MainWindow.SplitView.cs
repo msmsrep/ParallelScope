@@ -249,18 +249,16 @@ public partial class MainWindow
 
     void IBrowserPaneHost.ActivatePane(BrowserPaneViewModel paneViewModel) => ActivatePane(paneViewModel);
 
-    void IBrowserPaneHost.ClosePane(BrowserPaneViewModel paneViewModel)
+    void IBrowserPaneHost.ClosePane(BrowserPaneViewModel paneViewModel, bool moveTabs)
     {
-        if (!_viewModel.IsSplitViewEnabled || _viewModel.GetOtherPane(paneViewModel) is not { } keptPane)
+        if (!_viewModel.IsSplitViewEnabled)
         {
             return;
         }
 
         // 比率は畳む前の値を控えておく（メニューから分割をやめたときと同じ扱い）
         _viewModel.SetSplitRatio(GetCurrentSplitRatio());
-        // DisableSplitView は操作対象のペインを残すので、残す側へ切り替えてから畳む
-        _viewModel.SetActivePane(keptPane);
-        _viewModel.DisableSplitView();
+        _viewModel.ClosePane(paneViewModel, moveTabs);
         ApplySplitViewState();
     }
 

@@ -25,8 +25,9 @@ internal interface IBrowserPaneHost
     BrowserPaneViewModel? OpenSplitViewPane(string path);
 
     /// <summary>
-    /// 2画面のときに、指定のペインを閉じて1画面に戻す
-    /// （閉じる側のタブは、分割をやめたときと同じく残る側の末尾へ移す）。
+    /// 2画面のときに、指定のペインを閉じて1画面に戻す。
+    /// <paramref name="moveTabs"/> が真なら閉じる側のタブを残る側の末尾へ移し、
+    /// 偽ならそのまま閉じる（最後のタブを閉じてペインごと畳む場合）。
     /// </summary>
-    void ClosePane(BrowserPaneViewModel paneViewModel);
+    void ClosePane(BrowserPaneViewModel paneViewModel, bool moveTabs);
 }

@@ -150,13 +150,14 @@
                                             <TextBlock Text="{Binding DisplayName}" MaxWidth="160"
                                                        TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
                                                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
-                                            <!-- 最後の1つは閉じられないため、閉じるボタン自体を出さない -->
+                                            <!-- 1画面では最後の1つを閉じられないため、閉じるボタン自体を出さない
+                                                 （2画面のときは最後の1つも閉じられ、そのペインごと畳む） -->
                                             <Button Content="✕" Margin="6,0,0,0" Padding="3,0" FontSize="10"
                                                     Background="Transparent" BorderThickness="0"
                                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
                                                     ToolTip="{loc:Loc Tab.Close}"
                                                     Click="CloseTabButton_Click"
-                                                    Visibility="{Binding DataContext.CanCloseTabs, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                                                    Visibility="{Binding DataContext.ShowsTabCloseButton, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
                                         </StackPanel>
                                     </Border>
 

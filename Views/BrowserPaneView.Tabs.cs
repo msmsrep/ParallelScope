@@ -52,8 +52,24 @@ public partial class BrowserPaneView
     {
         if (_areTabsEnabled)
         {
-            _paneViewModel.CloseActiveTab();
+            CloseTab(ActiveTab);
         }
+    }
+
+    /// <summary>
+    /// タブを閉じる。2画面で最後の1つを閉じたときは、そのペインごと閉じて1画面に戻す
+    /// （1画面のときは従来どおり最後の1つを閉じられない）。
+    /// </summary>
+    private void CloseTab(BrowserTabViewModel tab)
+    {
+        if (_paneViewModel.CanCloseTabs)
+        {
+            _paneViewModel.CloseTab(tab);
+            return;
+        }
+
+        // 最後の1つ。閉じるタブは残る側へ移さず捨てる（このタブを閉じる操作なので）
+        _host.ClosePane(_paneViewModel, moveTabs: false);
     }
 
     /// <summary>直前に閉じたタブを開き直す。</summary>
@@ -122,7 +138,7 @@ public partial class BrowserPaneView
     {
         if (GetTabFrom(sender) is { } tab)
         {
-            _paneViewModel.CloseTab(tab);
+            CloseTab(tab);
         }
     }
 
@@ -138,7 +154,7 @@ public partial class BrowserPaneView
     {
         if (GetTabFrom(sender) is { } tab)
         {
-            _paneViewModel.CloseTab(tab);
+            CloseTab(tab);
         }
     }
 
@@ -152,7 +168,7 @@ public partial class BrowserPaneView
 
         if (e.ChangedButton == MouseButton.Middle)
         {
-            _paneViewModel.CloseTab(tab);
+            CloseTab(tab);
             e.Handled = true;
             return;
         }

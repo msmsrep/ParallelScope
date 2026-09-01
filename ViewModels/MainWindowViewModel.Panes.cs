@@ -141,13 +141,13 @@ public partial class MainWindowViewModel
 
         _isSplitViewEnabled = true;
         OnPropertyChanged(nameof(IsSplitViewEnabled));
-        NotifyActiveHighlightChanged();
+        NotifySplitStateChanged();
         OnPaneStateChanged();
         return pane;
     }
 
     /// <summary>
-    /// ペインを1つに戻す。閉じる側のタブは残る側の末尾へ移し、
+    /// ペインを1つに戻す。操作対象のペインを残し、閉じる側のタブは残る側の末尾へ移して
     /// 上限を超える分だけ古いものから閉じる（閲覧中の状態をできるだけ失わせない）。
     /// </summary>
     public void DisableSplitView()
@@ -157,18 +157,32 @@ public partial class MainWindowViewModel
             return;
         }
 
-        var keptPane = ActivePane;
-        var closedPane = Panes.First(pane => !ReferenceEquals(pane, keptPane));
+        ClosePane(Panes.First(pane => !ReferenceEquals(pane, ActivePane)), moveTabs: true);
+    }
 
-        foreach (var tab in closedPane.Tabs.ToList())
+    /// <summary>
+    /// 指定のペインを閉じて1画面に戻す。<paramref name="moveTabs"/> が真なら閉じる側のタブを
+    /// 残る側の末尾へ移し、偽ならそのまま閉じる（最後のタブを閉じてペインごと畳む場合）。
+    /// </summary>
+    public void ClosePane(BrowserPaneViewModel closedPane, bool moveTabs)
+    {
+        if (!_isSplitViewEnabled || GetOtherPane(closedPane) is not { } keptPane)
         {
-            if (!keptPane.CanAddTab)
-            {
-                break;
-            }
+            return;
+        }
 
-            closedPane.ReleaseTab(tab);
-            keptPane.AdoptTab(tab, keptPane.Tabs.Count);
+        if (moveTabs)
+        {
+            foreach (var tab in closedPane.Tabs.ToList())
+            {
+                if (!keptPane.CanAddTab)
+                {
+                    break;
+                }
+
+                closedPane.ReleaseTab(tab);
+                keptPane.AdoptTab(tab, keptPane.Tabs.Count);
+            }
         }
 
         closedPane.PropertyChanged -= Pane_PropertyChanged;
@@ -179,7 +193,7 @@ public partial class MainWindowViewModel
         keptPane.IsActive = true;
         OnPropertyChanged(nameof(IsSplitViewEnabled));
         OnPropertyChanged(nameof(ActivePane));
-        NotifyActiveHighlightChanged();
+        NotifySplitStateChanged();
         RebindActiveTab();
         OnPaneStateChanged();
     }
@@ -311,11 +325,11 @@ public partial class MainWindowViewModel
     }
 
     // アクティブペインの枠線は分割中だけ出すため、分割の切り替えでも通知し直す
-    private void NotifyActiveHighlightChanged()
+    private void NotifySplitStateChanged()
     {
         foreach (var pane in Panes)
         {
-            pane.NotifyActiveHighlightChanged();
+            pane.NotifySplitStateChanged();
         }
     }
 }

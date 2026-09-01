@@ -65,8 +65,18 @@ public partial class BrowserPaneViewModel : ObservableObject
     /// <summary>アクティブなペインである印（枠線）を出すか。1画面のときはどちらでもないので出さない。</summary>
     public bool ShowsActiveHighlight => _isActive && _shell.IsSplitViewEnabled;
 
-    /// <summary>分割の切り替えで、枠線を出すかどうかが変わったことを通知する。</summary>
-    internal void NotifyActiveHighlightChanged() => OnPropertyChanged(nameof(ShowsActiveHighlight));
+    /// <summary>
+    /// タブの✕ボタンを出すか。2画面のときは最後の1つも閉じられる
+    /// （閉じるとそのペインごと畳んで1画面に戻る）。
+    /// </summary>
+    public bool ShowsTabCloseButton => CanCloseTabs || _shell.IsSplitViewEnabled;
+
+    /// <summary>分割の切り替えで変わる表示（枠線・最後のタブの✕ボタン）を通知し直す。</summary>
+    internal void NotifySplitStateChanged()
+    {
+        OnPropertyChanged(nameof(ShowsActiveHighlight));
+        OnPropertyChanged(nameof(ShowsTabCloseButton));
+    }
 
     /// <summary>タブをこのペインから外す（別のペインへ移すため。閉じたタブとしては記録しない）。</summary>
     internal void ReleaseTab(BrowserTabViewModel tab)
@@ -346,6 +356,7 @@ public partial class BrowserPaneViewModel : ObservableObject
     private void NotifyTabCountChanged()
     {
         OnPropertyChanged(nameof(CanCloseTabs));
+        OnPropertyChanged(nameof(ShowsTabCloseButton));
         OnPropertyChanged(nameof(CanAddTab));
     }
 }

@@ -336,7 +336,7 @@ public partial class BrowserPaneView
     // 右クリックメニューから、このペインを閉じて1画面に戻す
     private void ClosePaneMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        _host.ClosePane(_paneViewModel);
+        _host.ClosePane(_paneViewModel, moveTabs: true);
     }
 
     // 右クリックメニューから、選択中のフォルダを反対側のペインで開く
