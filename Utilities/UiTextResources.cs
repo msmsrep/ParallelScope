@@ -175,7 +175,7 @@ internal static class UiTextResources
         ["Nav.Back"] = "← 戻る",
         ["Nav.Forward"] = "進む →",
         ["Nav.Up"] = "↑ 上へ",
-        ["FileList.AllFiles"] = "全ファイル",
+        ["FileList.AllFiles"] = "All Files",
 
         // ファイル一覧の列見出し
         ["Column.Name"] = "名前",
@@ -239,7 +239,7 @@ internal static class UiTextResources
         ["Common.Down"] = "↓ 下へ",
         ["Common.Save"] = "保存",
         ["Common.Cancel"] = "キャンセル",
-        ["Settings.SaveAndFullScan"] = "保存してフルスキャン",
+        ["Settings.SaveAndFullScan"] = "保存 + フルスキャン",
 
         // 設定画面: 左メニュー
         ["Settings.Menu.RootFolders"] = "ルートフォルダー",
