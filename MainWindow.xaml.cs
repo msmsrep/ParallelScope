@@ -41,6 +41,8 @@ public partial class MainWindow : Window
 
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        // 自前タイトルバーの最大化時のはみ出し補正は、ウィンドウハンドルができてから仕掛ける
+        SourceInitialized += MainWindow_SourceInitialized;
         // タブのショートカットは、アドレス欄・検索欄に入力中でも効かせたいのでウィンドウ側で拾う
         PreviewKeyDown += MainWindow_PreviewKeyDown;
     }

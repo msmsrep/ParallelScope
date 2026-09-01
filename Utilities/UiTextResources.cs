@@ -21,6 +21,12 @@ internal static class UiTextResources
         ["Nav.Up"] = "↑ Up",
         ["FileList.AllFiles"] = "All Files",
 
+        // タイトルバーのキャプションボタン
+        ["TitleBar.Minimize"] = "Minimize",
+        ["TitleBar.Maximize"] = "Maximize",
+        ["TitleBar.Restore"] = "Restore Down",
+        ["TitleBar.Close"] = "Close",
+
         // タブ列
         ["Tab.New"] = "New Tab",
         ["Tab.Close"] = "Close Tab",
@@ -189,6 +195,12 @@ internal static class UiTextResources
         ["Nav.Forward"] = "進む →",
         ["Nav.Up"] = "↑ 上へ",
         ["FileList.AllFiles"] = "All Files",
+
+        // タイトルバーのキャプションボタン
+        ["TitleBar.Minimize"] = "最小化",
+        ["TitleBar.Maximize"] = "最大化",
+        ["TitleBar.Restore"] = "元のサイズに戻す",
+        ["TitleBar.Close"] = "閉じる",
 
         // タブ列
         ["Tab.New"] = "新しいタブ",
