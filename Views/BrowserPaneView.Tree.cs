@@ -191,6 +191,16 @@ public partial class BrowserPaneView
             contextMenu.Items.Add(favoriteMenuItem);
         }
 
+        // 「このペインを閉じる」は2画面のときしか意味が無いので、1画面ではメニューに出さない
+        if (_viewModel.IsSplitViewEnabled)
+        {
+            var closePaneMenuItem = new MenuItem { Header = UiText.Get("Context.ClosePane") };
+            closePaneMenuItem.Click += ClosePaneMenuItem_Click;
+
+            contextMenu.Items.Add(new Separator());
+            contextMenu.Items.Add(closePaneMenuItem);
+        }
+
         if (isKeyboardInvoked)
         {
             contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;

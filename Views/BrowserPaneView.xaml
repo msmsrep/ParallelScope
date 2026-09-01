@@ -375,6 +375,9 @@
                         <!-- フォルダ行のときだけ有効にする（ContextMenuOpeningで切り替え） -->
                         <MenuItem Name="OpenInNewTabMenuItem" Header="{loc:Loc Context.OpenInNewTab}" Click="OpenInNewTabMenuItem_Click"/>
                         <MenuItem Name="OpenInOtherPaneMenuItem" Header="{loc:Loc Context.OpenInOtherPane}" Click="OpenInOtherPaneMenuItem_Click"/>
+                        <!-- 2画面のときだけ出す（ContextMenuOpeningで切り替え） -->
+                        <Separator Name="ClosePaneSeparator"/>
+                        <MenuItem Name="ClosePaneMenuItem" Header="{loc:Loc Context.ClosePane}" Click="ClosePaneMenuItem_Click"/>
                     </ContextMenu>
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>

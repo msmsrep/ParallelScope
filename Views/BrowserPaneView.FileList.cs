@@ -326,6 +326,17 @@ public partial class BrowserPaneView
         // 1画面のときは反対側のペインが無いが、その場合はクリック時に分割して開くので選べる状態にする
         var otherPane = _viewModel.GetOtherPane(_paneViewModel);
         OpenInOtherPaneMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && (otherPane?.CanAddTab ?? true);
+
+        // 「このペインを閉じる」は2画面のときしか意味が無いので、1画面では区切り線ごと隠す
+        var closePaneVisibility = otherPane is null ? Visibility.Collapsed : Visibility.Visible;
+        ClosePaneSeparator.Visibility = closePaneVisibility;
+        ClosePaneMenuItem.Visibility = closePaneVisibility;
+    }
+
+    // 右クリックメニューから、このペインを閉じて1画面に戻す
+    private void ClosePaneMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        _host.ClosePane(_paneViewModel);
     }
 
     // 右クリックメニューから、選択中のフォルダを反対側のペインで開く

@@ -23,4 +23,10 @@ internal interface IBrowserPaneHost
     /// （分割はPlus機能のため、未購読の場合や既に分割中の場合は null）。
     /// </summary>
     BrowserPaneViewModel? OpenSplitViewPane(string path);
+
+    /// <summary>
+    /// 2画面のときに、指定のペインを閉じて1画面に戻す
+    /// （閉じる側のタブは、分割をやめたときと同じく残る側の末尾へ移す）。
+    /// </summary>
+    void ClosePane(BrowserPaneViewModel paneViewModel);
 }
