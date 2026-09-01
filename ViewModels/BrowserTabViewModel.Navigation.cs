@@ -5,7 +5,7 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>戻る/進む/上へ・アドレス入力・パス遷移など、フォルダ間ナビゲーションに関する処理。</summary>
-public partial class MainWindowViewModel
+public partial class BrowserTabViewModel
 {
     /// <summary>指定フォルダへ移動する（履歴に追加される）。</summary>
     public bool LoadFiles(string folderPath)
@@ -31,7 +31,7 @@ public partial class MainWindowViewModel
         var success = LoadFilesInternal(targetPath);
         if (success)
         {
-            RecordFolderUsage(targetPath);
+            _host.RecordFolderUsage(targetPath);
         }
 
         NotifyNavigationStateChanged();
@@ -56,7 +56,7 @@ public partial class MainWindowViewModel
         var success = LoadFilesInternal(targetPath);
         if (success)
         {
-            RecordFolderUsage(targetPath);
+            _host.RecordFolderUsage(targetPath);
         }
 
         NotifyNavigationStateChanged();
@@ -95,7 +95,7 @@ public partial class MainWindowViewModel
             return false;
         }
 
-        if (IsExcludedPath(normalizedTargetPath))
+        if (_host.IsExcludedPath(normalizedTargetPath))
         {
             return false;
         }
@@ -114,7 +114,7 @@ public partial class MainWindowViewModel
         {
             // 「よく使う」の集計対象はユーザー操作による移動のみ。
             // 起動時やルート設定変更時の自動移動は addToHistory=false で呼ばれるため数えない
-            RecordFolderUsage(normalizedTargetPath);
+            _host.RecordFolderUsage(normalizedTargetPath);
 
             if (!string.IsNullOrEmpty(previousPath))
             {

@@ -5,7 +5,7 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>現在フォルダ配下のキャッシュ検索に関する処理。</summary>
-public partial class MainWindowViewModel
+public partial class BrowserTabViewModel
 {
     /// <summary>
     /// 入力された検索語で検索をリクエストする（インクリメンタルサーチ）。
@@ -64,7 +64,7 @@ public partial class MainWindowViewModel
                 ToViewModels(
                     SearchCacheEntries(rootPath, query)
                         .Where(x => !(filesOnly && x.IsFolder))
-                        .Where(x => !IsExcludedNormalizedPath(x.FullPath)))
+                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath)))
                     .ToList());
         }
         catch
@@ -79,7 +79,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (searchVersion != Volatile.Read(ref _searchVersion)
                 || !PathNormalizer.AreSame(CurrentPath, rootPath)
@@ -96,14 +96,14 @@ public partial class MainWindowViewModel
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
     private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
     {
-        var traversalPaths = GetTraversalPaths(rootPath);
+        var traversalPaths = _host.GetTraversalPaths(rootPath);
         if (traversalPaths.Count == 1)
         {
-            return _fileCacheRepository.EnumerateSearchEntriesUnderPath(traversalPaths[0], query);
+            return _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(traversalPaths[0], query);
         }
 
         var results = traversalPaths
-            .SelectMany(root => _fileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
+            .SelectMany(root => _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
 
         // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成でヒット全件分の FullPath 文字列を判定セットに同時保持しないため）

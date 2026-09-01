@@ -6,7 +6,7 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>キャッシュからの即時表示と、ファイルシステムからのバックグラウンド更新に関する処理。</summary>
-public partial class MainWindowViewModel
+public partial class BrowserTabViewModel
 {
     /// <summary>DBキャッシュから即座に一覧を表示し、その後キャッシュ済みフォルダサイズの反映をリクエストする。</summary>
     private async Task LoadFromCacheAsync(string folderPath, int navigationVersion)
@@ -17,8 +17,8 @@ public partial class MainWindowViewModel
         {
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cachedEntries = await Task.Run(() =>
-                _fileCacheRepository.GetEntriesByParentPath(folderPath)
-                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
+                _host.FileCacheRepository.GetEntriesByParentPath(folderPath)
+                    .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))
                     .ToList());
         }
         catch
@@ -31,7 +31,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, folderPath))
             {
@@ -50,14 +50,14 @@ public partial class MainWindowViewModel
     /// </summary>
     private async Task LoadVirtualFolderListingAsync(string virtualPath, int navigationVersion)
     {
-        var rootPaths = GetVirtualFolderPaths(VirtualFolders.GetKind(virtualPath));
+        var rootPaths = _host.GetTraversalPaths(virtualPath);
 
         List<FileItemViewModel> rootItems;
         try
         {
             rootItems = await Task.Run(() =>
             {
-                var cachedTotalSizes = _fileCacheRepository.GetCachedTotalSizesUnderPaths(rootPaths);
+                var cachedTotalSizes = _host.FileCacheRepository.GetCachedTotalSizesUnderPaths(rootPaths);
                 return rootPaths
                     .Select(rootPath =>
                     {
@@ -93,7 +93,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, virtualPath))
             {
@@ -111,7 +111,7 @@ public partial class MainWindowViewModel
 
         try
         {
-            liveEntries = await Task.Run(() => ReadEntriesFromFileSystem(folderPath));
+            liveEntries = await Task.Run(() => _host.ReadEntriesFromFileSystem(folderPath));
         }
         catch
         {
@@ -122,7 +122,7 @@ public partial class MainWindowViewModel
 
         try
         {
-            await Task.Run(() => _fileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
+            await Task.Run(() => _host.FileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
         }
         catch
         {
@@ -134,7 +134,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, folderPath))
             {
@@ -165,7 +165,7 @@ public partial class MainWindowViewModel
         Dictionary<string, long> cachedFolderSizes;
         try
         {
-            cachedFolderSizes = await Task.Run(() => _fileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
+            cachedFolderSizes = await Task.Run(() => _host.FileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
         }
         catch
         {
@@ -184,7 +184,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, folderPath))
             {

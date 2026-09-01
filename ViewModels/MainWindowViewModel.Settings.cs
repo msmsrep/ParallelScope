@@ -13,8 +13,8 @@ public partial class MainWindowViewModel
         var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、フィールドへ直接読み込む
-        _isFlatFileViewEnabled = settings.IsFlatFileViewEnabled;
+        // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む
+        _activeTab.InitializeFlatFileViewEnabled(settings.IsFlatFileViewEnabled);
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
         _columnOrder = NormalizeColumnOrder(settings.ColumnOrder);
         _columnWidths = NormalizeColumnWidths(settings.ColumnWidths);
@@ -329,10 +329,7 @@ public partial class MainWindowViewModel
         var currentRoot = RootFolders.FirstOrDefault();
         if (currentRoot is null)
         {
-            CurrentPath = string.Empty;
-            AddressInput = string.Empty;
-            _currentDirectoryItems.Clear();
-            ReplaceVisibleFileItems(Array.Empty<FileItemViewModel>());
+            _activeTab.Clear();
             return;
         }
 
@@ -358,7 +355,7 @@ public partial class MainWindowViewModel
             RootPaths = rootPaths.ToList(),
             ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
             FullScanIntervalHours = _fullScanIntervalHours,
-            IsFlatFileViewEnabled = _isFlatFileViewEnabled,
+            IsFlatFileViewEnabled = _activeTab.IsFlatFileViewEnabled,
             VisibleColumns = FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList(),
             ColumnOrder = _columnOrder.ToList(),
             ColumnWidths = new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase),
