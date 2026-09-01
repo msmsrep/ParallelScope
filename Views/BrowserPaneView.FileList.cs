@@ -153,11 +153,15 @@ public partial class BrowserPaneView
     private void FileListDataGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         var row = GetAncestor<DataGridRow>(e.OriginalSource as DependencyObject);
-        if (row is null)
+        if (row is null || row.IsSelected)
         {
+            // 既に選ばれている行の右クリックでは、選択（複数選択も含む）をそのまま保つ
             return;
         }
 
+        // DataGridの既定は複数選択（Extended）のため、IsSelectedを立てるだけでは
+        // 左クリックで選んでいた行が選択されたまま残り、SelectedItem もそちらを指し続ける
+        FileListDataGrid.UnselectAll();
         row.IsSelected = true;
         row.Focus();
     }
