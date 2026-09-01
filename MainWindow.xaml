@@ -63,8 +63,10 @@
                 <MenuItem Header="{loc:Loc Menu}">
                     <MenuItem Header="{loc:Loc Menu.Settings}" Click="OpenSettingsMenuItem_Click"/>
                     <Separator/>
-                    <!-- Plus機能。未購読時もメニューは出し、クリック時に購読案内を表示する -->
-                    <MenuItem Header="{loc:Loc Menu.ExportCsv}" Click="ExportCsvMenuItem_Click"/>
+                    <!-- Plus機能。未購読時もメニューは出すが、薄字で押せない状態にする
+                         （購読状態が分かる前に押せてしまわないよう既定は無効） -->
+                    <MenuItem Name="ExportCsvMenuItem" Header="{loc:Loc Menu.ExportCsv}"
+                              IsEnabled="False" Click="ExportCsvMenuItem_Click"/>
                     <Separator/>
                     <MenuItem Header="{loc:Loc Menu.UserGuide}" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>

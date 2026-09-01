@@ -14,10 +14,13 @@ public partial class MainWindow
     // 右クリックで押されたツリーノード（マウスを離す時点でカーソル直下が変わっても対象を保つため）
     private TreeViewItem? _rightClickedTreeViewItem;
 
-    // お気に入り・最近・よく使うノードはPlus機能のため、購読状態に合わせてツリーへの表示を切り替える
-    private void ApplyPlusTreeNodes()
+    // Plus機能（ツリーのお気に入り・最近・よく使うノードと、一覧のCSV書き出し）を購読状態に合わせて出し分ける
+    private void ApplyPlusFeatures()
     {
-        _viewModel.SetPlusFeaturesEnabled(_storeLicenseService.IsPlusActive);
+        var isActive = _storeLicenseService.IsPlusActive;
+
+        _viewModel.SetPlusFeaturesEnabled(isActive);
+        ExportCsvMenuItem.IsEnabled = isActive;
     }
 
     private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);

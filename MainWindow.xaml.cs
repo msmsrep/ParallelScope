@@ -73,7 +73,7 @@ public partial class MainWindow : Window
         await _storeLicenseService.RefreshLicenseAsync();
         ApplyFileListColumnVisibility();
         ApplyFileListColumnLayout();
-        ApplyPlusTreeNodes();
+        ApplyPlusFeatures();
 
         RequestAutomaticFullScan();
         ConfigureScheduledFullScanTimer();
@@ -140,7 +140,7 @@ public partial class MainWindow : Window
             // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、Plus機能の表示は反映し直す
             ApplyFileListColumnVisibility();
             ApplyFileListColumnLayout();
-            ApplyPlusTreeNodes();
+            ApplyPlusFeatures();
             return;
         }
 
@@ -163,7 +163,7 @@ public partial class MainWindow : Window
 
         ApplyFileListColumnVisibility();
         ApplyFileListColumnLayout();
-        ApplyPlusTreeNodes();
+        ApplyPlusFeatures();
         ConfigureScheduledFullScanTimer();
         SyncTreeSelectionToCurrentPath();
 

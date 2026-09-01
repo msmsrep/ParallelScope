@@ -14,22 +14,11 @@ namespace ParallelScope;
 public partial class MainWindow
 {
     // 表示中のファイル一覧（検索結果・All Files表示・通常一覧のいずれも、ソート順と表示列のまま）をCSVへ書き出す。
-    // Plus機能のため、未購読の場合は購読案内を表示して終了する
+    // Plus機能のため、未購読の間はメニュー項目自体を無効にしている（ここは念のための安全弁）
     private async void ExportCsvMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (!_storeLicenseService.IsPlusActive)
         {
-            var answer = MessageBox.Show(
-                UiText.Get("Csv.PlusRequired"),
-                UiText.Get("Csv.Caption"),
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Information);
-
-            if (answer == MessageBoxResult.Yes)
-            {
-                ShowSettingsDialog(startOnSubscriptionPage: true);
-            }
-
             return;
         }
 
