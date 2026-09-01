@@ -47,9 +47,15 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
 | `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
 | `ViewModels/TreeNodeSettingsTests` | ツリー最上位ノードの表示/非表示・並び順 | 既定値、非表示にしたノードがツリーから消えること、Foldersは全て隠しても残ること、並び替えの反映、表示中のノードを隠したときの退避、保存と復元、旧設定・未知キーの補完 |
+| `Utilities/HiddenItemVisibilityTests` | `HiddenItemVisibility` | 属性で一覧から外れること、片方だけ許可しても両方の属性を持つ項目は出さないこと、属性未取得（旧キャッシュ行）は出すこと、常にReparsePointを飛ばすこと |
+| `ViewModels/HiddenItemSettingsTests` | 隠し・システム属性の表示設定 | 既定が「両方とも表示」であること（更新前と同じ見え方）、保存と復元、購読状態で表示条件が動かないこと、ツリーの列挙条件（`FolderItemViewModel.AttributesToSkip`）への反映 |
 | `ViewModels/PlusFeatureGatingTests` | 無料版とPlusの機能分け | お気に入り・最近・よく使うノードのツリーへの出し入れ、非表示ノードからの退避、同じアクセス実績から「最近」（最終アクセス順）と「よく使う」（回数順）が別々に並ぶこと、購読が切れても保存済みデータを消さないこと、列カスタマイズの既定列へのフォールバック |
 
 ## テストを書くときの決まりごと
+
+### `MainWindowViewModel` を生成するテストは直列に走らせる
+
+フォルダツリーの列挙条件（`FolderItemViewModel.AttributesToSkip`）はプロセス全体で1つの静的な値で、ViewModelの生成・設定変更のたびに書き換わります。生成するテストクラスには `[Collection(FolderTreeCollection.Name)]` を付けてください（同一コレクション内は並列実行されません）。
 
 ### 表示言語を切り替えるテストは直列に走らせる
 

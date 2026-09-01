@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
@@ -33,9 +33,9 @@ public partial class MainWindowViewModel
         {
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             results = await Task.Run(() =>
-                GetFlatViewFiles(folderPath)
-                    .Where(x => !IsExcludedNormalizedPath(x.FullPath))
-                    .Select(ToViewModel)
+                ToViewModels(
+                    GetFlatViewFiles(folderPath)
+                        .Where(x => !IsExcludedNormalizedPath(x.FullPath)))
                     .ToList());
         }
         catch

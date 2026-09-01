@@ -54,6 +54,12 @@ public partial class SettingsWindow : Window
     public IReadOnlyList<string> ResultTreeNodeOrder =>
         _treeNodeOptions.Select(option => option.Key).ToList();
 
+    /// <summary>隠し属性のファイル/フォルダを一覧・ツリーに出すか。</summary>
+    public bool ResultShowHiddenItems => ShowHiddenItemsCheckBox.IsChecked == true;
+
+    /// <summary>システム属性のファイル/フォルダを一覧・ツリーに出すか。</summary>
+    public bool ResultShowSystemItems => ShowSystemItemsCheckBox.IsChecked == true;
+
     // 設定画面に出す列名の対訳表キー。ファイル一覧のヘッダーだけでは分かりにくい列は補足付きの専用キーを使う
     private static readonly Dictionary<string, string> ColumnDisplayNameKeys = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -89,6 +95,8 @@ public partial class SettingsWindow : Window
         AppLanguageSetting currentLanguage,
         Action<AppLanguageSetting> applyLanguage,
         StoreLicenseService storeLicenseService,
+        bool currentShowHiddenItems,
+        bool currentShowSystemItems,
         bool startOnSubscriptionPage = false)
     {
         InitializeComponent();
@@ -142,6 +150,9 @@ public partial class SettingsWindow : Window
             BuildTreeNodeOptions(currentTreeNodeOrder, currentVisibleTreeNodes));
 
         TreeNodeOrderListBox.ItemsSource = _treeNodeOptions;
+
+        ShowHiddenItemsCheckBox.IsChecked = currentShowHiddenItems;
+        ShowSystemItemsCheckBox.IsChecked = currentShowSystemItems;
     }
 
     // 言語切り替え時、XAMLのバインディングでは追従しない箇所を貼り替える

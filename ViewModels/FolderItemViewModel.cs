@@ -10,11 +10,25 @@ namespace ParallelScope.ViewModels;
 /// <summary>フォルダツリーの1ノードを表すViewModel。子フォルダは展開時に遅延読み込みされる。</summary>
 public class FolderItemViewModel : ObservableObject
 {
-    private static readonly EnumerationOptions NonRecursiveEnumerationOptions = new()
+    private static EnumerationOptions _nonRecursiveEnumerationOptions =
+        CreateEnumerationOptions(HiddenItemVisibility.AlwaysSkippedAttributes);
+
+    /// <summary>
+    /// 子フォルダの列挙で飛ばす属性（隠し・システムフォルダを出すかの設定を反映する）。
+    /// 設定はアプリ全体で1つなので、ノードごとに持たせず静的に共有する。
+    /// 差し替えても読み込み済みの子は入れ替わらないため、変更後は <see cref="Reload"/> を呼ぶこと。
+    /// </summary>
+    public static FileAttributes AttributesToSkip
+    {
+        get => _nonRecursiveEnumerationOptions.AttributesToSkip;
+        set => _nonRecursiveEnumerationOptions = CreateEnumerationOptions(value);
+    }
+
+    private static EnumerationOptions CreateEnumerationOptions(FileAttributes attributesToSkip) => new()
     {
         RecurseSubdirectories = false,
         IgnoreInaccessible = true,
-        AttributesToSkip = FileAttributes.ReparsePoint
+        AttributesToSkip = attributesToSkip
     };
 
     // 遅延読み込み中のダミーノードの表示名（対訳表のキー）
@@ -173,6 +187,34 @@ public class FolderItemViewModel : ObservableObject
         await Application.Current.Dispatcher.InvokeAsync(() => ApplySubFolders(subDirs));
     }
 
+    /// <summary>
+    /// 読み込み済みの子フォルダを捨て、次の展開で読み直す（隠しフォルダの表示切り替えなど、
+    /// 列挙の条件が変わったときに使う）。展開中のノードはその場で読み直す。
+    /// 子孫の展開状態は保たれない（条件が変わった以上、下位も並び直す必要があるため）。
+    /// 子を共有している仮想ノードと、遅延読み込みのダミーは対象外。
+    /// </summary>
+    public void Reload()
+    {
+        if (string.IsNullOrEmpty(_path) || VirtualFolders.IsVirtual(_path))
+        {
+            return;
+        }
+
+        _isLoaded = false;
+        _subFolders ??= new ObservableCollection<FolderItemViewModel>();
+        _subFolders.Clear();
+
+        var dummy = new FolderItemViewModel(string.Empty, null);
+        dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
+        _subFolders.Add(dummy);
+        HasSubFolders = true;
+
+        if (IsExpanded)
+        {
+            _ = EnsureLoadedAsync();
+        }
+    }
+
     /// <summary>直下の子フォルダ一覧を取得する。アクセス不可などの場合は空リストを返す。</summary>
     private List<FolderItemViewModel> GetSubFoldersList()
     {
@@ -180,7 +222,7 @@ public class FolderItemViewModel : ObservableObject
         {
             var dirInfo = new DirectoryInfo(_path);
             return dirInfo
-                .EnumerateDirectories("*", NonRecursiveEnumerationOptions)
+                .EnumerateDirectories("*", _nonRecursiveEnumerationOptions)
                 .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
                 .OrderBy(d => d.Name)
                 .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath, _isShortcut))

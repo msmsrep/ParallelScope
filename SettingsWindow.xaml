@@ -171,6 +171,7 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
@@ -224,6 +225,17 @@
                         <TextBlock Name="ResetColumnsHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
                                    Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                                    Text="{loc:Loc Settings.Columns.ResetHint}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 隠し・システム属性の表示。列の設定と違い無料版でも使えるため、購読状態では出し分けない -->
+                <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0" VerticalAlignment="Top">
+                    <StackPanel Name="HiddenItemsPanel">
+                        <TextBlock Text="{loc:Loc Settings.HiddenItems.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{loc:Loc Settings.HiddenItems.Description}"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+                        <CheckBox Name="ShowHiddenItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowHidden}"/>
+                        <CheckBox Name="ShowSystemItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowSystem}" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>

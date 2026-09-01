@@ -1,7 +1,8 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.IO;
 using System.Threading;
 using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -190,6 +191,20 @@ public partial class MainWindowViewModel
         {
             ReplaceVisibleFileItems(_currentDirectoryItems);
         }
+    }
+
+    /// <summary>
+    /// キャッシュエントリを、隠し/システム属性の表示設定で絞り込みつつ画面表示用ViewModelへ変換する。
+    /// キャッシュには属性に関わらず全件入っているため、絞り込みはここ（表示側）だけで行う。
+    /// </summary>
+    private IEnumerable<FileItemViewModel> ToViewModels(IEnumerable<CachedFileSystemEntry> entries)
+    {
+        var showHidden = _showHiddenItems;
+        var showSystem = _showSystemItems;
+
+        return entries
+            .Where(entry => HiddenItemVisibility.IsVisible(entry.Attributes, showHidden, showSystem))
+            .Select(ToViewModel);
     }
 
     /// <summary>キャッシュエントリを画面表示用ViewModelへ変換する。</summary>

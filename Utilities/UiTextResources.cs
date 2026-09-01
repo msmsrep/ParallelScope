@@ -1,4 +1,4 @@
-namespace ParallelScope.Utilities;
+﻿namespace ParallelScope.Utilities;
 
 /// <summary>
 /// UI表示文字列の対訳表。<see cref="English"/>と<see cref="Japanese"/>はキーを揃えて持つ
@@ -110,6 +110,10 @@ internal static class UiTextResources
         ["Settings.Columns.Note"] = "The Name column is always shown. Column widths and the order you set by dragging the column headers are saved when you close the app.",
         ["Settings.Columns.Reset"] = "Reset columns to defaults",
         ["Settings.Columns.ResetHint"] = "The selected columns and their order are back to the defaults, and the column widths will be reset when you save.",
+        ["Settings.HiddenItems.Header"] = "Hidden and system items",
+        ["Settings.HiddenItems.Description"] = "Both are shown by default. Clear a box to leave those items out of the file list and the folder tree.",
+        ["Settings.HiddenItems.ShowHidden"] = "Show hidden files and folders",
+        ["Settings.HiddenItems.ShowSystem"] = "Show system files and folders",
         ["Settings.Column.Name"] = "Name (always shown)",
         ["Settings.Column.Location"] = "Location (parent folder path)",
         ["Settings.Column.Attributes"] = "Attributes (R/H/S/A)",
@@ -265,6 +269,10 @@ internal static class UiTextResources
         ["Settings.Columns.Note"] = "「名前」列は常に表示されます。列の幅と、列見出しのドラッグで変えた並び順は、アプリを閉じるときに保存されます。",
         ["Settings.Columns.Reset"] = "列の設定を既定に戻す",
         ["Settings.Columns.ResetHint"] = "表示する列と並び順を既定に戻しました。列の幅は保存時にリセットされます。",
+        ["Settings.HiddenItems.Header"] = "隠しファイル・システムファイル",
+        ["Settings.HiddenItems.Description"] = "どちらも既定では表示します。チェックを外すと、ファイル一覧とフォルダーツリーのどちらにも出しません。",
+        ["Settings.HiddenItems.ShowHidden"] = "隠しファイル・隠しフォルダーを表示する",
+        ["Settings.HiddenItems.ShowSystem"] = "システムファイル・システムフォルダーを表示する",
         ["Settings.Column.Name"] = "名前（常に表示）",
         ["Settings.Column.Location"] = "場所（親フォルダーのパス）",
         ["Settings.Column.Attributes"] = "属性（R/H/S/A）",

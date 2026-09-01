@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Data;
@@ -80,6 +80,10 @@ public partial class MainWindowViewModel : ObservableObject
 
     // ファイル一覧に表示する列キー（FileListColumns参照。Name列は常時表示のため含まない）
     private HashSet<string> _visibleColumns = FileListColumns.DefaultVisibleColumns.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    // 隠し属性・システム属性のファイル/フォルダを出すか（既定は表示。この設定を入れる前と同じ見え方）
+    private bool _showHiddenItems = true;
+    private bool _showSystemItems = true;
 
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;

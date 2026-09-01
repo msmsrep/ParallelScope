@@ -1,4 +1,4 @@
-using ParallelScope.Data;
+﻿using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
@@ -6,6 +6,7 @@ using ParallelScope.ViewModels;
 namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>ツリー最上位ノードの表示/非表示・並び順の設定が反映され、保存・復元されることの確認。</summary>
+[Collection(FolderTreeCollection.Name)]
 public class TreeNodeSettingsTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
@@ -47,7 +48,9 @@ public class TreeNodeSettingsTests : IDisposable
             viewModel.GetVisibleColumns(),
             viewModel.GetColumnOrder(),
             visibleTreeNodes,
-            treeNodeOrder);
+            treeNodeOrder,
+            viewModel.GetShowHiddenItems(),
+            viewModel.GetShowSystemItems());
     }
 
     [Fact]

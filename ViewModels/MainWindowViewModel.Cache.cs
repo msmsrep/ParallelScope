@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
@@ -38,7 +38,7 @@ public partial class MainWindowViewModel
                 return;
             }
 
-            UpdateCurrentDirectoryItems(cachedEntries.Select(ToViewModel));
+            UpdateCurrentDirectoryItems(ToViewModels(cachedEntries));
             // キャッシュサイズ適用をリクエスト（統合）
             _folderSizeCoalescer.Request((folderPath, cachedEntries, navigationVersion));
         }, null);
@@ -141,7 +141,7 @@ public partial class MainWindowViewModel
                 return;
             }
 
-            UpdateCurrentDirectoryItems(liveEntries.Select(ToViewModel));
+            UpdateCurrentDirectoryItems(ToViewModels(liveEntries));
             // キャッシュサイズ適用をリクエスト（統合）
             _folderSizeCoalescer.Request((folderPath, liveEntries, navigationVersion));
         }, null);

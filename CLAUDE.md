@@ -39,6 +39,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
   - `PathNormalizer`: パスの正規化・比較・祖先判定（以前はViewModel・コードビハインド・リポジトリの間で重複実装されていました）。
   - `VirtualFolders` / `VirtualFolderKind`: ツリー最上位の仮想ノード（`Folders` / `★ Favorites` / `🕘 Recent` / `🕒 Frequently Used`）の定義。仮想パス（`::Recent::` のようにWindowsのパスに使えない `:` を含む文字列）と表示名の対訳表キーはここに集約されているので、種類を増やすときは `GetKind` / `GetPath` / `GetDisplayNameKey` を足せば呼び出し側の分岐は増えません。
   - `TreeNodes`: ツリー最上位ノードのカスタマイズ（表示/非表示・並び順）で使うキーの定義。`FileListColumns` と同じ形で、キーは `VirtualFolderKind` の名前そのまま（settings.json に保存されるためリネーム不可）。`Folders` は常に表示で並び順の対象にだけ入ります。
+  - `HiddenItemVisibility`: 隠し属性・システム属性のファイル/フォルダを表示するかの判定。無料版でも使える設定で、**既定は両方とも表示**です（エクスプローラーの既定とは逆ですが、更新前から見えていたファイルが消えないことを優先しています。`AppSettings` 側もプロパティ初期化子で `true` にしてあり、この設定を持たない既存の settings.json も表示側に倒れます）。スキャンとキャッシュは属性に関わらず全件記録し、絞り込みは表示側（`MainWindowViewModel.ToViewModels`）だけで行うため、切り替えにスキャンし直しは不要です。ツリーの子フォルダ列挙は `FolderItemViewModel.AttributesToSkip`（アプリ全体で1つの静的な値）に反映し、変更後は `FolderItemViewModel.Reload()` で読み込み済みの子を捨てて読み直します。
   - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。
   - `FileSizeFormatter`: バイト数を `"12.3 MB"` のような表示用文字列に変換します。
   - `AppVersionProvider`: `AppxManifest.xml`（csprojの設定によりexeと同じフォルダにコピーされる）の `Identity/@Version` を読み取り、ウィンドウタイトルにバージョンを表示するために使います。

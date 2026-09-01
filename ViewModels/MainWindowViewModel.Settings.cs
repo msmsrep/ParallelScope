@@ -19,6 +19,9 @@ public partial class MainWindowViewModel
         _columnOrder = NormalizeColumnOrder(settings.ColumnOrder);
         _columnWidths = NormalizeColumnWidths(settings.ColumnWidths);
         _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
+        _showHiddenItems = settings.ShowHiddenItems;
+        _showSystemItems = settings.ShowSystemItems;
+        ApplyHiddenItemVisibilityToTree();
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
         _language = AppLanguage.Parse(settings.Language);
@@ -51,6 +54,24 @@ public partial class MainWindowViewModel
     public IReadOnlyList<string> GetVisibleColumns()
     {
         return FileListColumns.OptionalColumns.Where(_visibleColumns.Contains).ToList();
+    }
+
+    /// <summary>隠し属性のファイル/フォルダを表示する設定かどうかを取得する。</summary>
+    public bool GetShowHiddenItems()
+    {
+        return _showHiddenItems;
+    }
+
+    /// <summary>システム属性のファイル/フォルダを表示する設定かどうかを取得する。</summary>
+    public bool GetShowSystemItems()
+    {
+        return _showSystemItems;
+    }
+
+    /// <summary>現在の表示設定をフォルダツリーの列挙条件へ反映する（読み込み済みの子は呼び出し側が読み直す）。</summary>
+    private void ApplyHiddenItemVisibilityToTree()
+    {
+        FolderItemViewModel.AttributesToSkip = HiddenItemVisibility.GetAttributesToSkip(_showHiddenItems, _showSystemItems);
     }
 
     /// <summary>ファイル一覧の列の並び順（列キー。Nameを含む）を取得する。</summary>
@@ -187,8 +208,13 @@ public partial class MainWindowViewModel
         IEnumerable<string>? visibleColumns,
         IEnumerable<string>? columnOrder,
         IEnumerable<string>? visibleTreeNodes,
-        IEnumerable<string>? treeNodeOrder)
+        IEnumerable<string>? treeNodeOrder,
+        bool showHiddenItems,
+        bool showSystemItems)
     {
+        var hiddenItemVisibilityChanged = _showHiddenItems != showHiddenItems || _showSystemItems != showSystemItems;
+        _showHiddenItems = showHiddenItems;
+        _showSystemItems = showSystemItems;
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
         _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
         _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
@@ -199,6 +225,28 @@ public partial class MainWindowViewModel
         // 非表示にしたノードを開いていた場合はここで「Folders」へ退避される
         RebuildTreeRoots();
         ApplyRootPaths(rootPaths ?? Enumerable.Empty<string>(), true);
+
+        // 一覧・ツリーの絞り込み条件が変わった場合は、表示中の内容を取り直す
+        // （ApplyRootPathsはルート構成が変わらない限り再読み込みしないため）
+        if (hiddenItemVisibilityChanged)
+        {
+            RefreshHiddenItemVisibility();
+        }
+    }
+
+    /// <summary>隠し/システム属性の表示条件を、ツリーの列挙条件と表示中の一覧へ反映し直す。</summary>
+    private void RefreshHiddenItemVisibility()
+    {
+        ApplyHiddenItemVisibilityToTree();
+
+        // 読み込み済みの子フォルダは前の条件で並んでいるため、ツリー上の実体ノードを読み直す
+        // （お気に入り等の複製ノードも同じ実フォルダを列挙するため対象に含める）
+        foreach (var folder in RootFolders.Concat(_favoriteFolders).Concat(_frequentFolders).Concat(_recentFolders))
+        {
+            folder.Reload();
+        }
+
+        RefreshCurrentFolder();
     }
 
     public void ApplyRootPaths(IEnumerable<string> rootPaths)
@@ -315,6 +363,8 @@ public partial class MainWindowViewModel
             ColumnOrder = _columnOrder.ToList(),
             ColumnWidths = new Dictionary<string, double>(_columnWidths, StringComparer.OrdinalIgnoreCase),
             CsvExportSizeInBytes = _csvExportSizeInBytes,
+            ShowHiddenItems = _showHiddenItems,
+            ShowSystemItems = _showSystemItems,
             Theme = _theme.ToString(),
             Language = _language.ToString(),
             VisibleTreeNodes = _treeNodeOrder.Where(_visibleTreeNodes.Contains).ToList(),

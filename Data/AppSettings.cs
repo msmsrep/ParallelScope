@@ -1,4 +1,4 @@
-namespace ParallelScope.Data;
+﻿namespace ParallelScope.Data;
 
 public sealed class AppSettings
 {
@@ -29,6 +29,15 @@ public sealed class AppSettings
 
     /// <summary>CSV出力でSize列を生のバイト数で書き出すか（falseなら "11.8 MB" のような表示中の文字列）。</summary>
     public bool CsvExportSizeInBytes { get; set; }
+
+    /// <summary>
+    /// 隠し属性のファイル/フォルダを一覧・ツリーに出すか。
+    /// 既定は表示（この設定を入れる前と同じ見え方。設定の無い settings.json からもtrueで読み込まれる）。
+    /// </summary>
+    public bool ShowHiddenItems { get; set; } = true;
+
+    /// <summary>システム属性のファイル/フォルダを一覧・ツリーに出すか。既定は <see cref="ShowHiddenItems"/> と同じ理由で表示。</summary>
+    public bool ShowSystemItems { get; set; } = true;
 
     /// <summary>お気に入りに登録されたフォルダのパス一覧（登録順）。</summary>
     public List<string> FavoritePaths { get; set; } = new();

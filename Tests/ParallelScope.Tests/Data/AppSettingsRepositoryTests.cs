@@ -130,5 +130,8 @@ public class AppSettingsRepositoryTests
         Assert.Equal(AppSettings.DefaultFullScanIntervalHours, settings.FullScanIntervalHours);
         Assert.Null(settings.VisibleColumns);
         Assert.Null(settings.VisibleTreeNodes);
+        // 更新前から使っている利用者のファイル一覧の見え方を変えないため、表示側に倒す
+        Assert.True(settings.ShowHiddenItems);
+        Assert.True(settings.ShowSystemItems);
     }
 }

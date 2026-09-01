@@ -11,6 +11,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// その結果が <see cref="MainWindowViewModel.SetPlusFeaturesEnabled"/> に渡ってくる前提で、
 /// 渡された後の切り替わり方をテストする。
 /// </summary>
+[Collection(FolderTreeCollection.Name)]
 public class PlusFeatureGatingTests : IDisposable
 {
     private const string FavoritePath = @"C:\PlusTest\Favorite";
