@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope 使い方ガイド</title>
-<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・最近開いたフォルダ・よく使うフォルダ、CSV出力、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
+<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・最近開いたフォルダ・よく使うフォルダ、CSV出力、英語/日本語の表示言語、隠しファイル・システムファイルの表示、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -263,7 +263,7 @@
   <div class="shot-pair">
     <figure>
       <a href="images/08-settings-theme.png"><img src="images/08-settings-theme.png" alt="設定画面の Theme ページ"></a>
-      <figcaption>「Settings &gt; Theme」で System / Light / Dark を切り替え。選んだ瞬間に適用・保存されます。</figcaption>
+      <figcaption>「Settings &gt; Theme（配色テーマ）」で System / Light / Dark を切り替え。選んだ瞬間に適用・保存されます。</figcaption>
     </figure>
     <figure>
       <a href="images/09-dark.png"><img src="images/09-dark.png" alt="ダークテーマのメイン画面"></a>
@@ -271,9 +271,23 @@
     </figure>
   </div>
 
+  <h3>表示言語</h3>
+  <p>
+    「Settings &gt; Language（言語）」で、アプリ内の表示を英語と日本語のどちらにするかを選べます。既定の「システム（Windowsに合わせる）」は
+    Windowsの表示言語に追従します。配色テーマと同じく、選んだ瞬間に適用・保存される（Saveボタンは不要）設定で、無料版でも使えます。
+  </p>
+  <ul>
+    <li>メニュー・設定画面・ファイル一覧の列見出し・ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」まで、その場で切り替わります。</li>
+    <li><strong>Type 列だけは例外</strong>です。この文字列はWindows自身が返す種類名のため、この設定ではなく<strong>OSの表示言語</strong>に従います。</li>
+    <li>CSV出力の見出しは、他のツールや表計算ソフトでそのまま扱えるよう英語のままです。</li>
+  </ul>
+  <div class="note">
+    <p>このページの画面写真は英語表示のまま撮っています。設定画面のページ名などは、日本語表示にすると訳語に変わります。</p>
+  </div>
+
   <h3>フォルダツリー（ParallelScope Plus の機能）</h3>
   <p>
-    「Settings &gt; フォルダツリー」では、<strong>ツリー最上位に表示するショートカットのノードと、その並び順</strong>を選べます。
+    「Settings &gt; Folder Tree（フォルダツリー）」では、<strong>ツリー最上位に表示するショートカットのノードと、その並び順</strong>を選べます。
     「★ Favorites」「🕘 Recent」「🕒 Frequently Used」にチェックを入れると表示され、「↑ Up」「↓ Down」で並べ替えられます。
     「Folders」はツリーが空になってしまうため非表示にはできませんが、位置は入れ替えられるので、ルートフォルダを一番上に置くこともできます。
   </p>
@@ -289,7 +303,7 @@
     <figcaption>未購読の場合、このページは薄字で表示され操作できません。</figcaption>
   </figure>
   <p>
-    「Settings &gt; Display Columns」では、ファイル一覧に<strong>どの列を出すかと、その並び順</strong>をまとめて指定できます。
+    「Settings &gt; Display Columns（表示する列）」では、ファイル一覧に<strong>どの列を出すかと、その並び順</strong>をまとめて指定できます。
     チェックを入れた列が表示され、「↑ Up」「↓ Down」で順番を入れ替えられます。選べる列は Location（親フォルダのパス）・Type・Size・Modified・Created・Attributes で、
     Name 列は常に表示されますが、並び順の変更対象には含まれます。
   </p>
@@ -297,6 +311,17 @@
     <li><strong>ヘッダーのドラッグ操作も保存されます。</strong>ファイル一覧の列見出しをドラッグして順番を入れ替えたり、境目をドラッグして幅を変えたりした結果は、アプリを閉じるときにまとめて保存され、次回起動時に復元されます。</li>
     <li><strong>「Reset columns to defaults」</strong>で、表示列・並び順・列幅をまとめて既定（Name / Type / Size / Modified）へ戻せます。列幅は保存した時点でリセットされます。</li>
     <li>これらは有料の Plus 機能です。未購読の間は既定の Name / Type / Size / Modified が既定の並び順で表示されます。設定自体は残るので、購読すれば以前のレイアウトがそのまま復活します。</li>
+  </ul>
+
+  <h3>隠しファイル・システムファイルの表示</h3>
+  <p>
+    同じ「Settings &gt; Display Columns（表示する列）」ページの下側に<strong>「Hidden and system items（隠しファイル・システムファイル）」</strong>があり、隠し属性のファイル/フォルダーと
+    システム属性のファイル/フォルダーを、それぞれ表示するかどうかをチェックボックスで選べます。<strong>既定はどちらも表示</strong>で、
+    チェックを外すとファイル一覧とフォルダツリーのどちらにも出さなくなります。上の列の設定と違い、こちらは無料版でも使えます。
+  </p>
+  <ul>
+    <li>変更は設定を保存したときに反映されます。キャッシュは属性に関わらず全件記録していて、絞り込みは表示のときに行うため、スキャンし直す必要はありません。</li>
+    <li>エクスプローラーの既定とは逆で、ParallelScope は指定しない限り隠し・システム属性の項目も表示します。これまで見えていたファイルが更新後に消えてしまわないことを優先しています。</li>
   </ul>
 </section>
 
@@ -318,7 +343,7 @@
   <h2>ParallelScope Plus（月額サブスクリプション）</h2>
   <figure>
     <a href="images/10-settings-subscription.png"><img src="images/10-settings-subscription.png" alt="設定画面の Subscription ページ"></a>
-    <figcaption>「Settings &gt; Subscription」から購読と解約の入り口にアクセスできます。</figcaption>
+    <figcaption>「Settings &gt; Subscription（サブスクリプション）」から購読と解約の入り口にアクセスできます。</figcaption>
   </figure>
   <ul>
     <li>現在の対象機能は次の 3 つです。
@@ -358,8 +383,11 @@
   <h3>追加したファイルが検索に出てこない</h3>
   <p>検索はキャッシュを対象にしています。そのフォルダをツリーで右クリックして「Scan everything under this folder」を実行するか、次の自動フルスキャンを待ってください。</p>
 
+  <h3>エクスプローラーでは見えるファイルが一覧に出てこない</h3>
+  <p>「Settings &gt; Display Columns（表示する列）」の「Hidden and system items（隠しファイル・システムファイル）」を確認してください。チェックを外していると、その属性が付いたファイル・フォルダーは一覧にもツリーにも表示されません。</p>
+
   <h3>ツリーに出てこないフォルダがある</h3>
-  <p>除外フォルダに含まれていないか、「Settings &gt; Root Folders」の Excluded Folders を確認してください。除外したパスとその配下は、ツリー・一覧・検索のいずれにも表示されません。</p>
+  <p>除外フォルダに含まれていないか、「Settings &gt; Root Folders（ルートフォルダー）」の Excluded Folders を確認してください。除外したパスとその配下は、ツリー・一覧・検索のいずれにも表示されません。</p>
 
   <h3>NAS やネットワークドライブが遅い・切断されている</h3>
   <p>接続できないルートがあっても、キャッシュ済みの内容はそのまま閲覧・検索できます。接続が戻れば、次のスキャンで内容が最新化されます。</p>
@@ -368,7 +396,7 @@
   <p>フォルダの合計サイズはスキャン済みのキャッシュから集計しています。まだスキャンされていないフォルダでは空欄になります。</p>
 
   <h3>表示列を変えたい</h3>
-  <p>列の増減・並び替えは Plus 機能です。「Settings &gt; Display Columns」から購読ページへ移動できます。</p>
+  <p>列の増減・並び替えは Plus 機能です。「Settings &gt; Display Columns（表示する列）」から購読ページへ移動できます。</p>
 
   <h3>列幅が既定に戻ってしまった</h3>
   <p>列幅とヘッダーの並び順はアプリを閉じるときに保存されるため、強制終了すると直前の変更が残りません。また、Plus未購読の間は保存済みの設定を無視して既定の列で表示します（購読が有効になれば元のレイアウトに戻ります）。</p>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope User Guide</title>
-<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites, Recent and Frequently Used folders, CSV export, and how scanning and the cache work — with screenshots.">
+<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites, Recent and Frequently Used folders, CSV export, the English / Japanese display language, hidden and system items, and how scanning and the cache work — with screenshots.">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -270,17 +270,16 @@
     </figure>
   </div>
 
-  <h3>Folder tree (a ParallelScope Plus feature)</h3>
+  <h3>Display language</h3>
   <p>
-    "Settings &gt; Folder Tree" controls <strong>which of the top-level shortcut nodes the tree shows and the order they appear
-    in</strong>. Tick "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" to show them, and move any of them with the
-    "↑ Up" / "↓ Down" buttons. The "Folders" node cannot be hidden — otherwise the tree could end up empty — but it can be moved,
-    so you can put it at the very top if you would rather have your roots first.
+    "Settings &gt; Language" switches the app's own text between English and Japanese. The default, "System (follow Windows)",
+    follows your Windows display language. Like the theme, the choice applies and is saved the moment you pick it — there is no
+    "Save" to press — and it works without a subscription.
   </p>
   <ul>
-    <li>The change takes effect when you save. If you hide the node you are currently looking at, the list moves back to "Folders".</li>
-    <li>Hiding a node does not throw anything away: "Recent" and "Frequently Used" keep being built from the folders you open, and your favorites are untouched.</li>
-    <li>Like the nodes themselves, this is a paid Plus feature. Without a subscription none of the three appear, but the settings are kept for when you subscribe.</li>
+    <li>The whole window swaps over straight away: the menu, the settings window, the file list headers, and the tree's "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" nodes.</li>
+    <li>The <strong>Type</strong> column is the exception. Those names come from Windows itself, so they follow the language of the OS rather than this setting.</li>
+    <li>CSV exports keep their English headers, so a file exported in one language can still be read by the same script or spreadsheet.</li>
   </ul>
 
   <h3>Folder tree (a ParallelScope Plus feature)</h3>
@@ -310,6 +309,18 @@
     <li><strong>Header drags are saved too.</strong> Reordering columns by dragging their headers in the file list, and resizing them by dragging the edges, are stored when you close the app and restored the next time you start it.</li>
     <li><strong>"Reset columns to defaults"</strong> puts the selection, the order, and the widths back to Name / Type / Size / Modified. The widths are cleared when you save.</li>
     <li>All of this is a paid Plus feature. Without a subscription the file list uses the default Name / Type / Size / Modified in the default order — but your settings are kept, so subscribing brings your layout straight back.</li>
+  </ul>
+
+  <h3>Hidden and system items</h3>
+  <p>
+    Below the column list, the same "Settings &gt; Display Columns" page has <strong>"Hidden and system items"</strong>, with one
+    checkbox for hidden files and folders and one for system files and folders. <strong>Both are ticked by default</strong>, so
+    those items are shown; clear a box to leave them out of the file list and the folder tree alike. Unlike the columns above it,
+    this part of the page works without a subscription.
+  </p>
+  <ul>
+    <li>The change takes effect when you save the settings. No rescan is needed — the cache records every item whatever its attributes are, and the filtering happens as the list is drawn.</li>
+    <li>This is the opposite of Explorer's default. ParallelScope shows hidden and system items unless you say otherwise, so files you could already see do not quietly disappear.</li>
   </ul>
 </section>
 
@@ -372,6 +383,9 @@
 
   <h3>A file I just added does not show up in search</h3>
   <p>Search reads the cache. Right-click that folder in the tree and run "Scan everything under this folder", or wait for the next automatic full scan.</p>
+
+  <h3>A file I can see in Explorer is missing from the list</h3>
+  <p>Check "Settings &gt; Display Columns" and look at "Hidden and system items". If either box is cleared, files and folders with that attribute are left out of both the list and the tree.</p>
 
   <h3>A folder is missing from the tree</h3>
   <p>Check "Settings &gt; Root Folders" and look at Excluded Folders — an excluded path and everything under it is hidden from the tree, the list, and search.</p>
