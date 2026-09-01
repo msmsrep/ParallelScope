@@ -46,14 +46,13 @@ public partial class MainWindow : IBrowserPaneHost
         {
             var scannedFolderCount = await _viewModel.ScanFolderSubtreeAsync(folderItem.Path);
 
-            // 表示していないタブは、次に表示するときにキャッシュから読み直す
-            _viewModel.MarkInactiveTabsStale();
+            // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う。
+            // 表示していないタブは印だけ付けて、次に表示するときにキャッシュから読み直す
+            _viewModel.RefreshAfterScan(folderItem.Path);
 
-            if (PathNormalizer.IsAncestorOrSame(folderItem.Path, _viewModel.CurrentPath))
+            foreach (var pane in _panes)
             {
-                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
-                _viewModel.RefreshCurrentFolder();
-                _pane.SyncTreeSelectionToCurrentPath();
+                pane.SyncTreeSelectionToCurrentPath();
             }
 
             MessageBox.Show(
@@ -117,14 +116,13 @@ public partial class MainWindow : IBrowserPaneHost
         {
             var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync(token);
 
-            // 表示していないタブは、次に表示するときにキャッシュから読み直す
-            _viewModel.MarkInactiveTabsStale();
+            // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う。
+            // 表示していないタブは印だけ付けて、次に表示するときにキャッシュから読み直す
+            _viewModel.RefreshAfterScan();
 
-            if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
+            foreach (var pane in _panes)
             {
-                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
-                _viewModel.RefreshCurrentFolder();
-                _pane.SyncTreeSelectionToCurrentPath();
+                pane.SyncTreeSelectionToCurrentPath();
             }
 
             if (showCompletionMessage)

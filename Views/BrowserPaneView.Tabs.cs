@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -204,6 +204,15 @@ public partial class BrowserPaneView
             return;
         }
 
+        if (!CanAcceptDraggedTab(dragged))
+        {
+            // 移動元が空になる場合と、このペインが上限に達している場合は受け付けない
+            e.Effects = DragDropEffects.None;
+            e.Handled = true;
+            ClearTabDropIndicators();
+            return;
+        }
+
         e.Effects = DragDropEffects.Move;
         e.Handled = true;
 
@@ -247,20 +256,70 @@ public partial class BrowserPaneView
         }
 
         var targetIndex = _paneViewModel.Tabs.IndexOf(target);
-        var draggedIndex = _paneViewModel.Tabs.IndexOf(dragged);
-        if (targetIndex < 0 || draggedIndex < 0)
+        if (targetIndex < 0)
         {
             return;
         }
 
         var newIndex = IsBeforeHalf(sender, e) ? targetIndex : targetIndex + 1;
+
+        // 別のペインから運ばれてきたタブは、インスタンスをそのまま受け取る
+        if (!_paneViewModel.Tabs.Contains(dragged))
+        {
+            _viewModel.MoveTabToPane(dragged, _paneViewModel, newIndex);
+            return;
+        }
+
         // 自分より後ろへ入れる場合、抜いた分だけ位置が1つ詰まる
-        if (draggedIndex < newIndex)
+        if (_paneViewModel.Tabs.IndexOf(dragged) < newIndex)
         {
             newIndex--;
         }
 
         _paneViewModel.MoveTab(dragged, newIndex);
+    }
+
+    // タブ列の余白（タブが並んでいない部分）へ落とされた場合は末尾へ移す
+    private void TabStrip_DragOver(object sender, DragEventArgs e)
+    {
+        var dragged = GetDraggedTab(e);
+        e.Effects = dragged is not null && CanAcceptDraggedTab(dragged)
+            ? DragDropEffects.Move
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private void TabStrip_Drop(object sender, DragEventArgs e)
+    {
+        ClearTabDropIndicators();
+
+        if (GetDraggedTab(e) is not { } dragged)
+        {
+            return;
+        }
+
+        e.Handled = true;
+
+        if (_paneViewModel.Tabs.Contains(dragged))
+        {
+            _paneViewModel.MoveTab(dragged, _paneViewModel.Tabs.Count - 1);
+            return;
+        }
+
+        _viewModel.MoveTabToPane(dragged, _paneViewModel, _paneViewModel.Tabs.Count);
+    }
+
+    /// <summary>ドラッグ中のタブをこのペインで受け取れるか（同じペイン内の並べ替えは常に可）。</summary>
+    private bool CanAcceptDraggedTab(BrowserTabViewModel dragged)
+    {
+        if (_paneViewModel.Tabs.Contains(dragged))
+        {
+            return true;
+        }
+
+        // 移動元の最後の1つは持ち出せない。移動先が上限に達している場合も受け取らない
+        return _paneViewModel.CanAddTab
+            && _viewModel.FindPaneOf(dragged) is { CanCloseTabs: true };
     }
 
     private static bool IsBeforeHalf(object sender, DragEventArgs e)

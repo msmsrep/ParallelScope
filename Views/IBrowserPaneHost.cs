@@ -11,4 +11,10 @@ internal interface IBrowserPaneHost
 {
     /// <summary>ツリーのコンテキストメニューから要求された、フォルダ配下の個別スキャンを実行する。</summary>
     Task RunFolderScanAsync(FolderItemViewModel folderItem);
+
+    /// <summary>このペインが操作されたこと（クリック・フォーカス移動）を通知する。</summary>
+    void OnPaneActivated(BrowserPaneView pane);
+
+    /// <summary>指定のペインを操作対象にする（反対側のペインで開いた直後など）。</summary>
+    void ActivatePane(BrowserPaneViewModel paneViewModel);
 }

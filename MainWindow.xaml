@@ -26,6 +26,14 @@
                     <MenuItem Name="ExportCsvMenuItem" Header="{loc:Loc Menu.ExportCsv}"
                               IsEnabled="False" Click="ExportCsvMenuItem_Click"/>
                     <Separator/>
+                    <!-- Plus機能。CSV書き出しと同じく、未購読時は薄字で選べない状態にする -->
+                    <MenuItem Name="SplitViewMenuItem" Header="{loc:Loc Menu.SplitView}" IsCheckable="True"
+                              IsEnabled="False" Click="SplitViewMenuItem_Click"/>
+                    <MenuItem Name="SplitVerticalMenuItem" Header="{loc:Loc Menu.SplitVertical}" IsCheckable="True"
+                              IsChecked="True" IsEnabled="False" Click="SplitOrientationMenuItem_Click"/>
+                    <MenuItem Name="SplitHorizontalMenuItem" Header="{loc:Loc Menu.SplitHorizontal}" IsCheckable="True"
+                              IsEnabled="False" Click="SplitOrientationMenuItem_Click"/>
+                    <Separator/>
                     <MenuItem Header="{loc:Loc Menu.UserGuide}" Click="OpenUserGuideMenuItem_Click"/>
                 </MenuItem>
             </Menu>

@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -48,6 +48,33 @@ public partial class BrowserPaneView : UserControl
 
     /// <summary>このペインで表示中のタブ。</summary>
     private BrowserTabViewModel ActiveTab => _paneViewModel.ActiveTab;
+
+    /// <summary>このペインのViewModel（ウィンドウ側からペインを見分けるために使う）。</summary>
+    internal BrowserPaneViewModel ViewModel => _paneViewModel;
+
+    // クリック・フォーカス移動で、このペインを操作対象にする（2画面表示のとき）
+    private void Pane_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        _host.OnPaneActivated(this);
+    }
+
+    private void Pane_PreviewGotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        _host.OnPaneActivated(this);
+    }
+
+    /// <summary>指定パスを反対側のペインの新しいタブで開き、そちらを操作対象にする。</summary>
+    private void OpenPathInOtherPane(string path)
+    {
+        var otherPane = _viewModel.GetOtherPane(_paneViewModel);
+        if (otherPane is null)
+        {
+            return;
+        }
+
+        otherPane.OpenTab(path);
+        _host.ActivatePane(otherPane);
+    }
 
     /// <summary>ウィンドウを閉じる際に、購読しているイベントから外れる。</summary>
     internal void Detach()

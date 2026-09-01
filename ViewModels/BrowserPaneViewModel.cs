@@ -20,6 +20,7 @@ public partial class BrowserPaneViewModel : ObservableObject
     private readonly MainWindowViewModel _shell;
     private readonly Stack<ClosedTabState> _closedTabs = new();
     private BrowserTabViewModel _activeTab;
+    private bool _isActive;
 
     internal BrowserPaneViewModel(MainWindowViewModel shell)
     {
@@ -41,6 +42,49 @@ public partial class BrowserPaneViewModel : ObservableObject
     {
         get => _activeTab;
         private set => SetProperty(ref _activeTab, value);
+    }
+
+    /// <summary>このペインが操作対象か（メニュー・ショートカットの反映先）。</summary>
+    public bool IsActive
+    {
+        get => _isActive;
+        internal set
+        {
+            if (SetProperty(ref _isActive, value))
+            {
+                OnPropertyChanged(nameof(ShowsActiveHighlight));
+            }
+        }
+    }
+
+    /// <summary>アクティブなペインである印（枠線）を出すか。1画面のときはどちらでもないので出さない。</summary>
+    public bool ShowsActiveHighlight => _isActive && _shell.IsSplitViewEnabled;
+
+    /// <summary>分割の切り替えで、枠線を出すかどうかが変わったことを通知する。</summary>
+    internal void NotifyActiveHighlightChanged() => OnPropertyChanged(nameof(ShowsActiveHighlight));
+
+    /// <summary>タブをこのペインから外す（別のペインへ移すため。閉じたタブとしては記録しない）。</summary>
+    internal void ReleaseTab(BrowserTabViewModel tab)
+    {
+        var index = Tabs.IndexOf(tab);
+        if (index < 0)
+        {
+            return;
+        }
+
+        Tabs.RemoveAt(index);
+        tab.IsActive = false;
+
+        if (ReferenceEquals(tab, ActiveTab) && Tabs.Count > 0)
+        {
+            ActivateTab(Tabs[Math.Min(index, Tabs.Count - 1)]);
+        }
+    }
+
+    /// <summary>別のペインから移されたタブを受け取る（表示するかどうかは呼び出し側が決める）。</summary>
+    internal void AdoptTab(BrowserTabViewModel tab, int index)
+    {
+        Tabs.Insert(Math.Clamp(index, 0, Tabs.Count), tab);
     }
 
     /// <summary>タブを閉じられるか（最後の1つは閉じられない）。</summary>

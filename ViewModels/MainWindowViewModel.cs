@@ -62,13 +62,8 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _showHiddenItems = true;
     private bool _showSystemItems = true;
 
-    /// <summary>
-    /// 閲覧ペイン。2画面表示（フェーズ4）で2件になるまでは1件だけ存在する。
-    /// </summary>
+    /// <summary>閲覧ペイン（1画面なら1件、2画面表示なら2件）。</summary>
     public ObservableCollection<BrowserPaneViewModel> Panes { get; } = new();
-
-    /// <summary>操作対象のペイン（メニューやスキャンの反映先）。</summary>
-    public BrowserPaneViewModel ActivePane => Panes[0];
 
     /// <summary>操作対象のペインで表示中のタブ。</summary>
     public BrowserTabViewModel ActiveTab => ActivePane.ActiveTab;
@@ -131,9 +126,9 @@ public partial class MainWindowViewModel : ObservableObject
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         // 設定の読み込みはペインのツリーとタブへ反映されるため、ペインを先に用意する
-        var pane = new BrowserPaneViewModel(this);
+        var pane = CreatePane();
+        pane.IsActive = true;
         Panes.Add(pane);
-        pane.PropertyChanged += ActivePane_PropertyChanged;
         _observedTab = pane.ActiveTab;
         _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
@@ -146,29 +141,6 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(e.PropertyName);
     }
 
-    // 表示中のタブが切り替わったら、中継先を繋ぎ替えて委譲プロパティをまとめて通知し直す
-    private void ActivePane_PropertyChanged(object? sender, PropertyChangedEventArgs e)
-    {
-        if (e.PropertyName != nameof(BrowserPaneViewModel.ActiveTab))
-        {
-            return;
-        }
-
-        _observedTab.PropertyChanged -= ActiveTab_PropertyChanged;
-        _observedTab = ActiveTab;
-        _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
-
-        OnPropertyChanged(nameof(ActiveTab));
-        OnPropertyChanged(nameof(FileItems));
-        OnPropertyChanged(nameof(CurrentPath));
-        OnPropertyChanged(nameof(AddressInput));
-        OnPropertyChanged(nameof(SearchQuery));
-        OnPropertyChanged(nameof(IsFlatFileViewEnabled));
-        OnPropertyChanged(nameof(CanGoBack));
-        OnPropertyChanged(nameof(CanGoForward));
-        OnPropertyChanged(nameof(CanGoUp));
-    }
-
     /// <summary>全ペインのツリーで、ルートフォルダのスキャン中表示を一括で切り替える。</summary>
     public void SetRootScanningState(bool isScanning)
     {
@@ -179,11 +151,29 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// スキャン完了後、表示していないタブに「キャッシュが更新された」印を付ける。
-    /// 印の付いたタブは次に表示されるときに一覧を読み直す（全タブを同時に再取得しないため）。
+    /// スキャン完了後の一覧の作り直し。表示中のタブ（各ペインのアクティブタブ）はその場で読み直し、
+    /// 表示していないタブには印だけ付けて次に表示するときに読み直す（全タブを同時に再取得しないため）。
     /// </summary>
-    public void MarkInactiveTabsStale()
+    /// <param name="scannedPath">
+    /// スキャンしたフォルダ。指定した場合、その配下を表示しているタブだけを読み直す（nullなら全ルート＝全て対象）。
+    /// </param>
+    public void RefreshAfterScan(string? scannedPath = null)
     {
+        foreach (var tab in Panes.Select(pane => pane.ActiveTab))
+        {
+            if (string.IsNullOrWhiteSpace(tab.CurrentPath))
+            {
+                continue;
+            }
+
+            if (scannedPath is not null && !PathNormalizer.IsAncestorOrSame(scannedPath, tab.CurrentPath))
+            {
+                continue;
+            }
+
+            tab.RefreshCurrentFolder();
+        }
+
         foreach (var tab in AllTabs.Where(tab => !tab.IsActive))
         {
             tab.MarkStale();

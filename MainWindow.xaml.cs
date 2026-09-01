@@ -17,8 +17,6 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly StoreLicenseService _storeLicenseService = new();
-    // 閲覧ペイン。2画面表示（分割）では2つ目が増えるため、参照はフィールドで保持する
-    private readonly BrowserPaneView _pane;
 
     public MainWindow()
     {
@@ -39,8 +37,7 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
 
         // ペインは列レイアウトの初期化にViewModelを必要とするため、ViewModelの生成後に組み立てる
-        _pane = new BrowserPaneView(_viewModel, _viewModel.ActivePane, _storeLicenseService, this);
-        PaneHost.Children.Add(_pane);
+        RebuildPaneLayout();
 
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -74,7 +71,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            _pane.SaveFileListColumnLayout();
+            // 列レイアウトは全ペイン共通の設定なので、最後に触ったペイン（操作対象）の値を保存する
+            ActivePaneView.SaveFileListColumnLayout();
         }
         catch
         {
@@ -84,7 +82,11 @@ public partial class MainWindow : Window
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
         PreviewKeyDown -= MainWindow_PreviewKeyDown;
-        _pane.Detach();
+
+        foreach (var pane in _panes)
+        {
+            pane.Detach();
+        }
     }
 
     // Plus機能（ツリーのお気に入り・最近・よく使うノード、一覧の表示列・列幅、CSV書き出し）を
@@ -95,41 +97,64 @@ public partial class MainWindow : Window
 
         _viewModel.SetPlusFeaturesEnabled(isActive);
         ExportCsvMenuItem.IsEnabled = isActive;
-        _pane.SetTabsEnabled(isActive);
-        _pane.ApplyFileListColumnVisibility();
-        _pane.ApplyFileListColumnLayout();
+        SplitViewMenuItem.IsEnabled = isActive;
+        SplitVerticalMenuItem.IsEnabled = isActive;
+        SplitHorizontalMenuItem.IsEnabled = isActive;
+
+        // 購読が切れた状態で分割したままにはしない（1画面＝未購読時の見た目に戻す）
+        if (!isActive && _viewModel.IsSplitViewEnabled)
+        {
+            _viewModel.DisableSplitView();
+            ApplySplitViewState();
+        }
+
+        foreach (var pane in _panes)
+        {
+            pane.SetTabsEnabled(isActive);
+            pane.ApplyFileListColumnVisibility();
+            pane.ApplyFileListColumnLayout();
+        }
     }
 
-    // タブ操作のキーボードショートカット（Plus機能のため、未購読の間はペイン側が受け付けない）
+    // タブ・ペイン操作のキーボードショートカット（Plus機能のため、未購読の間はペイン側が受け付けない）
     private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // F6は修飾キー無しでペインを切り替える（分割していなければ何もしない）
+        if (e.Key == Key.F6 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            ActivateOtherPane();
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
         {
             return;
         }
 
         var isShiftPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var pane = ActivePaneView;
 
         switch (e.Key)
         {
             case Key.T when isShiftPressed:
-                _pane.ReopenClosedTab();
+                pane.ReopenClosedTab();
                 break;
             case Key.T:
-                _pane.OpenNewTab();
+                pane.OpenNewTab();
                 break;
             case Key.W:
-                _pane.CloseActiveTab();
+                pane.CloseActiveTab();
                 break;
             case Key.Tab:
-                _pane.ActivateAdjacentTab(!isShiftPressed);
+                pane.ActivateAdjacentTab(!isShiftPressed);
                 break;
             case >= Key.D1 and <= Key.D8:
-                _pane.ActivateTabAt(e.Key - Key.D1);
+                pane.ActivateTabAt(e.Key - Key.D1);
                 break;
             case Key.D9:
                 // ブラウザーと同じく、Ctrl+9 は位置ではなく末尾のタブ
-                _pane.ActivateLastTab();
+                pane.ActivateLastTab();
                 break;
             default:
                 return;
@@ -155,7 +180,7 @@ public partial class MainWindow : Window
     {
         // 設定画面には最新の並び順を渡したいので、ヘッダーのドラッグで変わっている可能性のある
         // 現在の列レイアウトを先に確定させる
-        _pane.SaveFileListColumnLayout();
+        ActivePaneView.SaveFileListColumnLayout();
 
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
@@ -198,12 +223,19 @@ public partial class MainWindow : Window
         // 保存済み幅を消してから並び順・列幅を反映し直す（消し忘れると直後のApplyで元の幅に戻ってしまう）
         if (dialog.ShouldResetColumnWidths)
         {
-            _pane.ResetFileListColumnWidths();
+            foreach (var pane in _panes)
+            {
+                pane.ResetFileListColumnWidths();
+            }
         }
 
         ApplyPlusFeatures();
         ConfigureScheduledFullScanTimer();
-        _pane.SyncTreeSelectionToCurrentPath();
+
+        foreach (var pane in _panes)
+        {
+            pane.SyncTreeSelectionToCurrentPath();
+        }
 
         if (dialog.ShouldRunFullScan)
         {
@@ -211,10 +243,10 @@ public partial class MainWindow : Window
         }
     }
 
-    // 表示中のファイル一覧をCSVへ書き出す（対象はペインが持つ一覧）
+    // 表示中のファイル一覧をCSVへ書き出す（対象は操作対象のペインの一覧）
     private async void ExportCsvMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        await _pane.ExportCsvAsync();
+        await ActivePaneView.ExportCsvAsync();
     }
 
     // 使い方ガイド（GitHub Pages）を既定のブラウザーで開く

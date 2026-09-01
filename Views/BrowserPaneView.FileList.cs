@@ -321,8 +321,20 @@ public partial class BrowserPaneView
             return;
         }
 
-        // 「新しいタブで開く」はフォルダ行のときだけ（Plus未購読の間は常に無効）
+        // 「新しいタブで開く」「反対側のペインで開く」はフォルダ行のときだけ（Plus未購読の間は常に無効）
         OpenInNewTabMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && _paneViewModel.CanAddTab;
+        // 反対側のペインは分割表示中しか無い
+        var otherPane = _viewModel.GetOtherPane(_paneViewModel);
+        OpenInOtherPaneMenuItem.IsEnabled = _areTabsEnabled && item.IsFolder && otherPane is { CanAddTab: true };
+    }
+
+    // 右クリックメニューから、選択中のフォルダを反対側のペインで開く
+    private void OpenInOtherPaneMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (GetSelectedFileItem() is { IsFolder: true } item)
+        {
+            OpenPathInOtherPane(item.FullPath);
+        }
     }
 
     // 右クリックメニューから、選択中のフォルダを新しいタブで開く

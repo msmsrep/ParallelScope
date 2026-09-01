@@ -159,6 +159,21 @@ public partial class BrowserPaneView
             openInNewTabMenuItem.Click += OpenFolderInNewTabMenuItem_Click;
 
             contextMenu.Items.Add(openInNewTabMenuItem);
+
+            // 反対側のペインは分割表示中しか無い
+            var otherPane = _viewModel.GetOtherPane(_paneViewModel);
+            if (otherPane is not null)
+            {
+                var openInOtherPaneMenuItem = new MenuItem
+                {
+                    Header = UiText.Get("Context.OpenInOtherPane"),
+                    DataContext = folderItem,
+                    IsEnabled = otherPane.CanAddTab
+                };
+                openInOtherPaneMenuItem.Click += OpenFolderInOtherPaneMenuItem_Click;
+                contextMenu.Items.Add(openInOtherPaneMenuItem);
+            }
+
             contextMenu.Items.Add(new Separator());
         }
 
@@ -207,6 +222,15 @@ public partial class BrowserPaneView
         if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
         {
             OpenPathInNewTab(folderItem.Path);
+        }
+    }
+
+    // ツリーのコンテキストメニューから、選択フォルダを反対側のペインで開く
+    private void OpenFolderInOtherPaneMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            OpenPathInOtherPane(folderItem.Path);
         }
     }
 
