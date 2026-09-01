@@ -65,6 +65,14 @@ Parallel Scopeは、NASやPC内の大量のフォルダを“一瞬で検索・�
 
 ParallelScope Plus（月額サブスクリプション）でできること
 
+・複数タブ
+フォルダを複数のタブで開いたまま行き来できます。タブごとに現在のフォルダ・戻る/進むの履歴・検索語・All Filesモード・並び順を持ち、
+開いていたタブは次回起動時に復元されます。
+
+・2画面（分割表示）
+画面を左右または上下に分割し、離れた場所にある2つのフォルダを並べて見比べられます。
+それぞれの側がフォルダツリーとファイル一覧を1組ずつ持ち、タブはドラッグで反対側へ移せます。
+
 ・ツリー最上位のショートカット
 「★ お気に入り」「🕘 最近開いたフォルダ」「🕒 よく使うフォルダ」をツリーの最上位に表示します。
 どれを表示するか、どの順番で並べるかも選べます。
@@ -98,6 +106,8 @@ ParallelScope Plus（月額サブスクリプション）でできること
 - 配色テーマ（システム／ライト／ダーク）
 - 表示言語（システム／英語／日本語）
 - 隠しファイル・システムファイルの表示切り替え
+- ParallelScope Plus: 複数タブ（タブごとに表示状態を保持し、次回起動時に復元）
+- ParallelScope Plus: 2画面（左右／上下の分割表示）で2つのフォルダを並べて比較
 - ParallelScope Plus: お気に入り／最近開いたフォルダ／よく使うフォルダのツリー表示
 - ParallelScope Plus: 表示列の選択・並び順・列幅の保存
 - ParallelScope Plus: 表示中の一覧のCSV書き出し
@@ -160,6 +170,14 @@ They are shown by default; clear a checkbox to leave them out of both the file l
 
 What ParallelScope Plus (a monthly subscription) adds
 
+- Multiple tabs
+Keep several folders open and move between them. Each tab has its own folder, back/forward history, search text, All Files mode and sort order,
+and your open tabs come back the next time you start the app.
+
+- Split view
+Split the window side by side or top and bottom to compare two folders that live far apart.
+Each side has its own folder tree and file list, and tabs can be dragged from one side to the other.
+
 - Shortcuts at the top of the tree
 "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" appear above your root folders.
 You choose which of them to show, and in what order.
@@ -193,6 +211,8 @@ If you would like to help, there is a link inside the app — it is a real encou
 - Color theme (System / Light / Dark)
 - Display language (System / English / Japanese)
 - Show or hide hidden and system items
+- ParallelScope Plus: multiple tabs, each keeping its own view and restored on the next start
+- ParallelScope Plus: split view (side by side or stacked) for comparing two folders
 - ParallelScope Plus: Favorites, Recent and Frequently Used folders in the tree
 - ParallelScope Plus: choose the file list columns, their order and their widths
 - ParallelScope Plus: export the list you are looking at to CSV

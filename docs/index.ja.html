@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope 使い方ガイド</title>
-<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、お気に入り・最近開いたフォルダ・よく使うフォルダ、CSV出力、英語/日本語の表示言語、隠しファイル・システムファイルの表示、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
+<meta name="description" content="ParallelScope（Windows向けの複数ルート横断ファイルブラウザ）の使い方ガイド。画面の見方、初期設定、検索、All Filesモード、タブと画面分割、お気に入り・最近開いたフォルダ・よく使うフォルダ、CSV出力、英語/日本語の表示言語、隠しファイル・システムファイルの表示、スキャンとキャッシュの仕組みを画面写真つきで説明します。">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -35,6 +35,7 @@
     <li><a href="#favorites">お気に入り・最近開いたフォルダ・よく使うフォルダ</a></li>
     <li><a href="#search">検索する</a></li>
     <li><a href="#allfiles">All Files モード</a></li>
+    <li><a href="#tabs">タブと画面分割</a></li>
     <li><a href="#contextmenu">右クリックメニュー</a></li>
     <li><a href="#scan">スキャンとキャッシュ</a></li>
     <li><a href="#customize">表示のカスタマイズ</a></li>
@@ -206,8 +207,57 @@
     <li>この表示もキャッシュから作られるため、直近のスキャン時点の内容になります。</li>
     <li>ONのまま別のフォルダを選ぶと、そのフォルダ配下のファイルに切り替わります。</li>
     <li>ONのまま検索すると、結果はファイルのみになります。</li>
-    <li>ON / OFF の状態は保存され、次回起動時も引き継がれます。</li>
+    <li>ON / OFF の状態はタブごとに保存され、次回起動時も引き継がれます。</li>
   </ul>
+</section>
+
+<section id="tabs">
+  <h2>タブと画面分割（ParallelScope Plus の機能）</h2>
+  <p>
+    フォルダを複数開いたまま行き来したいときは、タブと画面分割が使えます。
+    どちらも ParallelScope Plus の機能で、未購読の間はタブ列が表示されず、メニューの「画面を分割する」も選べません。
+  </p>
+
+  <h3>タブ</h3>
+  <ul>
+    <li>タブ列は画面の一番上に出ます。右端の「＋」で新しいタブが開き、いま見ているフォルダと同じ場所から始まります。</li>
+    <li>タブの「✕」または中クリックで閉じます。最後の 1 つは閉じられません。</li>
+    <li>タブはドラッグで並べ替えられます。</li>
+    <li>タブごとに、現在のフォルダ・戻る/進むの履歴・検索語・All Files モード・一覧の並び順を別々に持ちます。</li>
+    <li>1 つのペインに開けるタブは 20 個までです。</li>
+    <li>ツリーのフォルダを右クリックした「Open in New Tab」、一覧のフォルダ行の中クリックでも新しいタブで開けます。</li>
+  </ul>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>ショートカット</th><th>動作</th></tr></thead>
+      <tbody>
+        <tr><td>Ctrl + T</td><td>新しいタブを開く</td></tr>
+        <tr><td>Ctrl + W</td><td>いま見ているタブを閉じる</td></tr>
+        <tr><td>Ctrl + Shift + T</td><td>閉じたタブを開き直す（アプリ実行中の直近 10 件まで）</td></tr>
+        <tr><td>Ctrl + Tab / Ctrl + Shift + Tab</td><td>次 / 前のタブへ移る</td></tr>
+        <tr><td>Ctrl + 1 〜 8</td><td>左から数えたその位置のタブへ移る</td></tr>
+        <tr><td>Ctrl + 9</td><td>いちばん右のタブへ移る</td></tr>
+        <tr><td>F6</td><td>（分割中）操作するペインを切り替える</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>画面分割（2 画面）</h3>
+  <ul>
+    <li>「メニュー &gt; 画面を分割する」で画面を 2 つに分けます。向きは「左右に分割」「上下に分割」から選べます。</li>
+    <li>分割したそれぞれの側（ペイン）が、フォルダツリー・アドレス欄・検索欄・タブ列・ファイル一覧を 1 組ずつ持ちます。左右（上下）で別のフォルダを並べて見比べられます。</li>
+    <li>操作の対象になっているペインは枠線で示されます。クリックするか F6 で切り替わります。メニューの CSV 書き出しなども、こちらのペインが対象です。</li>
+    <li>間の仕切りをドラッグすると配分を変えられます。配分は保存されます。</li>
+    <li>タブは反対側のペインへドラッグして移せます。ツリー・一覧の右クリックの「Open in Other Pane」でも反対側で開けます。</li>
+    <li>分割をやめると、閉じる側のタブは残る側の末尾へ移ります。</li>
+  </ul>
+  <div class="note">
+    <p>ファイル一覧の表示列・列幅・並び順は両方のペインで共通の設定です。分割中に片側で列幅を変えると、その値が共通の設定として保存されます。</p>
+  </div>
+  <p>
+    開いていたタブと分割の状態は保存され、次回起動時に復元されます（検索語は復元されません）。
+    フォルダが無くなっていたタブは、最初のルートフォルダに寄せて開きます。
+  </p>
 </section>
 
 <section id="contextmenu">
@@ -230,6 +280,8 @@
         <tr><td>Copy File Name</td><td>ファイル名だけをテキストとしてコピーします。</td></tr>
         <tr><td>Copy Full Path</td><td>フルパスをテキストとしてコピーします。</td></tr>
         <tr><td>Open Parent Folder</td><td>エクスプローラーで親フォルダを開き、その項目を選択状態にします。</td></tr>
+        <tr><td>Open in New Tab</td><td>そのフォルダを<a href="#tabs">新しいタブ</a>で開きます。Plus機能のため、未購読の間は選べません。</td></tr>
+        <tr><td>Open in Other Pane</td><td>そのフォルダを<a href="#tabs">反対側のペイン</a>で開きます。画面を分割しているときだけ選べます。</td></tr>
         <tr><td>Scan everything under this folder</td><td>（ツリー側）そのフォルダ配下だけをスキャンし、キャッシュを更新します。</td></tr>
         <tr><td>★ Add to Favorites / ☆ Remove from Favorites</td><td>（ツリー側）そのフォルダを「★ Favorites」に登録・解除します。Plus機能のため、未購読の間はメニューに出ません。</td></tr>
       </tbody>
@@ -346,12 +398,14 @@
     <figcaption>「Settings &gt; Subscription（サブスクリプション）」から購読と解約の入り口にアクセスできます。</figcaption>
   </figure>
   <ul>
-    <li>現在の対象機能は次の 3 つです。
+    <li>現在の対象機能は次のとおりです。
       <ul>
         <li><a href="#favorites">「★ Favorites」「🕘 Recent」「🕒 Frequently Used」</a>（ツリー最上位のショートカット）</li>
         <li><a href="#customize">ツリー最上位に表示するノードと並び順の選択</a></li>
         <li><a href="#customize">ファイル一覧の列のカスタマイズ</a>（表示する列・並び順・列幅）</li>
         <li><a href="#csv">ファイル一覧のCSV出力</a></li>
+        <li><a href="#tabs">複数タブ</a></li>
+        <li><a href="#tabs">画面分割（2 画面）</a></li>
       </ul>
       これら以外のすべての機能は購読なしで使えます。</li>
     <li>購入・請求・解約はすべて Microsoft Store が処理します。解約は「Manage / Cancel subscription」から Microsoft アカウントのサブスクリプション管理ページを開いて行います。</li>
@@ -400,6 +454,9 @@
 
   <h3>列幅が既定に戻ってしまった</h3>
   <p>列幅とヘッダーの並び順はアプリを閉じるときに保存されるため、強制終了すると直前の変更が残りません。また、Plus未購読の間は保存済みの設定を無視して既定の列で表示します（購読が有効になれば元のレイアウトに戻ります）。</p>
+
+  <h3>タブ列が出てこない・「画面を分割する」が選べない</h3>
+  <p><a href="#tabs">タブと画面分割</a>は ParallelScope Plus の機能です。購読すると表示されます。保存済みのタブ構成は未購読の間も消えないので、購読すれば元の構成に戻ります。</p>
 
   <h3>「Favorites」「Recent」「Frequently Used」がツリーに出てこない</h3>
   <p>いずれも Plus 機能です。購読が確認できた時点で表示されるため、起動直後は少し遅れて現れることがあります。</p>

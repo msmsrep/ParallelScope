@@ -18,12 +18,14 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 - Double-click in the list to navigate into folders or open files with the default app
 - Color theme (System / Light / Dark)
 - Display language (System / English / Japanese; defaults to your Windows display language, available in the free version)
-- Plus features: "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" folders in the tree (which of them to show and in what order), file list column
-  customization (which columns, their order, and their widths), and CSV export of the current list
+- Plus features: multiple tabs, split view (two panes), "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" folders in the tree (which of them to show
+  and in what order), file list column customization (which columns, their order, and their widths), and CSV export of the current list
 
 ## Release
 
 - Unreleased
+  - Added multiple tabs (Plus): each tab keeps its own folder, history, search text, view mode and sort order, and the layout is restored on the next start
+  - Added a split view (Plus): two panes side by side or stacked, each with its own tree and file list
   - Added a "Folder Tree" settings page to show/hide and reorder the top-level tree nodes (Plus)
   - Added a "🕘 Recent" node to the folder tree (Plus)
   - Added an English / Japanese display language setting (defaults to your Windows display language)
@@ -88,6 +90,7 @@ Unit tests (xUnit) cover the UI-independent layers. See [Tests/README.md](./Test
    - File: open with the default application
 6. Turn on "All Files" to list every file under the current folder, regardless of depth.
 7. Use "Menu > Export CSV..." to write the list you are looking at to a CSV file (Plus).
+8. Open a new tab with "＋" on the tab strip or Ctrl+T, and split the window from "Menu > Split View" (both Plus).
 
 See the [User Guide](https://msmsrep.github.io/ParallelScope/) for details.
 
@@ -128,6 +131,8 @@ dotnet ef database update
 Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
 
 - **Plus features**:
+  - Multiple tabs (the tab strip is hidden without a subscription; a saved tab layout is kept as is and comes back when you subscribe)
+  - Split view (two panes) ("Menu > Split View" stays greyed out without a subscription)
   - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree, and "Folder Tree" in the settings window for choosing which of them to show and in what order (hidden entirely without a subscription)
   - "Display Columns" in the settings window (which columns the file list shows, their order, and their widths)
   - "Menu > Export CSV..." (exporting the displayed list)
