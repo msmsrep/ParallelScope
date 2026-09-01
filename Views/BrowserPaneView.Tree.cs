@@ -79,10 +79,10 @@ public partial class BrowserPaneView
         switch (VirtualFolders.GetKind(folderItem.Path))
         {
             case VirtualFolderKind.Frequent:
-                _viewModel.RefreshFrequentFolders();
+                _paneViewModel.RefreshFrequentFolders();
                 return;
             case VirtualFolderKind.Recent:
-                _viewModel.RefreshRecentFolders();
+                _paneViewModel.RefreshRecentFolders();
                 return;
         }
 
@@ -262,7 +262,7 @@ public partial class BrowserPaneView
             return;
         }
 
-        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
+        var rootFolder = _paneViewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
         if (rootFolder is null)
         {
             return;
@@ -279,7 +279,7 @@ public partial class BrowserPaneView
 
         // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
         // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
-        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_viewModel.AllRootsNode) is not TreeViewItem allRootsItem)
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_paneViewModel.AllRootsNode) is not TreeViewItem allRootsItem)
         {
             return;
         }

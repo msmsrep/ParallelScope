@@ -16,7 +16,6 @@ namespace ParallelScope.ViewModels;
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
-    private ObservableCollection<FolderItemViewModel> _rootFolders;
     // 変更通知を画面へ中継しているタブ（アクティブなタブが切り替わるたびに繋ぎ替える）
     private BrowserTabViewModel _observedTab;
     private readonly FileCacheRepository _fileCacheRepository;
@@ -29,8 +28,11 @@ public partial class MainWindowViewModel : ObservableObject
     private AppThemeSetting _theme = AppThemeSetting.System;
     private AppLanguageSetting _language = AppLanguageSetting.System;
 
-    // バックグラウンド処理（横断検索・フラット表示・Roots一覧）から参照するルートパスの不変スナップショット。
-    // RootFolders（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
+    // 設定されているルートパス（正規化済み。除外設定に該当するものも含む＝settings.jsonに保存する内容）
+    private List<string> _rootPaths = new();
+
+    // 実際にツリー・横断列挙の対象にするルートパス（除外設定に該当するものを除いた不変スナップショット）。
+    // ツリーのノード（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
     /// <summary>
@@ -60,18 +62,6 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _showHiddenItems = true;
     private bool _showSystemItems = true;
 
-    public ObservableCollection<FolderItemViewModel> RootFolders
-    {
-        get => _rootFolders;
-        set => SetProperty(ref _rootFolders, value);
-    }
-
-    /// <summary>
-    /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Folders」ノード1件のみを含み、
-    /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
-    /// </summary>
-    public ObservableCollection<FolderItemViewModel> TreeRoots { get; } = new();
-
     /// <summary>
     /// 閲覧ペイン。2画面表示（フェーズ4）で2件になるまでは1件だけ存在する。
     /// </summary>
@@ -82,6 +72,14 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>操作対象のペインで表示中のタブ。</summary>
     public BrowserTabViewModel ActiveTab => ActivePane.ActiveTab;
+
+    // ツリーはペインごとの持ち物。画面・テストから見えるこれらは操作対象のペインのものを指す
+    public ObservableCollection<FolderItemViewModel> RootFolders => ActivePane.RootFolders;
+
+    public ObservableCollection<FolderItemViewModel> TreeRoots => ActivePane.TreeRoots;
+
+    /// <summary>ツリー最上位の「Folders」ノード。</summary>
+    public FolderItemViewModel AllRootsNode => ActivePane.AllRootsNode;
 
     /// <summary>開いているすべてのタブ（設定変更をタブ全体へ反映するために使う）。</summary>
     private IEnumerable<BrowserTabViewModel> AllTabs => Panes.SelectMany(pane => pane.Tabs);
@@ -128,19 +126,17 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository)
     {
-        _rootFolders = new ObservableCollection<FolderItemViewModel>();
         _fileCacheRepository = fileCacheRepository;
         _appSettingsRepository = appSettingsRepository;
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
-        // ツリーの初期化・設定の読み込みはどちらも現在パス（＝タブの状態）を参照するため、ペインとタブを先に用意する
+        // 設定の読み込みはペインのツリーとタブへ反映されるため、ペインを先に用意する
         var pane = new BrowserPaneViewModel(this);
         Panes.Add(pane);
         pane.PropertyChanged += ActivePane_PropertyChanged;
         _observedTab = pane.ActiveTab;
         _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
-        InitializeTreeNodes();
         InitializeRootFolders();
     }
 
@@ -171,6 +167,15 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(CanGoForward));
         OnPropertyChanged(nameof(CanGoUp));
+    }
+
+    /// <summary>全ペインのツリーで、ルートフォルダのスキャン中表示を一括で切り替える。</summary>
+    public void SetRootScanningState(bool isScanning)
+    {
+        foreach (var rootFolder in Panes.SelectMany(pane => pane.RootFolders))
+        {
+            rootFolder.IsScanning = isScanning;
+        }
     }
 
     /// <summary>

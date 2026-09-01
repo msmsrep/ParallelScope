@@ -5,9 +5,9 @@ namespace ParallelScope.ViewModels;
 
 /// <summary>
 /// 1つの閲覧ペイン（フォルダツリー＋タブ列＋ファイル一覧）のViewModel。
-/// タブの開閉・切り替え・並べ替えを受け持ち、表示中のタブを <see cref="ActiveTab"/> で示す。
-/// フォルダツリーは本来ペインの持ち物だが、2画面表示（フェーズ4）まではシェルが1つだけ持つため、
-/// <see cref="TreeRoots"/> はシェルのものをそのまま見せている。
+/// タブの開閉・切り替え・並べ替えと、そのペインのフォルダツリーを受け持つ。
+/// ツリーのノードは <c>BrowserPaneViewModel.Tree.cs</c> にあり、元データ（ルートパス・
+/// お気に入り・アクセス実績）はアプリ全体で1つなのでシェルから借りる。
 /// </summary>
 public partial class BrowserPaneViewModel : ObservableObject
 {
@@ -29,6 +29,8 @@ public partial class BrowserPaneViewModel : ObservableObject
         _activeTab.IsActive = true;
         Tabs.Add(_activeTab);
         Tabs.CollectionChanged += (_, _) => NotifyTabCountChanged();
+
+        InitializeTreeNodes();
     }
 
     /// <summary>このペインに開いているタブ（左から並び順どおり）。</summary>
@@ -40,9 +42,6 @@ public partial class BrowserPaneViewModel : ObservableObject
         get => _activeTab;
         private set => SetProperty(ref _activeTab, value);
     }
-
-    /// <summary>フォルダツリーの最上位ノード（フェーズ4でツリーがペインの持ち物になるまではシェルのものを共有する）。</summary>
-    public ObservableCollection<FolderItemViewModel> TreeRoots => _shell.TreeRoots;
 
     /// <summary>タブを閉じられるか（最後の1つは閉じられない）。</summary>
     public bool CanCloseTabs => Tabs.Count > 1;

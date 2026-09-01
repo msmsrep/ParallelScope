@@ -32,10 +32,10 @@ public partial class MainWindowViewModel
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
-    /// <summary>現在設定されているルートフォルダのパス一覧を取得する。</summary>
+    /// <summary>現在設定されているルートフォルダのパス一覧を取得する（除外設定に該当するものは除く）。</summary>
     public IReadOnlyList<string> GetConfiguredRootPaths()
     {
-        return RootFolders.Select(x => x.Path).ToList();
+        return _rootPathsSnapshot.ToList();
     }
 
     /// <summary>フルスキャンの実行間隔（時間）を取得する。</summary>
@@ -105,7 +105,7 @@ public partial class MainWindowViewModel
 
         _columnOrder = normalizedOrder;
         _columnWidths = normalizedWidths;
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
     }
 
     /// <summary>
@@ -120,7 +120,7 @@ public partial class MainWindowViewModel
         }
 
         _columnWidths = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
     }
 
     /// <summary>CSV出力でSize列を生のバイト数で書き出す設定か（保存ダイアログの既定選択に使う）。</summary>
@@ -138,7 +138,7 @@ public partial class MainWindowViewModel
         }
 
         _csvExportSizeInBytes = sizeInBytes;
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
     }
 
     /// <summary>settings.jsonに書かれた開発者専用のPlus解放キーを取得する（未設定ならnull）。</summary>
@@ -166,7 +166,7 @@ public partial class MainWindowViewModel
 
         _theme = theme;
         AppTheme.Apply(_theme);
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
     }
 
     /// <summary>現在の表示言語設定を取得する。</summary>
@@ -191,7 +191,7 @@ public partial class MainWindowViewModel
         // バインディング経由で更新されないツリー・タブ見出しの表示名（仮想ノード・読み込み中のダミー）を引き直す
         RefreshLocalizedTreeNames();
         RefreshLocalizedTabNames();
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
     }
 
     /// <summary>起動時に、保存済みの表示言語をアプリ全体へ適用する。</summary>
@@ -241,11 +241,10 @@ public partial class MainWindowViewModel
     {
         ApplyHiddenItemVisibilityToTree();
 
-        // 読み込み済みの子フォルダは前の条件で並んでいるため、ツリー上の実体ノードを読み直す
-        // （お気に入り等の複製ノードも同じ実フォルダを列挙するため対象に含める）
-        foreach (var folder in RootFolders.Concat(_favoriteFolders).Concat(_frequentFolders).Concat(_recentFolders))
+        // 読み込み済みの子フォルダは前の条件で並んでいるため、全ペインのツリーを読み直す
+        foreach (var pane in Panes)
         {
-            folder.Reload();
+            pane.ReloadTreeFolders();
         }
 
         foreach (var tab in AllTabs)
@@ -268,70 +267,21 @@ public partial class MainWindowViewModel
             normalizedRootPaths = GetFallbackDriveRoots().ToList();
         }
 
-        // 差分更新: 既存のルートフォルダをマップ化
-        var newRootPaths = new HashSet<string>(normalizedRootPaths, StringComparer.OrdinalIgnoreCase);
+        _rootPaths = normalizedRootPaths;
+        // 除外設定に該当するルートはツリーにも横断列挙にも出さない（設定自体は消さずに残す）
+        _rootPathsSnapshot = normalizedRootPaths.Where(path => !IsExcludedPath(path)).ToList();
 
-        // 削除: 新しいリストに含まれないルートフォルダを削除
-        var rootsToRemove = RootFolders
-            .Where(x => !newRootPaths.Contains(x.Path) || IsExcludedPath(x.Path))
-            .ToList();
-        foreach (var root in rootsToRemove)
+        foreach (var pane in Panes)
         {
-            RootFolders.Remove(root);
+            pane.ApplyRootPaths(_rootPathsSnapshot);
         }
-
-        // 追加: 新しいリストに含まれるがまだ存在しないルートフォルダを追加
-        var existingRootPaths = new HashSet<string>(RootFolders.Select(x => x.Path), StringComparer.OrdinalIgnoreCase);
-        foreach (var rootPath in normalizedRootPaths)
-        {
-            if (!IsExcludedPath(rootPath) && !existingRootPaths.Contains(rootPath))
-            {
-                var newRootFolder = new FolderItemViewModel(rootPath, IsExcludedPath);
-                // ルートフォルダは追加時に即座に読み込みを開始する（遅延展開ではなく）。
-                // ただし同期版だと切断中のNASルートでUIスレッドがSMBタイムアウトまでブロックするため、
-                // 非同期版で開始だけして先へ進む（読み込み完了までツリーにはダミーの子が表示される）
-                _ = newRootFolder.EnsureLoadedAsync();
-                RootFolders.Add(newRootFolder);
-            }
-        }
-
-        // 並び替え: 既存項目の削除・追加だけでは順序変更が反映されないため、設定の順序に合わせて移動する。
-        // 再生成せずMoveで並び替えることで、読み込み済みのサブフォルダツリーを保持する
-        var orderedIndex = 0;
-        foreach (var rootPath in normalizedRootPaths)
-        {
-            var currentIndex = -1;
-            for (var i = 0; i < RootFolders.Count; i++)
-            {
-                if (string.Equals(RootFolders[i].Path, rootPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    currentIndex = i;
-                    break;
-                }
-            }
-
-            if (currentIndex < 0)
-            {
-                // 除外パス等でRootFoldersに存在しないルートは順序合わせの対象外
-                continue;
-            }
-
-            if (currentIndex != orderedIndex)
-            {
-                RootFolders.Move(currentIndex, orderedIndex);
-            }
-
-            orderedIndex++;
-        }
-
-        _rootPathsSnapshot = RootFolders.Select(x => x.Path).ToList();
 
         if (saveSettings)
         {
-            SaveSettings(normalizedRootPaths);
+            SaveSettings();
         }
 
-        var currentRoot = RootFolders.FirstOrDefault();
+        var currentRoot = _rootPathsSnapshot.FirstOrDefault();
         if (currentRoot is null)
         {
             foreach (var tab in AllTabs)
@@ -353,19 +303,20 @@ public partial class MainWindowViewModel
             }
 
             if (string.IsNullOrWhiteSpace(tab.CurrentPath)
-                || !RootFolders.Any(x => PathNormalizer.IsAncestorOrSame(x.Path, tab.CurrentPath)))
+                || !_rootPathsSnapshot.Any(rootPath => PathNormalizer.IsAncestorOrSame(rootPath, tab.CurrentPath)))
             {
-                tab.NavigateTo(currentRoot.Path, false);
+                tab.NavigateTo(currentRoot, false);
             }
         }
     }
 
     /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ・お気に入り・アクセス実績）をsettings.jsonへ保存する。</summary>
-    private void SaveSettings(IEnumerable<string> rootPaths)
+    private void SaveSettings()
     {
         _appSettingsRepository.Save(new AppSettings
         {
-            RootPaths = rootPaths.ToList(),
+            // 除外設定に該当するルートも設定としては残す（除外を外せばまた使えるように）
+            RootPaths = _rootPaths.ToList(),
             ExcludedPaths = _excludedPaths.OrderBy(x => x, StringComparer.OrdinalIgnoreCase).ToList(),
             FullScanIntervalHours = _fullScanIntervalHours,
             IsFlatFileViewEnabled = ActiveTab.IsFlatFileViewEnabled,
@@ -577,7 +528,7 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>指定パスが除外設定に該当するか（自身または祖先が除外パスに含まれるか）を判定する。</summary>
-    private bool IsExcludedPath(string path)
+    internal bool IsExcludedPath(string path)
     {
         var normalizedPath = PathNormalizer.Normalize(path);
         if (string.IsNullOrWhiteSpace(normalizedPath))

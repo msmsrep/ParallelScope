@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
@@ -29,5 +29,5 @@ public partial class MainWindowViewModel : IBrowserTabHost
     void IBrowserTabHost.RecordFolderUsage(string path) => RecordFolderUsage(path);
 
     // All Filesモードは settings.json に持つ設定のため、タブ側で切り替わったらそのまま保存する
-    void IBrowserTabHost.OnFlatFileViewEnabledChanged() => SaveSettings(RootFolders.Select(x => x.Path));
+    void IBrowserTabHost.OnFlatFileViewEnabledChanged() => SaveSettings();
 }

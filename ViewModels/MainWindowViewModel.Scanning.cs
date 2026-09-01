@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
@@ -28,8 +28,7 @@ public partial class MainWindowViewModel
     /// <summary>設定済みの全ルートフォルダをフルスキャンし、キャッシュを更新する。</summary>
     public async Task<int> FullScanConfiguredRootsAsync(CancellationToken token)
     {
-        var allConfiguredRootPaths = RootFolders
-            .Select(x => PathNormalizer.Normalize(x.Path))
+        var allConfiguredRootPaths = _rootPathsSnapshot
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -294,8 +293,9 @@ public partial class MainWindowViewModel
     {
         _uiContext.Post(_ =>
         {
-            var rootFolder = RootFolders.FirstOrDefault(x => PathNormalizer.AreSame(x.Path, rootPath));
-            if (rootFolder is not null)
+            // ツリーはペインごとにあるため、同じルートのノードをすべて消す
+            foreach (var rootFolder in Panes.SelectMany(pane => pane.RootFolders)
+                .Where(x => PathNormalizer.AreSame(x.Path, rootPath)))
             {
                 rootFolder.IsScanning = false;
             }

@@ -164,12 +164,9 @@ public partial class MainWindow : IBrowserPaneHost
         _fullScanCts?.Cancel();
     }
 
-    // 全ルートフォルダのスキャン中表示フラグを一括で切り替える
+    // 全ルートフォルダのスキャン中表示フラグを一括で切り替える（ツリーはペインごとにある）
     private void SetRootScanningState(bool isScanning)
     {
-        foreach (var rootFolder in _viewModel.RootFolders)
-        {
-            rootFolder.IsScanning = isScanning;
-        }
+        _viewModel.SetRootScanningState(isScanning);
     }
 }
