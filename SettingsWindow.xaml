@@ -166,78 +166,84 @@
                 </Border>
             </Grid>
 
-            <!-- 右側: ファイル一覧の表示列カスタマイズのページ -->
+            <!-- 右側: ファイル一覧の表示列カスタマイズのページ。
+                 未購読時はアンロック案内が増えてウィンドウの高さに収まらなくなるため、カードはスクロール領域に入れる
+                 （固定サイズのウィンドウなので、収まらないと下のカードが見えなくなってしまう） -->
             <Grid Grid.Column="1" Name="ColumnSettingsPanel" Visibility="Collapsed">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="*"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Text="{loc:Loc Settings.Columns.Header}" Style="{StaticResource PaneHeaderTextStyle}"/>
 
-                <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
-                <Border Grid.Row="1" Name="PlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
-                        Visibility="Collapsed">
-                    <StackPanel>
-                        <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
-                                   Text="{loc:Loc Settings.Columns.PlusUpsell}"/>
-                        <Button Name="GoToSubscriptionButton" Content="{loc:Loc Settings.GoToSubscription}" HorizontalAlignment="Left"
-                                Padding="8,6" Click="GoToSubscriptionButton_Click"/>
-                    </StackPanel>
-                </Border>
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,4,0">
 
-                <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
-                <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
-                    <StackPanel Name="ColumnCheckBoxesPanel">
-                        <TextBlock Text="{loc:Loc Settings.Columns.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
-                        <TextBlock Text="{loc:Loc Settings.Columns.Note}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                    <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
+                    <Border Name="PlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       Text="{loc:Loc Settings.Columns.PlusUpsell}"/>
+                            <Button Name="GoToSubscriptionButton" Content="{loc:Loc Settings.GoToSubscription}" HorizontalAlignment="Left"
+                                    Padding="8,6" Click="GoToSubscriptionButton_Click"/>
+                        </StackPanel>
+                    </Border>
 
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
+                    <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                        <StackPanel Name="ColumnCheckBoxesPanel">
+                            <TextBlock Text="{loc:Loc Settings.Columns.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                            <TextBlock Text="{loc:Loc Settings.Columns.Note}"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
 
-                            <!-- 並びがそのままファイル一覧の列順になる（項目は ColumnOptionItem） -->
-                            <ListBox Grid.Column="0" Name="ColumnOrderListBox" Height="240">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <CheckBox Content="{Binding DisplayName}"
-                                                  IsChecked="{Binding IsVisible, Mode=TwoWay}"
-                                                  IsEnabled="{Binding CanToggleVisibility}"/>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top">
-                                <Button Content="{loc:Loc Common.Up}" MinWidth="80" Padding="8,6" Click="MoveColumnUpButton_Click"/>
-                                <Button Content="{loc:Loc Common.Down}" MinWidth="80" Margin="0,8,0,0" Padding="8,6" Click="MoveColumnDownButton_Click"/>
-                            </StackPanel>
-                        </Grid>
+                                <!-- 並びがそのままファイル一覧の列順になる（項目は ColumnOptionItem） -->
+                                <ListBox Grid.Column="0" Name="ColumnOrderListBox" Height="240">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <CheckBox Content="{Binding DisplayName}"
+                                                      IsChecked="{Binding IsVisible, Mode=TwoWay}"
+                                                      IsEnabled="{Binding CanToggleVisibility}"/>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
 
-                        <!-- 列幅はこの画面では編集できない（ヘッダーのドラッグで変わる）ため、まとめて既定に戻す手段を置く -->
-                        <Button Name="ResetColumnsButton" Content="{loc:Loc Settings.Columns.Reset}" HorizontalAlignment="Left"
-                                Margin="0,12,0,0" Padding="8,6" Click="ResetColumnsButton_Click"/>
-                        <TextBlock Name="ResetColumnsHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
-                                   Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="{loc:Loc Settings.Columns.ResetHint}"/>
-                    </StackPanel>
-                </Border>
+                                <StackPanel Grid.Column="1" Margin="8,0,0,0" VerticalAlignment="Top">
+                                    <Button Content="{loc:Loc Common.Up}" MinWidth="80" Padding="8,6" Click="MoveColumnUpButton_Click"/>
+                                    <Button Content="{loc:Loc Common.Down}" MinWidth="80" Margin="0,8,0,0" Padding="8,6" Click="MoveColumnDownButton_Click"/>
+                                </StackPanel>
+                            </Grid>
 
-                <!-- 隠し・システム属性の表示。列の設定と違い無料版でも使えるため、購読状態では出し分けない -->
-                <Border Grid.Row="3" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0" VerticalAlignment="Top">
-                    <StackPanel Name="HiddenItemsPanel">
-                        <TextBlock Text="{loc:Loc Settings.HiddenItems.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <TextBlock Text="{loc:Loc Settings.HiddenItems.Description}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
-                        <CheckBox Name="ShowHiddenItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowHidden}"/>
-                        <CheckBox Name="ShowSystemItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowSystem}" Margin="0,8,0,0"/>
-                    </StackPanel>
-                </Border>
+                            <!-- 列幅はこの画面では編集できない（ヘッダーのドラッグで変わる）ため、まとめて既定に戻す手段を置く -->
+                            <Button Name="ResetColumnsButton" Content="{loc:Loc Settings.Columns.Reset}" HorizontalAlignment="Left"
+                                    Margin="0,12,0,0" Padding="8,6" Click="ResetColumnsButton_Click"/>
+                            <TextBlock Name="ResetColumnsHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
+                                       Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       Text="{loc:Loc Settings.Columns.ResetHint}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 隠し・システム属性の表示。列の設定と違い無料版でも使えるため、購読状態では出し分けない -->
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0" VerticalAlignment="Top">
+                        <StackPanel Name="HiddenItemsPanel">
+                            <TextBlock Text="{loc:Loc Settings.HiddenItems.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                            <TextBlock Text="{loc:Loc Settings.HiddenItems.Description}"
+                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+                            <CheckBox Name="ShowHiddenItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowHidden}"/>
+                            <CheckBox Name="ShowSystemItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowSystem}" Margin="0,8,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+                </ScrollViewer>
             </Grid>
 
             <!-- 右側: 配色テーマのページ。切り替えは即座に適用・保存されるためSave/Cancelボタンは出さない -->
