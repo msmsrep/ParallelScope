@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
 using ParallelScope.ViewModels;
 using ParallelScope.Views;
@@ -26,6 +26,10 @@ public partial class MainWindow
 
     private readonly List<BrowserPaneView> _panes = new();
 
+    // 直前に組み立てたレイアウトの内容（ペイン数と向き）。変わっていなければ組み立て直さない
+    // （ペインを付け替えると一覧のスクロール位置やフォーカスが失われるため）
+    private string? _appliedLayoutSignature;
+
     /// <summary>操作対象のペイン（メニュー・スキャンの反映先）。</summary>
     private BrowserPaneView ActivePaneView =>
         _panes.FirstOrDefault(pane => ReferenceEquals(pane.ViewModel, _viewModel.ActivePane)) ?? _panes[0];
@@ -33,32 +37,20 @@ public partial class MainWindow
     /// <summary>ViewModelのペイン構成どおりに、ペインとスプリッターを配置し直す。</summary>
     private void RebuildPaneLayout()
     {
+        SyncPaneViews();
+
+        // 構成が変わっていなければ触らない（付け替えで一覧のスクロール位置が飛ぶのを防ぐ）
+        var signature = $"{_panes.Count}:{_viewModel.SplitOrientation}";
+        if (_appliedLayoutSignature == signature && PaneHost.Children.Count > 0)
+        {
+            return;
+        }
+
+        _appliedLayoutSignature = signature;
+
         PaneHost.Children.Clear();
         PaneHost.ColumnDefinitions.Clear();
         PaneHost.RowDefinitions.Clear();
-
-        // ViewModel側のペインに対応するビューを用意する（既存のインスタンスは使い回す）
-        foreach (var paneViewModel in _viewModel.Panes)
-        {
-            if (_panes.All(pane => !ReferenceEquals(pane.ViewModel, paneViewModel)))
-            {
-                var pane = new BrowserPaneView(_viewModel, paneViewModel, _storeLicenseService, this);
-                pane.SetTabsEnabled(_storeLicenseService.IsPlusActive);
-                pane.ApplyFileListColumnVisibility();
-                pane.ApplyFileListColumnLayout();
-                _panes.Add(pane);
-            }
-        }
-
-        // 閉じられたペインのビューは破棄する
-        foreach (var removed in _panes.Where(pane => !_viewModel.Panes.Contains(pane.ViewModel)).ToList())
-        {
-            removed.Detach();
-            _panes.Remove(removed);
-        }
-
-        // ビューの並びをViewModelの並びに合わせる
-        _panes.Sort((a, b) => _viewModel.Panes.IndexOf(a.ViewModel).CompareTo(_viewModel.Panes.IndexOf(b.ViewModel)));
 
         if (_panes.Count == 1)
         {
@@ -105,6 +97,33 @@ public partial class MainWindow
         PaneHost.Children.Add(_panes[0]);
         PaneHost.Children.Add(splitter);
         PaneHost.Children.Add(_panes[1]);
+    }
+
+    /// <summary>ViewModelのペインに対応するビューを増減し、並びを合わせる。</summary>
+    private void SyncPaneViews()
+    {
+        // ViewModel側のペインに対応するビューを用意する（既存のインスタンスは使い回す）
+        foreach (var paneViewModel in _viewModel.Panes)
+        {
+            if (_panes.All(pane => !ReferenceEquals(pane.ViewModel, paneViewModel)))
+            {
+                var pane = new BrowserPaneView(_viewModel, paneViewModel, _storeLicenseService, this);
+                pane.SetTabsEnabled(_storeLicenseService.IsPlusActive);
+                pane.ApplyFileListColumnVisibility();
+                pane.ApplyFileListColumnLayout();
+                _panes.Add(pane);
+            }
+        }
+
+        // 閉じられたペインのビューは破棄する
+        foreach (var removed in _panes.Where(pane => !_viewModel.Panes.Contains(pane.ViewModel)).ToList())
+        {
+            removed.Detach();
+            _panes.Remove(removed);
+        }
+
+        // ビューの並びをViewModelの並びに合わせる
+        _panes.Sort((a, b) => _viewModel.Panes.IndexOf(a.ViewModel).CompareTo(_viewModel.Panes.IndexOf(b.ViewModel)));
     }
 
     // スプリッターを離した時点の比率を控える（次に組み立て直すときの初期値になる）

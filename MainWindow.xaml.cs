@@ -96,6 +96,10 @@ public partial class MainWindow : Window
         var isActive = _storeLicenseService.IsPlusActive;
 
         _viewModel.SetPlusFeaturesEnabled(isActive);
+        // 保存済みのタブ構成・分割状態は、購読が確認できた時点で1回だけ復元する
+        _viewModel.RestorePanes(isActive);
+        ApplySplitViewState();
+
         ExportCsvMenuItem.IsEnabled = isActive;
         SplitViewMenuItem.IsEnabled = isActive;
         SplitVerticalMenuItem.IsEnabled = isActive;

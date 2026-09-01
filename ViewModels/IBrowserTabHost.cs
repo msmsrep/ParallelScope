@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
@@ -39,4 +39,7 @@ internal interface IBrowserTabHost
 
     /// <summary>タブのAll Filesモードが切り替わったことを通知する（設定ファイルへの保存用）。</summary>
     void OnFlatFileViewEnabledChanged();
+
+    /// <summary>タブが別のフォルダへ移動したことを通知する（タブ構成の保存用）。</summary>
+    void OnTabNavigated();
 }

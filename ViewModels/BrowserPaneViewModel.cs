@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Data;
 
 namespace ParallelScope.ViewModels;
 
@@ -29,7 +30,11 @@ public partial class BrowserPaneViewModel : ObservableObject
         _activeTab = new BrowserTabViewModel(shell);
         _activeTab.IsActive = true;
         Tabs.Add(_activeTab);
-        Tabs.CollectionChanged += (_, _) => NotifyTabCountChanged();
+        Tabs.CollectionChanged += (_, _) =>
+        {
+            NotifyTabCountChanged();
+            _shell.OnPaneStateChanged();
+        };
 
         InitializeTreeNodes();
     }
@@ -108,6 +113,8 @@ public partial class BrowserPaneViewModel : ObservableObject
         }
 
         var tab = new BrowserTabViewModel(_shell);
+        // 新しいタブは、いま見ているタブの表示モードを引き継ぐ
+        tab.InitializeFlatFileViewEnabled(ActiveTab.IsFlatFileViewEnabled);
         Tabs.Add(tab);
 
         // 移動は履歴に積まない（開いた直後のタブに「戻る」先は無いため）
@@ -197,6 +204,61 @@ public partial class BrowserPaneViewModel : ObservableObject
         // 一覧を持ったまま並べておくとタブ数ぶんメモリを食うため、大きい一覧は手放して読み直す
         previous.SuspendIfHeavy();
         tab.OnActivated();
+        _shell.OnPaneStateChanged();
+    }
+
+    /// <summary>
+    /// 保存済みのタブ構成を復元する。1つ目のタブは既にあるものを使い回す。
+    /// 移動できなかった（フォルダが無くなった）タブは、最初のルートへ寄せるか取り除く。
+    /// </summary>
+    internal void RestoreTabs(IReadOnlyList<TabStateSettings> states, int activeTabIndex, string? fallbackPath)
+    {
+        for (var index = 0; index < states.Count && index < MaxTabCount; index++)
+        {
+            var state = states[index];
+            var tab = index == 0 ? Tabs[0] : new BrowserTabViewModel(_shell);
+            if (index > 0)
+            {
+                Tabs.Add(tab);
+            }
+
+            // セッターだと保存や再取得が走るため、初期値として直接入れる
+            tab.InitializeFlatFileViewEnabled(state.IsFlatFileViewEnabled);
+
+            if (!tab.NavigateTo(state.Path, false) && fallbackPath is not null)
+            {
+                tab.NavigateTo(fallbackPath, false);
+            }
+        }
+
+        // 移動先が1つも見つからなかったタブは残さない（空のタブが並ぶのを防ぐ）。最後の1つは残す
+        foreach (var emptyTab in Tabs.Where(tab => string.IsNullOrWhiteSpace(tab.CurrentPath)).ToList())
+        {
+            if (!CanCloseTabs)
+            {
+                break;
+            }
+
+            Tabs.Remove(emptyTab);
+        }
+
+        ActivateTab(Tabs[Math.Clamp(activeTabIndex, 0, Tabs.Count - 1)]);
+    }
+
+    /// <summary>settings.json へ保存するための、このペインのタブ構成を組み立てる。</summary>
+    internal PaneStateSettings CreateStateSettings()
+    {
+        return new PaneStateSettings
+        {
+            Tabs = Tabs
+                .Select(tab => new TabStateSettings
+                {
+                    Path = tab.CurrentPath,
+                    IsFlatFileViewEnabled = tab.IsFlatFileViewEnabled
+                })
+                .ToList(),
+            ActiveTabIndex = Math.Max(0, Tabs.IndexOf(ActiveTab))
+        };
     }
 
     /// <summary>左から数えて指定位置のタブを表示する（範囲外なら何もしない）。</summary>

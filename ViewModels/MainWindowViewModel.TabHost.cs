@@ -30,4 +30,7 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     // All Filesモードは settings.json に持つ設定のため、タブ側で切り替わったらそのまま保存する
     void IBrowserTabHost.OnFlatFileViewEnabledChanged() => SaveSettings();
+
+    // タブごとの現在パスも保存対象なので、移動のたびに書き出す
+    void IBrowserTabHost.OnTabNavigated() => OnPaneStateChanged();
 }

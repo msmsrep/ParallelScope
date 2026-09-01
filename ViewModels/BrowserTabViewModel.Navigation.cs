@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using System.Threading;
 using ParallelScope.Utilities;
 
@@ -149,6 +149,7 @@ public partial class BrowserTabViewModel
                 RequestFlatFileView();
             }
 
+            _host.OnTabNavigated();
             return true;
         }
 
@@ -177,6 +178,7 @@ public partial class BrowserTabViewModel
                 RequestFlatFileView();
             }
 
+            _host.OnTabNavigated();
             return true;
         }
         catch

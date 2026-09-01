@@ -1,5 +1,7 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -27,6 +29,13 @@ public partial class MainWindowViewModel
     private PaneSplitOrientation _splitOrientation = PaneSplitOrientation.Vertical;
     private double _splitRatio = DefaultSplitRatio;
 
+    // 復元は購読状態が分かってからでないと行えないため、それまでは読み込んだ内容をそのまま書き戻す
+    // （未購読の間に保存済みのタブ構成が消えないようにする）
+    private List<PaneStateSettings>? _savedPaneStates;
+    private bool _savedIsSplitViewEnabled;
+    private int _savedActivePaneIndex;
+    private bool _hasRestoredPanes;
+
     /// <summary>操作対象のペイン（メニューやスキャンの反映先）。</summary>
     public BrowserPaneViewModel ActivePane => Panes[_activePaneIndex];
 
@@ -38,6 +47,85 @@ public partial class MainWindowViewModel
 
     /// <summary>分割時の1つ目のペインの比率（0.1〜0.9）。</summary>
     public double SplitRatio => _splitRatio;
+
+    /// <summary>保存済みのペイン構成を読み込む（復元自体は購読状態が分かってから行う）。</summary>
+    private void LoadPaneStates(AppSettings settings)
+    {
+        _savedPaneStates = settings.Panes;
+        _savedIsSplitViewEnabled = settings.IsSplitViewEnabled;
+        _savedActivePaneIndex = settings.ActivePaneIndex;
+
+        // 向きと比率は表示の好みなので、購読状態に関わらず読み込んでおく
+        _splitOrientation = Enum.TryParse<PaneSplitOrientation>(settings.SplitOrientation, true, out var orientation)
+            ? orientation
+            : PaneSplitOrientation.Vertical;
+        _splitRatio = settings.SplitRatio is { } ratio && double.IsFinite(ratio)
+            ? Math.Clamp(ratio, 0.1, 0.9)
+            : DefaultSplitRatio;
+    }
+
+    /// <summary>
+    /// 保存済みのタブ構成・分割状態を復元する。タブと分割はPlus機能のため、
+    /// 未購読の間は復元せず、保存済みの内容にも触れない（購読すれば元の構成に戻る）。
+    /// 起動直後は購読状態が未確定なので、確定した時点で1回だけ呼ばれる。
+    /// </summary>
+    public void RestorePanes(bool arePlusFeaturesEnabled)
+    {
+        if (_hasRestoredPanes || !arePlusFeaturesEnabled)
+        {
+            return;
+        }
+
+        var states = _savedPaneStates;
+        var fallbackPath = _rootPathsSnapshot.FirstOrDefault();
+
+        if (states is { Count: > 0 })
+        {
+            Panes[0].RestoreTabs(states[0].Tabs, states[0].ActiveTabIndex, fallbackPath);
+
+            if (_savedIsSplitViewEnabled && states.Count > 1)
+            {
+                var secondPane = EnableSplitView();
+                secondPane.RestoreTabs(states[1].Tabs, states[1].ActiveTabIndex, fallbackPath);
+            }
+
+            if (_savedActivePaneIndex > 0 && _savedActivePaneIndex < Panes.Count)
+            {
+                SetActivePane(Panes[_savedActivePaneIndex]);
+            }
+        }
+
+        // 復元したタブが、表示されていない仮想ノードを開いたままにならないようにする
+        LeaveHiddenVirtualFolder();
+
+        _hasRestoredPanes = true;
+        SaveSettings();
+    }
+
+    /// <summary>タブ構成・分割状態が変わったので保存する（復元前は保存済みの内容をそのまま書き戻す）。</summary>
+    internal void OnPaneStateChanged()
+    {
+        if (!_isInitialized)
+        {
+            return;
+        }
+
+        SaveSettings();
+    }
+
+    /// <summary>settings.json へ書き出すペイン構成を組み立てる（復元前は読み込んだ内容をそのまま返す）。</summary>
+    private List<PaneStateSettings>? BuildPaneStates()
+    {
+        return _hasRestoredPanes
+            ? Panes.Select(pane => pane.CreateStateSettings()).ToList()
+            : _savedPaneStates;
+    }
+
+    /// <summary>settings.json へ書き出す「分割中か」（復元前は読み込んだ値のまま）。</summary>
+    private bool GetPersistedIsSplitViewEnabled() => _hasRestoredPanes ? _isSplitViewEnabled : _savedIsSplitViewEnabled;
+
+    /// <summary>settings.json へ書き出す操作対象ペインの位置（復元前は読み込んだ値のまま）。</summary>
+    private int GetPersistedActivePaneIndex() => _hasRestoredPanes ? _activePaneIndex : _savedActivePaneIndex;
 
     /// <summary>ペインを2つに増やす。2つ目は現在のタブと同じ場所を開いた状態で始める。</summary>
     public BrowserPaneViewModel EnableSplitView()
@@ -54,6 +142,7 @@ public partial class MainWindowViewModel
         _isSplitViewEnabled = true;
         OnPropertyChanged(nameof(IsSplitViewEnabled));
         NotifyActiveHighlightChanged();
+        OnPaneStateChanged();
         return pane;
     }
 
@@ -92,6 +181,7 @@ public partial class MainWindowViewModel
         OnPropertyChanged(nameof(ActivePane));
         NotifyActiveHighlightChanged();
         RebindActiveTab();
+        OnPaneStateChanged();
     }
 
     /// <summary>分割の向きを切り替える。</summary>
@@ -104,6 +194,7 @@ public partial class MainWindowViewModel
 
         _splitOrientation = orientation;
         OnPropertyChanged(nameof(SplitOrientation));
+        OnPaneStateChanged();
     }
 
     /// <summary>分割の比率を記録する（スプリッターのドラッグ後に呼ばれる）。</summary>
@@ -116,6 +207,7 @@ public partial class MainWindowViewModel
 
         _splitRatio = Math.Clamp(ratio, 0.1, 0.9);
         OnPropertyChanged(nameof(SplitRatio));
+        OnPaneStateChanged();
     }
 
     /// <summary>操作対象のペインを切り替える。</summary>
@@ -133,6 +225,7 @@ public partial class MainWindowViewModel
 
         OnPropertyChanged(nameof(ActivePane));
         RebindActiveTab();
+        OnPaneStateChanged();
     }
 
     /// <summary>もう一方のペインを返す（分割していなければ null）。</summary>

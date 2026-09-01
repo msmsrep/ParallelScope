@@ -28,6 +28,9 @@ public partial class MainWindowViewModel : ObservableObject
     private AppThemeSetting _theme = AppThemeSetting.System;
     private AppLanguageSetting _language = AppLanguageSetting.System;
 
+    // 起動時の組み立て中は設定を書き出さない（読み込んだ内容を途中の状態で上書きしないため）
+    private bool _isInitialized;
+
     // 設定されているルートパス（正規化済み。除外設定に該当するものも含む＝settings.jsonに保存する内容）
     private List<string> _rootPaths = new();
 
@@ -133,6 +136,7 @@ public partial class MainWindowViewModel : ObservableObject
         _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
         InitializeRootFolders();
+        _isInitialized = true;
     }
 
     // タブ側の状態変化を、そのまま同名プロパティの変更通知として画面へ流す

@@ -29,6 +29,7 @@ public partial class MainWindowViewModel
         _treeNodeOrder = NormalizeTreeNodeOrder(settings.TreeNodeOrder);
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
         LoadFavoritesAndUsage(settings);
+        LoadPaneStates(settings);
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
     }
 
@@ -328,6 +329,11 @@ public partial class MainWindowViewModel
             ShowSystemItems = _showSystemItems,
             Theme = _theme.ToString(),
             Language = _language.ToString(),
+            IsSplitViewEnabled = GetPersistedIsSplitViewEnabled(),
+            SplitOrientation = _splitOrientation.ToString(),
+            SplitRatio = _splitRatio,
+            ActivePaneIndex = GetPersistedActivePaneIndex(),
+            Panes = BuildPaneStates(),
             VisibleTreeNodes = _treeNodeOrder.Where(_visibleTreeNodes.Contains).ToList(),
             TreeNodeOrder = _treeNodeOrder.ToList(),
             FavoritePaths = _favoritePaths.ToList(),
