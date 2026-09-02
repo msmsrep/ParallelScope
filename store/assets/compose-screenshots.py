@@ -139,6 +139,36 @@ SHOTS = [
                     "Light and dark are both included.",
         },
     },
+    {
+        "raw": "05-tabs.png",
+        "out": "05-tabs.png",
+        "ja": {
+            "headline": ["見たい場所を", "タブで並べておく"],
+            "body": "フォルダごとにタブを開いておけば、行ったり来たりが一手で済みます。"
+                    "タブごとに履歴も検索語も別々。開いていたタブは次に起動したときも残っています。",
+        },
+        "en": {
+            "headline": ["Keep every folder", "a tab away"],
+            "body": "Open a tab per folder and switching is one click. Each tab keeps its own "
+                    "history, search text and sort order, and the tabs you left open come back "
+                    "the next time you start.",
+        },
+    },
+    {
+        "raw": "06-split-view.png",
+        "out": "06-split-view.png",
+        "ja": {
+            "headline": ["左右に並べて", "見比べる"],
+            "body": "画面を2つに分けると、離れたフォルダを並べて確認できます。左右にも上下にも"
+                    "分けられ、タブはドラッグで反対側へ移せます。ツリーは畳んで一覧を広く使えます。",
+        },
+        "en": {
+            "headline": ["Two folders,", "side by side"],
+            "body": "Split the window and compare folders that live far apart. Choose side by "
+                    "side or stacked, drag a tab across to the other pane, and collapse a tree "
+                    "when the list needs the room.",
+        },
+    },
 ]
 
 

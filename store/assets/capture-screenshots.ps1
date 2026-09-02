@@ -1,4 +1,4 @@
-#Requires -Version 7
+﻿#Requires -Version 7
 <#
 .SYNOPSIS
     ストア掲載用のスクリーンショットを、実際に動かしたアプリから撮る。
@@ -145,7 +145,9 @@ function Get-TextBoxes($window) {
     $condition = New-Object System.Windows.Automation.PropertyCondition(
         $automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
 
-    $deadline = (Get-Date).AddSeconds(15)
+    # 初回起動はDBの作成と最初のフルスキャンが重なり、UIオートメーションの問い合わせが
+    # 何度か空振りする。待ち時間を長めに取る（短いと1枚目だけ落ちる）
+    $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline) {
         $found = @($window.FindAll($treeScope::Descendants, $condition))
         if ($found.Count -ge 2) {
@@ -153,7 +155,8 @@ function Get-TextBoxes($window) {
         }
         Start-Sleep -Milliseconds 300
     }
-    throw 'アドレス欄と検索欄が見つかりませんでした。'
+    # どのウィンドウを掴んでいたのか分からないと原因を追えないので、名前を添えて投げる
+    throw ("アドレス欄と検索欄が見つかりませんでした。window='" + $window.Current.Name + "'")
 }
 
 function Set-TextBoxValue($element, [string]$value) {
@@ -245,6 +248,49 @@ $shots = @(
         # 開くのは移動より先。最後の移動で実在パスへ戻す
         ExpandVirtual = $true
     }
+    @{
+        File     = '05-tabs.png'
+        Note     = '複数タブ'
+        Theme    = 'Light'
+        Nodes    = @()
+        Columns  = @('Size', 'Modified')
+        Widths   = @{ Name = 420; Size = 90; Modified = 160 }
+        Flat     = $false
+        # タブ構成は保存済みの設定として与える（Plus有効なら起動時に復元される）。
+        # 移動も検索も要らないので Navigate は置かない
+        Panes    = @(
+            @{
+                Tabs = @("$sample\Projects\Apollo\src", "$sample\Reports6",
+                         "$sample\Design\Mockups", "$sample\Projects\Borealis")
+                ActiveTabIndex = 0
+                IsTreeVisible  = $true
+            }
+        )
+    }
+    @{
+        File     = '06-split-view.png'
+        Note     = '2画面（分割表示）'
+        Theme    = 'Light'
+        Nodes    = @()
+        Columns  = @('Size', 'Modified')
+        # 2画面では1ペインの幅が半分になるので、名前列を詰めて列が切れないようにする
+        Widths   = @{ Name = 240; Size = 90; Modified = 160 }
+        Flat     = $false
+        Split    = $true
+        # 右のペインはツリーを畳んで、ツリーの開閉も同じ1枚で見せる
+        Panes    = @(
+            @{
+                Tabs = @("$sample\Projects\Apollo\src", "$sample\Projects\Apollo\docs")
+                ActiveTabIndex = 0
+                IsTreeVisible  = $true
+            }
+            @{
+                Tabs = @("$sample\Reports", "$sample\Reports\Drafts")
+                ActiveTabIndex = 0
+                IsTreeVisible  = $false
+            }
+        )
+    }
 )
 
 # 仮想ノードの表示名（Utilities/UiTextResources.cs と揃える）
@@ -317,6 +363,27 @@ try {
 
             Stop-App
 
+            <#
+              ペインの状態は、要素が1つでも必ず配列として書き出す。
+              ConvertTo-Json は単独要素の配列を素のオブジェクトへ畳んでしまい、
+              AppSettings の List<PaneStateSettings> へ読めずに settings.json 全体が
+              既定値（＝利用者のデスクトップ）へ落ちる。
+            #>
+            [object[]]$paneStates = @()
+            foreach ($pane in @($shot.Panes)) {
+                if (-not $pane) { continue }
+                [object[]]$tabStates = @()
+                foreach ($path in @($pane.Tabs)) {
+                    $tabStates += @{ Path = $path; IsFlatFileViewEnabled = [bool]$shot.Flat }
+                }
+                $paneStates += @{
+                    Tabs           = $tabStates
+                    ActiveTabIndex = $pane.ActiveTabIndex
+                    IsTreeVisible  = $pane.IsTreeVisible
+                }
+            }
+            if ($paneStates.Count -eq 0) { $paneStates = $null }
+
             @{
                 RootPaths            = $rootPaths
                 ExcludedPaths        = @()
@@ -327,13 +394,19 @@ try {
                 VisibleTreeNodes     = $shot.Nodes
                 TreeNodeOrder        = if ($shot.NodeOrder) { $shot.NodeOrder } else { @('AllRoots', 'Favorites', 'Recent', 'Frequent') }
                 # Location は既定幅だと配下の深いパスが切れて Size 列へめり込むので広げる
-                ColumnWidths         = @{ Location = 380; Size = 90; Modified = 160 }
+                ColumnWidths         = if ($shot.Widths) { $shot.Widths } else { @{ Location = 380; Size = 90; Modified = 160 } }
                 CsvExportSizeInBytes = $false
                 FavoritePaths        = $favoritePaths
                 FolderUsages         = $folderUsages
                 Theme                = $shot.Theme
                 Language             = $languageSetting[$code]
-            } | ConvertTo-Json -Depth 5 | Set-Content $settingsPath -Encoding UTF8
+                # タブ・分割はPlus機能。保存済みの状態として与えると、起動時に復元される
+                IsSplitViewEnabled   = [bool]$shot.Split
+                SplitOrientation     = 'Vertical'
+                SplitRatio           = 0.5
+                ActivePaneIndex      = 0
+                Panes                = $paneStates
+            } | ConvertTo-Json -Depth 6 | Set-Content $settingsPath -Encoding UTF8
 
             $process = Start-Process $exe -PassThru
             $window = Get-Window $process.Id
@@ -371,7 +444,7 @@ try {
               開いたノード（例:「よく使うフォルダー」）に残ったままになり、
               アドレス欄の行き先とツリーの選択が食い違って写るため。
             #>
-            $times = if ($shot.ExpandVirtual) { 2 } else { 1 }
+            $times = if (-not $shot.Navigate) { 0 } elseif ($shot.ExpandVirtual) { 2 } else { 1 }
             for ($i = 0; $i -lt $times; $i++) {
                 Set-TextBoxValue $addressBox $shot.Navigate
                 $addressBox.SetFocus()
