@@ -91,7 +91,6 @@ ParallelScope Plus（月額サブスクリプション）でできること
 本アプリ（ParallelScope）は個人で開発・運営しています。
 アドオンとは別に、継続的なアップデートや機能改善のため、任意の開発支援を受け付けています。
 ご協力いただける場合は、アプリ内のリンクから支援していただけると大変励みになります。
-（本サポートは対価のない任意の寄付であり、特典の提供はございません。）
 
 ### 製品の機能
 
@@ -196,7 +195,6 @@ Everything else is yours without a subscription.
 ParallelScope is developed and run by one person.
 Separately from the add-on, optional support toward continued updates and improvements is welcome.
 If you would like to help, there is a link inside the app — it is a real encouragement.
-(That support is a voluntary donation with nothing given in return, and no rewards attached.)
 
 ### Product features
 
