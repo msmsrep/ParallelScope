@@ -82,11 +82,13 @@ public partial class MainWindowViewModel
         if (states is { Count: > 0 })
         {
             Panes[0].RestoreTabs(states[0].Tabs, states[0].ActiveTabIndex, fallbackPath);
+            Panes[0].InitializeTreeVisible(states[0].IsTreeVisible);
 
             if (_savedIsSplitViewEnabled && states.Count > 1)
             {
                 var secondPane = EnableSplitView();
                 secondPane.RestoreTabs(states[1].Tabs, states[1].ActiveTabIndex, fallbackPath);
+                secondPane.InitializeTreeVisible(states[1].IsTreeVisible);
             }
 
             if (_savedActivePaneIndex > 0 && _savedActivePaneIndex < Panes.Count)

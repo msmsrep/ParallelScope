@@ -109,6 +109,7 @@ public partial class MainWindow
             {
                 var pane = new BrowserPaneView(_viewModel, paneViewModel, _storeLicenseService, this);
                 pane.SetTabsEnabled(_storeLicenseService.IsPlusActive);
+                pane.SetTreeCollapseEnabled(_storeLicenseService.IsPlusActive);
                 pane.ApplyFileListColumnVisibility();
                 pane.ApplyFileListColumnLayout();
                 _panes.Add(pane);

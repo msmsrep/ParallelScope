@@ -65,7 +65,7 @@
         </Grid.RowDefinitions>
 
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="200" MinWidth="120"/>
+            <ColumnDefinition x:Name="TreeColumn" Width="200" MinWidth="120"/>
             <ColumnDefinition Width="Auto"/>
             <ColumnDefinition Width="*" MinWidth="240"/>
         </Grid.ColumnDefinitions>
@@ -198,6 +198,12 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                    <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
+                    <ToggleButton Name="TreeToggleButton" Width="36" Padding="0" Margin="0,0,6,0"
+                                  Visibility="Collapsed" Content="&#xE700;"
+                                  FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                  ToolTip="{loc:Loc Nav.ToggleTree}"
+                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}"/>
                     <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
                     <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
                             IsEnabled="{Binding ActiveTab.CanGoBack}"/>
@@ -213,7 +219,7 @@
         </Border>
 
         <!-- 左側: フォルダツリー -->
-        <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+        <Border Grid.Row="2" Grid.Column="0" Name="TreeBorder" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
             <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
@@ -286,7 +292,7 @@
         </Border>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Row="2" Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+        <GridSplitter Grid.Row="2" Grid.Column="1" Name="TreeSplitter" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                       Background="Transparent" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->

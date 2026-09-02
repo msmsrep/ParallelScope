@@ -1,4 +1,4 @@
-namespace ParallelScope.Data;
+﻿namespace ParallelScope.Data;
 
 /// <summary>settings.json に保存する、1つのペインのタブ構成。</summary>
 public sealed class PaneStateSettings
@@ -8,6 +8,9 @@ public sealed class PaneStateSettings
 
     /// <summary>表示していたタブの位置。</summary>
     public int ActiveTabIndex { get; set; }
+
+    /// <summary>フォルダツリーを開いていたか（Plus機能。持たない既存の設定は開いた状態にする）。</summary>
+    public bool IsTreeVisible { get; set; } = true;
 }
 
 /// <summary>

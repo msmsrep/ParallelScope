@@ -117,6 +117,7 @@ public partial class MainWindow : Window
         foreach (var pane in _panes)
         {
             pane.SetTabsEnabled(isActive);
+            pane.SetTreeCollapseEnabled(isActive);
             pane.ApplyFileListColumnVisibility();
             pane.ApplyFileListColumnLayout();
         }

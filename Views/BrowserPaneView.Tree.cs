@@ -17,6 +17,46 @@ public partial class BrowserPaneView
     // パス→TreeViewItem の対応表。ツリーはペインごとに別インスタンスなので、この表もペインごとに持つ
     private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
 
+    // ツリーの開閉が使えるか。未購読の間はfalse（開いたまま固定）
+    private bool _isTreeCollapseEnabled;
+
+    // 畳む直前のツリー幅。開き直したときに元の幅へ戻すために控える
+    private GridLength _expandedTreeWidth = new(200);
+
+    /// <summary>ツリーの開閉（Plus機能）の有効/無効を購読状態に合わせて切り替える。</summary>
+    internal void SetTreeCollapseEnabled(bool isEnabled)
+    {
+        _isTreeCollapseEnabled = isEnabled;
+        TreeToggleButton.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
+        ApplyTreeVisibility();
+    }
+
+    /// <summary>ツリーの開閉状態を画面へ反映する（未購読の間は畳まず常に開く）。</summary>
+    internal void ApplyTreeVisibility()
+    {
+        var isVisible = !_isTreeCollapseEnabled || _paneViewModel.IsTreeVisible;
+        if (isVisible == (TreeBorder.Visibility == Visibility.Visible))
+        {
+            return;
+        }
+
+        if (isVisible)
+        {
+            TreeColumn.MinWidth = 120;
+            TreeColumn.Width = _expandedTreeWidth;
+        }
+        else
+        {
+            // 幅の下限を残したままだと列が縮みきらないため、畳む間だけ0にする
+            _expandedTreeWidth = new GridLength(TreeColumn.ActualWidth > 0 ? TreeColumn.ActualWidth : 200);
+            TreeColumn.MinWidth = 0;
+            TreeColumn.Width = new GridLength(0);
+        }
+
+        TreeBorder.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        TreeSplitter.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
     private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
     {

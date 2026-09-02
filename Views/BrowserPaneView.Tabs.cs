@@ -111,6 +111,12 @@ public partial class BrowserPaneView
     // 表示中のタブが切り替わったら、タブごとに持っている表示状態（ソート順・ツリー選択）を反映し直す
     private void PaneViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(BrowserPaneViewModel.IsTreeVisible))
+        {
+            ApplyTreeVisibility();
+            return;
+        }
+
         if (e.PropertyName != nameof(BrowserPaneViewModel.ActiveTab))
         {
             return;

@@ -19,6 +19,7 @@ internal static class UiTextResources
         ["Nav.Back"] = "← Back",
         ["Nav.Forward"] = "Forward →",
         ["Nav.Up"] = "↑ Up",
+        ["Nav.ToggleTree"] = "Show/hide the folder tree",
         ["FileList.AllFiles"] = "All Files",
 
         // タイトルバーのキャプションボタン
@@ -195,6 +196,7 @@ internal static class UiTextResources
         ["Nav.Back"] = "← 戻る",
         ["Nav.Forward"] = "進む →",
         ["Nav.Up"] = "↑ 上へ",
+        ["Nav.ToggleTree"] = "フォルダツリーの表示/非表示",
         ["FileList.AllFiles"] = "All Files",
 
         // タイトルバーのキャプションボタン

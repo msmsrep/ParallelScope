@@ -22,6 +22,7 @@ public partial class BrowserPaneViewModel : ObservableObject
     private readonly Stack<ClosedTabState> _closedTabs = new();
     private BrowserTabViewModel _activeTab;
     private bool _isActive;
+    private bool _isTreeVisible = true;
 
     internal BrowserPaneViewModel(MainWindowViewModel shell)
     {
@@ -47,6 +48,32 @@ public partial class BrowserPaneViewModel : ObservableObject
     {
         get => _activeTab;
         private set => SetProperty(ref _activeTab, value);
+    }
+
+    /// <summary>
+    /// フォルダツリーを開いているか（Plus機能）。未購読の間は畳めないため、
+    /// 表示側（<c>BrowserPaneView</c>）がこの値を無視して常に開いた状態にする。
+    /// </summary>
+    public bool IsTreeVisible
+    {
+        get => _isTreeVisible;
+        set
+        {
+            if (SetProperty(ref _isTreeVisible, value))
+            {
+                _shell.OnPaneStateChanged();
+            }
+        }
+    }
+
+    /// <summary>復元時の初期値として入れる（セッターと違い保存を走らせない）。</summary>
+    internal void InitializeTreeVisible(bool isVisible)
+    {
+        if (_isTreeVisible != isVisible)
+        {
+            _isTreeVisible = isVisible;
+            OnPropertyChanged(nameof(IsTreeVisible));
+        }
     }
 
     /// <summary>このペインが操作対象か（メニュー・ショートカットの反映先）。</summary>
@@ -267,7 +294,8 @@ public partial class BrowserPaneViewModel : ObservableObject
                     IsFlatFileViewEnabled = tab.IsFlatFileViewEnabled
                 })
                 .ToList(),
-            ActiveTabIndex = Math.Max(0, Tabs.IndexOf(ActiveTab))
+            ActiveTabIndex = Math.Max(0, Tabs.IndexOf(ActiveTab)),
+            IsTreeVisible = _isTreeVisible
         };
     }
 
