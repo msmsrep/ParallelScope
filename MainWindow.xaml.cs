@@ -1,16 +1,12 @@
-﻿using System.ComponentModel;
-using System.Windows;
-using System.Windows.Controls;
+﻿using System.Windows;
 using System.Diagnostics;
-using System.Globalization;
-using System.IO;
-using System.Windows.Data;
 using System.Windows.Input;
-using System.Windows.Media;
+using System.Globalization;
 using System.Windows.Threading;
 using ParallelScope.Services;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
+using ParallelScope.Views;
 
 namespace ParallelScope;
 
@@ -21,12 +17,10 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
     private readonly StoreLicenseService _storeLicenseService = new();
+
     public MainWindow()
     {
         InitializeComponent();
-
-        _defaultFileListColumnWidths = GetFileListColumnsByKey()
-            .ToDictionary(pair => pair.Key, pair => pair.Value.Width, StringComparer.OrdinalIgnoreCase);
 
         // AppxManifest.xmlのバージョンをタイトルに付与する（取得できない場合は元のタイトルのまま）
         Title = BuildWindowTitleWithVersion(Title);
@@ -41,19 +35,16 @@ public partial class MainWindow : Window
         // フルスキャンの多重実行防止とキャンセル後の再実行は、ViewModel側と同じくコアレサーに任せる
         _fullScanCoalescer = new SingleFlightCoalescer<FullScanRequest>(RunFullScanAsync);
         DataContext = _viewModel;
+
+        // ペインは列レイアウトの初期化にViewModelを必要とするため、ViewModelの生成後に組み立てる
+        RebuildPaneLayout();
+
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
-        AppLanguage.Changed += AppLanguage_Changed;
-
-        ApplyFileListColumnHeaders();
-        ApplyFileListColumnVisibility();
-        SyncTreeSelectionToCurrentPath();
-    }
-
-    // 言語切り替え時、バインディングでは追従しない箇所（ファイル一覧の列見出し）を貼り替える
-    private void AppLanguage_Changed(object? sender, EventArgs e)
-    {
-        ApplyFileListColumnHeaders();
+        // 自前タイトルバーの最大化時のはみ出し補正は、ウィンドウハンドルができてから仕掛ける
+        SourceInitialized += MainWindow_SourceInitialized;
+        // タブのショートカットは、アドレス欄・検索欄に入力中でも効かせたいのでウィンドウ側で拾う
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
     }
 
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
@@ -71,8 +62,6 @@ public partial class MainWindow : Window
         // settings.jsonに開発者キーが設定されていればStoreの購読状態に関わらずPlusを有効化する
         _storeLicenseService.ApplyDeveloperUnlockKey(_viewModel.GetDeveloperUnlockKey());
         await _storeLicenseService.RefreshLicenseAsync();
-        ApplyFileListColumnVisibility();
-        ApplyFileListColumnLayout();
         ApplyPlusFeatures();
 
         RequestAutomaticFullScan();
@@ -84,7 +73,8 @@ public partial class MainWindow : Window
     {
         try
         {
-            SaveFileListColumnLayout();
+            // 列レイアウトは全ペイン共通の設定なので、最後に触ったペイン（操作対象）の値を保存する
+            ActivePaneView.SaveFileListColumnLayout();
         }
         catch
         {
@@ -93,7 +83,91 @@ public partial class MainWindow : Window
 
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
-        AppLanguage.Changed -= AppLanguage_Changed;
+        PreviewKeyDown -= MainWindow_PreviewKeyDown;
+
+        foreach (var pane in _panes)
+        {
+            pane.Detach();
+        }
+    }
+
+    // Plus機能（ツリーのお気に入り・最近・よく使うノード、一覧の表示列・列幅、CSV書き出し）を
+    // 購読状態に合わせて出し分ける
+    private void ApplyPlusFeatures()
+    {
+        var isActive = _storeLicenseService.IsPlusActive;
+
+        _viewModel.SetPlusFeaturesEnabled(isActive);
+        // 保存済みのタブ構成・分割状態は、購読が確認できた時点で1回だけ復元する
+        _viewModel.RestorePanes(isActive);
+        ApplySplitViewState();
+
+        ExportCsvMenuItem.IsEnabled = isActive;
+        SplitViewMenuItem.IsEnabled = isActive;
+        SplitVerticalMenuItem.IsEnabled = isActive;
+        SplitHorizontalMenuItem.IsEnabled = isActive;
+
+        // 購読が切れた状態で分割したままにはしない（1画面＝未購読時の見た目に戻す）
+        if (!isActive && _viewModel.IsSplitViewEnabled)
+        {
+            _viewModel.DisableSplitView();
+            ApplySplitViewState();
+        }
+
+        foreach (var pane in _panes)
+        {
+            pane.SetTabsEnabled(isActive);
+            pane.SetTreeCollapseEnabled(isActive);
+            pane.ApplyFileListColumnVisibility();
+            pane.ApplyFileListColumnLayout();
+        }
+    }
+
+    // タブ・ペイン操作のキーボードショートカット（Plus機能のため、未購読の間はペイン側が受け付けない）
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        // F6は修飾キー無しでペインを切り替える（分割していなければ何もしない）
+        if (e.Key == Key.F6 && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            ActivateOtherPane();
+            e.Handled = true;
+            return;
+        }
+
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt) || !Keyboard.Modifiers.HasFlag(ModifierKeys.Control))
+        {
+            return;
+        }
+
+        var isShiftPressed = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift);
+        var pane = ActivePaneView;
+
+        switch (e.Key)
+        {
+            case Key.T when isShiftPressed:
+                pane.ReopenClosedTab();
+                break;
+            case Key.T:
+                pane.OpenNewTab();
+                break;
+            case Key.W:
+                pane.CloseActiveTab();
+                break;
+            case Key.Tab:
+                pane.ActivateAdjacentTab(!isShiftPressed);
+                break;
+            case >= Key.D1 and <= Key.D8:
+                pane.ActivateTabAt(e.Key - Key.D1);
+                break;
+            case Key.D9:
+                // ブラウザーと同じく、Ctrl+9 は位置ではなく末尾のタブ
+                pane.ActivateLastTab();
+                break;
+            default:
+                return;
+        }
+
+        e.Handled = true;
     }
 
     // "アプリ名" を "アプリ名 vX.Y.Z.W" に組み立てる。バージョンが取得できない場合は元のタイトルのまま返す
@@ -113,7 +187,7 @@ public partial class MainWindow : Window
     {
         // 設定画面には最新の並び順を渡したいので、ヘッダーのドラッグで変わっている可能性のある
         // 現在の列レイアウトを先に確定させる
-        SaveFileListColumnLayout();
+        ActivePaneView.SaveFileListColumnLayout();
 
         var dialog = new SettingsWindow(
             _viewModel.GetConfiguredRootPaths(),
@@ -138,8 +212,6 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() != true)
         {
             // Cancelで閉じてもダイアログ内でPlusを購読した可能性があるため、Plus機能の表示は反映し直す
-            ApplyFileListColumnVisibility();
-            ApplyFileListColumnLayout();
             ApplyPlusFeatures();
             return;
         }
@@ -158,19 +230,30 @@ public partial class MainWindow : Window
         // 保存済み幅を消してから並び順・列幅を反映し直す（消し忘れると直後のApplyで元の幅に戻ってしまう）
         if (dialog.ShouldResetColumnWidths)
         {
-            ResetFileListColumnWidths();
+            foreach (var pane in _panes)
+            {
+                pane.ResetFileListColumnWidths();
+            }
         }
 
-        ApplyFileListColumnVisibility();
-        ApplyFileListColumnLayout();
         ApplyPlusFeatures();
         ConfigureScheduledFullScanTimer();
-        SyncTreeSelectionToCurrentPath();
+
+        foreach (var pane in _panes)
+        {
+            pane.SyncTreeSelectionToCurrentPath();
+        }
 
         if (dialog.ShouldRunFullScan)
         {
             RequestFullScanFromSettings();
         }
+    }
+
+    // 表示中のファイル一覧をCSVへ書き出す（対象は操作対象のペインの一覧）
+    private async void ExportCsvMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        await ActivePaneView.ExportCsvAsync();
     }
 
     // 使い方ガイド（GitHub Pages）を既定のブラウザーで開く
@@ -195,72 +278,4 @@ public partial class MainWindow : Window
             MessageBox.Show(UiText.Format("UserGuide.OpenFailed", ex.Message), UiText.Get("UserGuide.Caption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
-
-    // 戻る履歴のフォルダへ移動し、ツリー選択を同期する
-    private void BackButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel.GoBack())
-        {
-            SyncTreeSelectionToCurrentPath();
-        }
-    }
-
-    // 進む履歴のフォルダへ移動し、ツリー選択を同期する
-    private void ForwardButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel.GoForward())
-        {
-            SyncTreeSelectionToCurrentPath();
-        }
-    }
-
-    // 親フォルダへ移動し、ツリー選択を同期する
-    private void UpButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (_viewModel.GoUp())
-        {
-            SyncTreeSelectionToCurrentPath();
-        }
-    }
-
-    // Enterキーでアドレス欄のパスへ移動する
-    private void AddressTextBox_KeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter)
-        {
-            return;
-        }
-
-        NavigateByAddressInput();
-        e.Handled = true;
-    }
-
-    // 指定した要素の祖先から、型Tに一致する最初の要素を探す（コンテキストメニュー表示位置の特定などに使用）
-    private static T? GetAncestor<T>(DependencyObject? current) where T : DependencyObject
-    {
-        while (current is not null)
-        {
-            if (current is T match)
-            {
-                return match;
-            }
-
-            current = VisualTreeHelper.GetParent(current);
-        }
-
-        return null;
-    }
-
-    // アドレス欄のパスへ移動する。失敗した場合はエラーメッセージを表示する
-    private void NavigateByAddressInput()
-    {
-        if (_viewModel.TryNavigateByAddressInput())
-        {
-            SyncTreeSelectionToCurrentPath();
-            return;
-        }
-
-        MessageBox.Show(UiText.Get("Navigation.Failed"), UiText.Get("Navigation.Caption"), MessageBoxButton.OK, MessageBoxImage.Warning);
-    }
-
 }

@@ -13,10 +13,26 @@ internal static class UiTextResources
         ["Menu.Settings"] = "⚙  Settings",
         ["Menu.ExportCsv"] = "📄  Export CSV...",
         ["Menu.UserGuide"] = "📖  User Guide",
+        ["Menu.SplitView"] = "⬛  Split View",
+        ["Menu.SplitVertical"] = "     Side by Side",
+        ["Menu.SplitHorizontal"] = "     Top and Bottom",
         ["Nav.Back"] = "← Back",
         ["Nav.Forward"] = "Forward →",
         ["Nav.Up"] = "↑ Up",
+        ["Nav.ToggleTree"] = "Show/hide the folder tree",
         ["FileList.AllFiles"] = "All Files",
+
+        // タイトルバーのキャプションボタン
+        ["TitleBar.Minimize"] = "Minimize",
+        ["TitleBar.Maximize"] = "Maximize",
+        ["TitleBar.Restore"] = "Restore Down",
+        ["TitleBar.Close"] = "Close",
+
+        // タブ列
+        ["Tab.New"] = "New Tab",
+        ["Tab.Close"] = "Close Tab",
+        ["Tab.Duplicate"] = "Duplicate Tab",
+        ["Tab.CloseOthers"] = "Close Other Tabs",
 
         // ファイル一覧の列見出し
         ["Column.Name"] = "Name",
@@ -32,6 +48,9 @@ internal static class UiTextResources
         ["Context.CopyFileName"] = "Copy File Name",
         ["Context.CopyFullPath"] = "Copy Full Path",
         ["Context.OpenParentFolder"] = "Open Parent Folder",
+        ["Context.OpenInNewTab"] = "Open in New Tab",
+        ["Context.OpenInOtherPane"] = "Open in Other Pane",
+        ["Context.ClosePane"] = "Close This Pane",
         ["Context.ScanSubtree"] = "Scan everything under this folder",
         ["Context.AddFavorite"] = "★  Add to Favorites",
         ["Context.RemoveFavorite"] = "☆  Remove from Favorites",
@@ -171,10 +190,26 @@ internal static class UiTextResources
         ["Menu.Settings"] = "⚙  設定",
         ["Menu.ExportCsv"] = "📄  CSVに書き出す...",
         ["Menu.UserGuide"] = "📖  使い方ガイド",
+        ["Menu.SplitView"] = "⬛  画面を分割する",
+        ["Menu.SplitVertical"] = "     左右に分割",
+        ["Menu.SplitHorizontal"] = "     上下に分割",
         ["Nav.Back"] = "← 戻る",
         ["Nav.Forward"] = "進む →",
         ["Nav.Up"] = "↑ 上へ",
+        ["Nav.ToggleTree"] = "フォルダツリーの表示/非表示",
         ["FileList.AllFiles"] = "All Files",
+
+        // タイトルバーのキャプションボタン
+        ["TitleBar.Minimize"] = "最小化",
+        ["TitleBar.Maximize"] = "最大化",
+        ["TitleBar.Restore"] = "元のサイズに戻す",
+        ["TitleBar.Close"] = "閉じる",
+
+        // タブ列
+        ["Tab.New"] = "新しいタブ",
+        ["Tab.Close"] = "タブを閉じる",
+        ["Tab.Duplicate"] = "タブを複製",
+        ["Tab.CloseOthers"] = "他のタブを閉じる",
 
         // ファイル一覧の列見出し
         ["Column.Name"] = "名前",
@@ -190,6 +225,9 @@ internal static class UiTextResources
         ["Context.CopyFileName"] = "ファイル名をコピー",
         ["Context.CopyFullPath"] = "フルパスをコピー",
         ["Context.OpenParentFolder"] = "親フォルダーを開く",
+        ["Context.OpenInNewTab"] = "新しいタブで開く",
+        ["Context.OpenInOtherPane"] = "反対側のペインで開く",
+        ["Context.ClosePane"] = "このペインを閉じる",
         ["Context.ScanSubtree"] = "このフォルダー配下をすべてスキャン",
         ["Context.AddFavorite"] = "★  お気に入りに追加",
         ["Context.RemoveFavorite"] = "☆  お気に入りから削除",

@@ -1,14 +1,14 @@
-﻿using System.Collections.ObjectModel;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
 /// <summary>
-/// ツリー最上位の「★ Favorites」「🕘 Recent」「🕒 Frequently Used」ノードに関する処理。
+/// ツリー最上位の「★ Favorites」「🕘 Recent」「🕒 Frequently Used」の元データに関する処理。
 /// いずれもPlus機能のため、未購読の間はツリーに出さない（SetPlusFeaturesEnabled）。
 /// Recent と Frequently Used はどちらも _folderUsages（フォルダごとのアクセス実績）が元データで、
 /// 並べる基準だけが違う（Recent は最終アクセスが新しい順、Frequently Used はアクセス回数の多い順）。
+/// ノードのViewModelはツリーごと（＝ペインごと）に作られるため、ここは値の提供と変更の通知だけを行う。
 /// </summary>
 public partial class MainWindowViewModel
 {
@@ -30,106 +30,16 @@ public partial class MainWindowViewModel
     private HashSet<string> _visibleTreeNodes = TreeNodes.DefaultVisibleNodes.ToHashSet(StringComparer.OrdinalIgnoreCase);
     private List<string> _treeNodeOrder = TreeNodes.AllNodes.ToList();
 
-    /// <summary>「★ Favorites」ノードの子（お気に入りフォルダ）。</summary>
-    private readonly ObservableCollection<FolderItemViewModel> _favoriteFolders = new();
-
-    /// <summary>「🕒 Frequently Used」ノードの子（アクセス回数の多いフォルダ）。</summary>
-    private readonly ObservableCollection<FolderItemViewModel> _frequentFolders = new();
-
-    /// <summary>「🕘 Recent」ノードの子（最近開いたフォルダ）。</summary>
-    private readonly ObservableCollection<FolderItemViewModel> _recentFolders = new();
-
-    /// <summary>ツリー最上位の「Folders」ノード。ツリー選択の同期で起点として使う。</summary>
-    public FolderItemViewModel AllRootsNode { get; private set; } = null!;
-
-    private FolderItemViewModel _favoritesNode = null!;
-    private FolderItemViewModel _frequentNode = null!;
-    private FolderItemViewModel _recentNode = null!;
-
-    /// <summary>ツリー最上位のノードを生成する（表示するかどうかは SetPlusFeaturesEnabled が決める）。</summary>
-    private void InitializeTreeNodes()
-    {
-        AllRootsNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.AllRoots, _rootFolders, isExpanded: true);
-        // お気に入り・最近・よく使うは、ルートフォルダの一覧（Folders）を見渡しやすくするため既定では閉じておく
-        _favoritesNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Favorites, _favoriteFolders, isExpanded: false);
-        _frequentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Frequent, _frequentFolders, isExpanded: false);
-        _recentNode = FolderItemViewModel.CreateVirtualNode(VirtualFolderKind.Recent, _recentFolders, isExpanded: false);
-
-        RebuildTreeRoots();
-    }
-
-    /// <summary>ノードキーに対応する最上位ノードを返す（未知のキーはnull）。</summary>
-    private FolderItemViewModel? GetTreeNode(string key) => TreeNodes.GetKind(key) switch
-    {
-        VirtualFolderKind.AllRoots => AllRootsNode,
-        VirtualFolderKind.Favorites => _favoritesNode,
-        VirtualFolderKind.Frequent => _frequentNode,
-        VirtualFolderKind.Recent => _recentNode,
-        _ => null
-    };
-
-    /// <summary>
-    /// 設定（並び順・表示するノード・Plusの購読状態）どおりに TreeRoots を組み立て直す。
-    /// ノードのインスタンスは使い回し、位置がずれている分だけ差分で入れ替える
-    /// （毎回作り直すとTreeViewItemが再生成され、展開状態や選択が飛んでしまうため）。
-    /// </summary>
-    private void RebuildTreeRoots()
-    {
-        var visibleOptionalNodes = TreeNodes
-            .GetEffectiveVisibleNodes(_visibleTreeNodes, _arePlusFeaturesEnabled)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        var desired = _treeNodeOrder
-            // 「Folders」は非表示にできない（全て隠すとツリーが空になってしまうため）
-            .Where(key => string.Equals(key, TreeNodes.AllRoots, StringComparison.OrdinalIgnoreCase)
-                || visibleOptionalNodes.Contains(key))
-            .Select(GetTreeNode)
-            .OfType<FolderItemViewModel>()
-            .ToList();
-
-        for (var index = 0; index < desired.Count; index++)
-        {
-            var currentIndex = TreeRoots.IndexOf(desired[index]);
-            if (currentIndex < 0)
-            {
-                TreeRoots.Insert(index, desired[index]);
-            }
-            else if (currentIndex != index)
-            {
-                // index より前は確定済みで、ノードは重複しないため currentIndex は必ず index より後ろ
-                TreeRoots.Move(currentIndex, index);
-            }
-        }
-
-        // 目的の並びに含まれなかったノードは末尾へ押し出されているので、まとめて取り除く
-        while (TreeRoots.Count > desired.Count)
-        {
-            TreeRoots.RemoveAt(TreeRoots.Count - 1);
-        }
-
-        LeaveHiddenVirtualFolder();
-    }
-
-    /// <summary>ツリーから消えた仮想ノードを開いたままにしないよう、「Folders」へ退避する。</summary>
-    private void LeaveHiddenVirtualFolder()
-    {
-        if (!VirtualFolders.IsVirtual(CurrentPath))
-        {
-            return;
-        }
-
-        if (TreeRoots.Any(node => string.Equals(node.Path, CurrentPath, StringComparison.OrdinalIgnoreCase)))
-        {
-            return;
-        }
-
-        NavigateTo(VirtualFolders.AllRootsPath, false);
-    }
-
     /// <summary>ツリーに表示するノードのキー一覧（並び順どおり。常に表示の「Folders」は含まない）。</summary>
     public IReadOnlyList<string> GetVisibleTreeNodes()
     {
         return _treeNodeOrder.Where(_visibleTreeNodes.Contains).ToList();
+    }
+
+    /// <summary>購読状態も踏まえて、実際にツリーへ出すオプションノードのキー一覧を返す。</summary>
+    internal IReadOnlyList<string> GetEffectiveVisibleTreeNodes()
+    {
+        return TreeNodes.GetEffectiveVisibleNodes(_visibleTreeNodes, _arePlusFeaturesEnabled);
     }
 
     /// <summary>ツリー最上位のノードの並び順（「Folders」を含む全てのキー）。</summary>
@@ -138,16 +48,47 @@ public partial class MainWindowViewModel
         return _treeNodeOrder.ToList();
     }
 
-    /// <summary>
-    /// 言語切り替え後に、ツリー上の言語依存の表示名（仮想ノード・遅延読み込み中のダミー）を引き直す。
-    /// TreeRootsに出ていない（未購読時の）お気に入り・最近・よく使うノードも含めて更新する。
-    /// </summary>
+    /// <summary>全ペインのツリーを、現在の表示設定・購読状態どおりに組み立て直す。</summary>
+    private void RebuildTreeRoots()
+    {
+        foreach (var pane in Panes)
+        {
+            pane.RebuildTreeRoots();
+        }
+
+        LeaveHiddenVirtualFolder();
+    }
+
+    /// <summary>ツリーから消えた仮想ノードを開いたままにしないよう、「Folders」へ退避する。</summary>
+    private void LeaveHiddenVirtualFolder()
+    {
+        var visibleNodes = GetEffectiveVisibleTreeNodes().ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // 表示していないタブも同じノードを開いたままにできないため、全タブを対象にする
+        foreach (var tab in AllTabs)
+        {
+            var kind = VirtualFolders.GetKind(tab.CurrentPath);
+            if (kind is VirtualFolderKind.None or VirtualFolderKind.AllRoots)
+            {
+                continue;
+            }
+
+            if (visibleNodes.Contains(TreeNodes.GetKey(kind)))
+            {
+                continue;
+            }
+
+            tab.NavigateTo(VirtualFolders.AllRootsPath, false);
+        }
+    }
+
+    /// <summary>言語切り替え後に、ツリー上の言語依存の表示名（仮想ノード・遅延読み込み中のダミー）を引き直す。</summary>
     private void RefreshLocalizedTreeNames()
     {
-        AllRootsNode.RefreshLocalizedDisplayName();
-        _favoritesNode.RefreshLocalizedDisplayName();
-        _frequentNode.RefreshLocalizedDisplayName();
-        _recentNode.RefreshLocalizedDisplayName();
+        foreach (var pane in Panes)
+        {
+            pane.RefreshLocalizedTreeNames();
+        }
     }
 
     /// <summary>
@@ -165,8 +106,7 @@ public partial class MainWindowViewModel
 
         if (isEnabled)
         {
-            RefreshRecentFolders();
-            RefreshFrequentFolders();
+            RefreshUsageFolders();
         }
 
         RebuildTreeRoots();
@@ -196,24 +136,25 @@ public partial class MainWindowViewModel
         if (index >= 0)
         {
             _favoritePaths.RemoveAt(index);
-            // 子ノードは登録順と同じ並びなので同じ位置を消せばよい（丸ごと作り直すと他ノードの展開状態が失われる）
-            _favoriteFolders.RemoveAt(index);
         }
         else
         {
             _favoritePaths.Add(normalized);
-            _favoriteFolders.Add(CreateShortcutNode(normalized));
         }
 
-        SaveSettings(RootFolders.Select(x => x.Path));
+        SaveSettings();
+
+        foreach (var pane in Panes)
+        {
+            pane.RefreshFavoriteFolders();
+        }
 
         // お気に入りは「最近」「よく使う」から除外しているため、登録/解除のたびに並べ直す
-        RefreshRecentFolders();
-        RefreshFrequentFolders();
+        RefreshUsageFolders();
 
-        if (VirtualFolders.GetKind(CurrentPath) == VirtualFolderKind.Favorites)
+        foreach (var tab in AllTabs.Where(tab => VirtualFolders.GetKind(tab.CurrentPath) == VirtualFolderKind.Favorites))
         {
-            RefreshCurrentFolder();
+            tab.RefreshCurrentFolder();
         }
 
         return index < 0;
@@ -245,7 +186,7 @@ public partial class MainWindowViewModel
 
         try
         {
-            SaveSettings(RootFolders.Select(x => x.Path));
+            SaveSettings();
         }
         catch
         {
@@ -254,48 +195,13 @@ public partial class MainWindowViewModel
         }
     }
 
-    /// <summary>
-    /// 「よく使う」の一覧を最新のアクセス実績で並べ直す。
-    /// 移動のたびに並べ替えるとツリーが目の前で動いてしまうため、起動時とノードの展開時にだけ呼ぶ。
-    /// </summary>
-    public void RefreshFrequentFolders()
+    /// <summary>全ペインの「最近」「よく使う」を最新のアクセス実績で並べ直す。</summary>
+    private void RefreshUsageFolders()
     {
-        var paths = GetFrequentPaths();
-
-        // 並びが変わっていなければ作り直さない（展開状態を保つ）
-        if (paths.Count == _frequentFolders.Count
-            && paths.Zip(_frequentFolders).All(pair => string.Equals(pair.First, pair.Second.Path, StringComparison.OrdinalIgnoreCase)))
+        foreach (var pane in Panes)
         {
-            return;
-        }
-
-        _frequentFolders.Clear();
-        foreach (var path in paths)
-        {
-            _frequentFolders.Add(CreateShortcutNode(path));
-        }
-    }
-
-    /// <summary>
-    /// 「最近」の一覧を最新のアクセス実績で並べ直す。
-    /// 「よく使う」と同じく、移動のたびに並べ替えるとツリーが目の前で動いてしまうため、
-    /// 起動時とノードの展開時にだけ呼ぶ（ノードを開いた先のファイル一覧は常に最新の順で作られる）。
-    /// </summary>
-    public void RefreshRecentFolders()
-    {
-        var paths = GetRecentPaths();
-
-        // 並びが変わっていなければ作り直さない（展開状態を保つ）
-        if (paths.Count == _recentFolders.Count
-            && paths.Zip(_recentFolders).All(pair => string.Equals(pair.First, pair.Second.Path, StringComparison.OrdinalIgnoreCase)))
-        {
-            return;
-        }
-
-        _recentFolders.Clear();
-        foreach (var path in paths)
-        {
-            _recentFolders.Add(CreateShortcutNode(path));
+            pane.RefreshRecentFolders();
+            pane.RefreshFrequentFolders();
         }
     }
 
@@ -342,7 +248,7 @@ public partial class MainWindowViewModel
         _ => Array.Empty<string>()
     };
 
-    /// <summary>保存済みのお気に入り・アクセス実績を読み込み、ツリーの子ノードを構築する。</summary>
+    /// <summary>保存済みのお気に入り・アクセス実績を読み込み、各ペインのツリーへ反映する。</summary>
     private void LoadFavoritesAndUsage(AppSettings settings)
     {
         _favoritePaths = NormalizeStoredPaths(settings.FavoritePaths).ToList();
@@ -372,20 +278,12 @@ public partial class MainWindowViewModel
             };
         }
 
-        _favoriteFolders.Clear();
-        foreach (var path in _favoritePaths)
+        foreach (var pane in Panes)
         {
-            _favoriteFolders.Add(CreateShortcutNode(path));
+            pane.RefreshFavoriteFolders();
         }
 
-        RefreshRecentFolders();
-        RefreshFrequentFolders();
-    }
-
-    /// <summary>お気に入り／最近／よく使う配下に置く、実体ツリーの複製ノードを生成する。</summary>
-    private FolderItemViewModel CreateShortcutNode(string path)
-    {
-        return new FolderItemViewModel(path, IsExcludedPath, isShortcut: true);
+        RefreshUsageFolders();
     }
 
     /// <summary>実在パスとして正規化する。仮想パス・空・不正な形式はnullを返す。</summary>

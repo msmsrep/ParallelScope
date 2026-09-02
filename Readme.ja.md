@@ -1,4 +1,4 @@
-# ParallelScope
+﻿# ParallelScope
 
 [English](./Readme.md) | 日本語
 
@@ -18,12 +18,15 @@ WPF で UI を構築し、ローカル SQLite キャッシュを使って表示�
 - 一覧のダブルクリックでフォルダ移動/ファイルを既定アプリで起動
 - 配色テーマ（System / Light / Dark）
 - 表示言語（System / English / 日本語。既定はWindowsの表示言語に追従。無料版でも利用可）
-- Plus機能: ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（表示するノードと並び順を選択可）、ファイル一覧の列カスタマイズ
-  （表示列・並び順・列幅）、表示中の一覧のCSV出力
+- Plus機能: 複数タブ、2画面（分割表示）、ペインごとのフォルダツリーの開閉、ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（表示するノードと並び順を選択可）、
+  ファイル一覧の列カスタマイズ（表示列・並び順・列幅）、表示中の一覧のCSV出力
 
 ## リリース
 
 - 未リリース
+  - 複数タブを追加（Plus機能。タブごとに現在フォルダ・履歴・検索語・表示モード・並び順を保持し、構成は次回起動時に復元）
+  - 2画面（分割表示）を追加（Plus機能。左右／上下に分割し、ペインごとにツリーと一覧を持つ）
+  - フォルダツリーの開閉を追加（Plus機能。ツリーを畳んで一覧を全幅で使える。開閉状態はペインごとに保存し、分割で増やしたペインは畳んだ状態から始まる）
   - 設定に「フォルダツリー」ページを追加し、ツリー最上位のノードの表示/非表示と並び順を変更できるように（Plus機能）
   - ツリーに「🕘 Recent」（最近開いたフォルダー）を追加（Plus機能）
   - 英語/日本語の表示言語切り替えを追加（既定はWindowsの表示言語に追従）
@@ -88,6 +91,8 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
    - ファイル: 既定アプリで開く
 6. 「All Files」をONにすると、現在フォルダ配下の全ファイルを階層に関係なく一覧表示
 7. 「Menu > Export CSV...」で、表示中の一覧をCSVへ書き出し（Plus機能）
+8. タブ列の「＋」または Ctrl+T で新しいタブ、「Menu > 画面を分割する」で左右／上下の2画面表示（どちらもPlus機能）
+9. 「Back」の左にある「☰」ボタンでフォルダツリーを畳み、一覧を全幅で表示（Plus機能）
 
 詳しくは[使い方ガイド](https://msmsrep.github.io/ParallelScope/index.ja.html)を参照してください。
 
@@ -113,9 +118,10 @@ dotnet ef database update
 
 ### 主な構成
 
-- `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面
+- `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面（メニューとペインの置き場）
+- `Views/BrowserPaneView.xaml`: 閲覧ペイン（タブ列＋フォルダツリー＋ファイル一覧）。2画面表示では2つ並ぶ
 - `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/フォルダツリー/表示列/テーマ/言語/購読/支援）
-- `ViewModels/`: 画面ロジック（`MainWindowViewModel` は責務ごとにpartialクラスへ分割）
+- `ViewModels/`: 画面ロジック（シェル `MainWindowViewModel` / ペイン `BrowserPaneViewModel` / タブ `BrowserTabViewModel` の3層。いずれも責務ごとにpartialクラスへ分割）
 - `Data/`: 設定/キャッシュ/DbContext
 - `Utilities/`: 共通ユーティリティ（パス正規化・CSV出力・列定義・仮想フォルダなど）
 - `Services/`: Microsoft Store のライセンス判定
@@ -128,6 +134,9 @@ dotnet ef database update
 一部の機能は、Microsoft Store のアドオン「ParallelScope Plus」（月額サブスクリプション）として提供しています。
 
 - **対象機能**:
+  - 複数タブ（未購読の間はタブ列を表示しません。保存済みのタブ構成は消さずに残り、購読すると元の構成に戻ります）
+  - 2画面（分割表示）（未購読の間は「Menu > 画面を分割する」を選べません）
+  - フォルダツリーの開閉（未購読の間は「☰」ボタンを表示せず、ツリーは常に開いたままです）
   - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」と、その表示/非表示・並び順を選ぶ設定画面の「フォルダツリー」ページ（未購読の間はツリーに表示されません）
   - 設定画面の「Display Columns」（ファイル一覧の表示列・並び順・列幅のカスタマイズ）
   - 「Menu > Export CSV...」（表示中の一覧のCSV出力）

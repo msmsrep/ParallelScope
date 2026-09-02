@@ -1,4 +1,4 @@
-#Requires -Version 7
+﻿#Requires -Version 7
 <#
 .SYNOPSIS
     ストア掲載用のスクリーンショットを、実際に動かしたアプリから撮る。
@@ -49,6 +49,9 @@ param(
     [int]$WindowHeight = 940,
     # 起動後、初回フルスキャンが終わるのを待つ時間
     [int]$ScanSeconds = 8,
+    # 撮り直す1枚を指定する（ファイル名の一部。省略時は全部）。
+    # PowerShellの変数名は大文字小文字を区別しないため、ループ変数 $shot と衝突しない名前にする
+    [string[]]$Only,
     # ビルド済みのexeがあっても作り直す
     [switch]$Rebuild,
     # 撮るだけで、掲載用の仕立てを行わない
@@ -145,7 +148,9 @@ function Get-TextBoxes($window) {
     $condition = New-Object System.Windows.Automation.PropertyCondition(
         $automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
 
-    $deadline = (Get-Date).AddSeconds(15)
+    # 初回起動はDBの作成と最初のフルスキャンが重なり、UIオートメーションの問い合わせが
+    # 何度か空振りする。待ち時間を長めに取る（短いと1枚目だけ落ちる）
+    $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline) {
         $found = @($window.FindAll($treeScope::Descendants, $condition))
         if ($found.Count -ge 2) {
@@ -153,7 +158,8 @@ function Get-TextBoxes($window) {
         }
         Start-Sleep -Milliseconds 300
     }
-    throw 'アドレス欄と検索欄が見つかりませんでした。'
+    # どのウィンドウを掴んでいたのか分からないと原因を追えないので、名前を添えて投げる
+    throw ("アドレス欄と検索欄が見つかりませんでした。window='" + $window.Current.Name + "'")
 }
 
 function Set-TextBoxValue($element, [string]$value) {
@@ -245,6 +251,54 @@ $shots = @(
         # 開くのは移動より先。最後の移動で実在パスへ戻す
         ExpandVirtual = $true
     }
+    @{
+        File     = '05-tabs.png'
+        Note     = '複数タブ'
+        Theme    = 'Light'
+        Nodes    = @()
+        Columns  = @('Size', 'Modified')
+        Widths   = @{ Name = 420; Size = 90; Modified = 160 }
+        Flat     = $false
+        # タブ列が主役の1枚なので、一覧の空白を詰めて縦を短く撮る
+        Height   = 620
+        # タブ構成は保存済みの設定として与える（Plus有効なら起動時に復元される）。
+        # 移動も検索も要らないので Navigate は置かない
+        Panes    = @(
+            @{
+                Tabs = @("$sample\Projects\Apollo\src", "$sample\Projects\Apollo\docs",
+                         "$sample\Projects\Borealis", "$sample\Projects\Cascade",
+                         "$sample\Reports\2026", "$sample\Reports\Drafts",
+                         "$sample\Design\Mockups")
+                # 開いているタブの中身が見えるよう、真ん中あたりのタブを表示中にする
+                ActiveTabIndex = 4
+                IsTreeVisible  = $true
+            }
+        )
+    }
+    @{
+        File     = '06-split-view.png'
+        Note     = '2画面（分割表示）'
+        Theme    = 'Light'
+        Nodes    = @()
+        Columns  = @('Size', 'Modified')
+        # 2画面では1ペインの幅が半分になるので、名前列を詰めて列が切れないようにする
+        Widths   = @{ Name = 240; Size = 90; Modified = 160 }
+        Flat     = $false
+        Split    = $true
+        # 右のペインはツリーを畳んで、ツリーの開閉も同じ1枚で見せる
+        Panes    = @(
+            @{
+                Tabs = @("$sample\Projects\Apollo\src", "$sample\Projects\Apollo\docs")
+                ActiveTabIndex = 0
+                IsTreeVisible  = $true
+            }
+            @{
+                Tabs = @("$sample\Reports", "$sample\Reports\Drafts")
+                ActiveTabIndex = 0
+                IsTreeVisible  = $false
+            }
+        )
+    }
 )
 
 # 仮想ノードの表示名（Utilities/UiTextResources.cs と揃える）
@@ -313,94 +367,139 @@ try {
         New-Item -ItemType Directory -Path $output -Force | Out-Null
 
         foreach ($shot in $shots) {
-            Write-Host "撮影: $code/$($shot.File)  [$($shot.Note)]" -ForegroundColor Cyan
-
-            Stop-App
-
-            @{
-                RootPaths            = $rootPaths
-                ExcludedPaths        = @()
-                FullScanIntervalHours = 3
-                IsFlatFileViewEnabled = [bool]$shot.Flat
-                VisibleColumns       = $shot.Columns
-                ColumnOrder          = @('Name', 'Location', 'Type', 'Size', 'Modified', 'Created', 'Attributes')
-                VisibleTreeNodes     = $shot.Nodes
-                TreeNodeOrder        = if ($shot.NodeOrder) { $shot.NodeOrder } else { @('AllRoots', 'Favorites', 'Recent', 'Frequent') }
-                # Location は既定幅だと配下の深いパスが切れて Size 列へめり込むので広げる
-                ColumnWidths         = @{ Location = 380; Size = 90; Modified = 160 }
-                CsvExportSizeInBytes = $false
-                FavoritePaths        = $favoritePaths
-                FolderUsages         = $folderUsages
-                Theme                = $shot.Theme
-                Language             = $languageSetting[$code]
-            } | ConvertTo-Json -Depth 5 | Set-Content $settingsPath -Encoding UTF8
-
-            $process = Start-Process $exe -PassThru
-            $window = Get-Window $process.Id
-
-            # 画面の中央へ置く。SWP_NOZORDER 以外は指定しない（0x0004 = NOZORDER）
-            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-            $handle = [IntPtr]$window.Current.NativeWindowHandle
-            [void][Win]::SetWindowPos(
-                $handle, [IntPtr]::Zero,
-                [int](($screen.Width - $WindowWidth) / 2), [int](($screen.Height - $WindowHeight) / 2),
-                $WindowWidth, $WindowHeight, 0x0004)
-            [void][Win]::SetForegroundWindow($handle)
-
-            # 起動直後のフルスキャンを待つ。検索と All Files はキャッシュだけを見るので、
-            # ここが終わっていないと空の一覧が撮れる
-            Start-Sleep -Seconds $ScanSeconds
-
-            $textBoxes = Get-TextBoxes $window
-            $addressBox = $textBoxes[0]
-            $searchBox = $textBoxes[1]
-
-            # 仮想ノードを開くのは移動より先（開いたノード自身が選ばれるため）
-            if ($shot.ExpandVirtual) {
-                foreach ($name in $virtualNodeNames[$code]) {
-                    if (-not (Expand-TreeNode $window $name)) {
-                        throw "ツリーのノード「$name」が見つかりませんでした（$code/$($shot.File)）。"
-                    }
-                }
-            }
+            if ($Only -and -not ($Only | Where-Object { $shot.File -like "*$_*" })) { continue }
 
             <#
-              アドレス欄にパスを入れて Enter。利用者が打ち込むのと同じ経路。
-
-              仮想ノードを開いた後は2回移動する。1回目の移動ではツリーの選択が
-              開いたノード（例:「よく使うフォルダー」）に残ったままになり、
-              アドレス欄の行き先とツリーの選択が食い違って写るため。
+              初回起動はDBの作成と最初のフルスキャンが重なり、UIオートメーションの問い合わせが
+              空振りしたまま返ることがある（アプリのUIスレッドが応答しきれないため）。
+              その場合は撮り直す。3回とも駄目なら実際の不具合として投げる。
             #>
-            $times = if ($shot.ExpandVirtual) { 2 } else { 1 }
-            for ($i = 0; $i -lt $times; $i++) {
-                Set-TextBoxValue $addressBox $shot.Navigate
-                $addressBox.SetFocus()
-                Start-Sleep -Milliseconds 300
-                [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
-                Start-Sleep -Seconds 3
-            }
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+                try {
+                    Write-Host "撮影: $code/$($shot.File)  [$($shot.Note)]" -ForegroundColor Cyan
 
-            # 移動先のフォルダを開く（実体のノードは移動して初めてツリーに現れる）
-            foreach ($name in @($shot.Expand)) {
-                if ($name -and -not (Expand-TreeNode $window $name)) {
-                    throw "ツリーのノード「$name」が見つかりませんでした（$code/$($shot.File)）。"
+                    Stop-App
+
+                    <#
+                      ペインの状態は、要素が1つでも必ず配列として書き出す。
+                      ConvertTo-Json は単独要素の配列を素のオブジェクトへ畳んでしまい、
+                      AppSettings の List<PaneStateSettings> へ読めずに settings.json 全体が
+                      既定値（＝利用者のデスクトップ）へ落ちる。
+                    #>
+                    [object[]]$paneStates = @()
+                    foreach ($pane in @($shot.Panes)) {
+                        if (-not $pane) { continue }
+                        [object[]]$tabStates = @()
+                        foreach ($path in @($pane.Tabs)) {
+                            $tabStates += @{ Path = $path; IsFlatFileViewEnabled = [bool]$shot.Flat }
+                        }
+                        $paneStates += @{
+                            Tabs           = $tabStates
+                            ActiveTabIndex = $pane.ActiveTabIndex
+                            IsTreeVisible  = $pane.IsTreeVisible
+                        }
+                    }
+                    if ($paneStates.Count -eq 0) { $paneStates = $null }
+
+                    @{
+                        RootPaths            = $rootPaths
+                        ExcludedPaths        = @()
+                        FullScanIntervalHours = 3
+                        IsFlatFileViewEnabled = [bool]$shot.Flat
+                        VisibleColumns       = $shot.Columns
+                        ColumnOrder          = @('Name', 'Location', 'Type', 'Size', 'Modified', 'Created', 'Attributes')
+                        VisibleTreeNodes     = $shot.Nodes
+                        TreeNodeOrder        = if ($shot.NodeOrder) { $shot.NodeOrder } else { @('AllRoots', 'Favorites', 'Recent', 'Frequent') }
+                        # Location は既定幅だと配下の深いパスが切れて Size 列へめり込むので広げる
+                        ColumnWidths         = if ($shot.Widths) { $shot.Widths } else { @{ Location = 380; Size = 90; Modified = 160 } }
+                        CsvExportSizeInBytes = $false
+                        FavoritePaths        = $favoritePaths
+                        FolderUsages         = $folderUsages
+                        Theme                = $shot.Theme
+                        Language             = $languageSetting[$code]
+                        # タブ・分割はPlus機能。保存済みの状態として与えると、起動時に復元される
+                        IsSplitViewEnabled   = [bool]$shot.Split
+                        SplitOrientation     = 'Vertical'
+                        SplitRatio           = 0.5
+                        ActivePaneIndex      = 0
+                        Panes                = $paneStates
+                    } | ConvertTo-Json -Depth 6 | Set-Content $settingsPath -Encoding UTF8
+
+                    $process = Start-Process $exe -PassThru
+                    $window = Get-Window $process.Id
+
+                    # 画面の中央へ置く。SWP_NOZORDER 以外は指定しない（0x0004 = NOZORDER）
+                            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+                    $shotHeight = if ($shot.Height) { $shot.Height } else { $WindowHeight }
+                    $handle = [IntPtr]$window.Current.NativeWindowHandle
+                    [void][Win]::SetWindowPos(
+                        $handle, [IntPtr]::Zero,
+                        [int](($screen.Width - $WindowWidth) / 2), [int](($screen.Height - $shotHeight) / 2),
+                        $WindowWidth, $shotHeight, 0x0004)
+                    [void][Win]::SetForegroundWindow($handle)
+
+                    # 起動直後のフルスキャンを待つ。検索と All Files はキャッシュだけを見るので、
+                    # ここが終わっていないと空の一覧が撮れる
+                    Start-Sleep -Seconds $ScanSeconds
+
+                    $textBoxes = Get-TextBoxes $window
+                    $addressBox = $textBoxes[0]
+                    $searchBox = $textBoxes[1]
+
+                    # 仮想ノードを開くのは移動より先（開いたノード自身が選ばれるため）
+                    if ($shot.ExpandVirtual) {
+                        foreach ($name in $virtualNodeNames[$code]) {
+                            if (-not (Expand-TreeNode $window $name)) {
+                                throw "ツリーのノード「$name」が見つかりませんでした（$code/$($shot.File)）。"
+                            }
+                        }
+                    }
+
+                    <#
+                      アドレス欄にパスを入れて Enter。利用者が打ち込むのと同じ経路。
+
+                      仮想ノードを開いた後は2回移動する。1回目の移動ではツリーの選択が
+                      開いたノード（例:「よく使うフォルダー」）に残ったままになり、
+                      アドレス欄の行き先とツリーの選択が食い違って写るため。
+                    #>
+                    $times = if (-not $shot.Navigate) { 0 } elseif ($shot.ExpandVirtual) { 2 } else { 1 }
+                    for ($i = 0; $i -lt $times; $i++) {
+                        Set-TextBoxValue $addressBox $shot.Navigate
+                        $addressBox.SetFocus()
+                        Start-Sleep -Milliseconds 300
+                        [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+                        Start-Sleep -Seconds 3
+                    }
+
+                    # 移動先のフォルダを開く（実体のノードは移動して初めてツリーに現れる）
+                    foreach ($name in @($shot.Expand)) {
+                        if ($name -and -not (Expand-TreeNode $window $name)) {
+                            throw "ツリーのノード「$name」が見つかりませんでした（$code/$($shot.File)）。"
+                        }
+                    }
+
+                    if ($shot.Search) {
+                        # 入力の都度走るインクリメンタルサーチなので、Enter は要らない
+                        Set-TextBoxValue $searchBox $shot.Search
+                        Start-Sleep -Seconds 3
+                    }
+
+                    # ツリーに残るキーボードフォーカスの黒枠が写らないよう、
+                    # 最後にアドレス欄へフォーカスを戻してから撮る
+                    [void][Win]::SetForegroundWindow($handle)
+                    $addressBox.SetFocus()
+                    Start-Sleep -Milliseconds 800
+
+                    $size = Capture $handle (Join-Path $output $shot.File)
+                    Write-Host "  -> $code/$($shot.File)  ($size)" -ForegroundColor Green
+                    break
+                }
+                catch {
+                    if ($attempt -eq 3) { throw }
+                    Write-Host "  撮り直します（$($_.Exception.Message)）" -ForegroundColor Yellow
+                    Stop-App
                 }
             }
-
-            if ($shot.Search) {
-                # 入力の都度走るインクリメンタルサーチなので、Enter は要らない
-                Set-TextBoxValue $searchBox $shot.Search
-                Start-Sleep -Seconds 3
-            }
-
-            # ツリーに残るキーボードフォーカスの黒枠が写らないよう、
-            # 最後にアドレス欄へフォーカスを戻してから撮る
-            [void][Win]::SetForegroundWindow($handle)
-            $addressBox.SetFocus()
-            Start-Sleep -Milliseconds 800
-
-            $size = Capture $handle (Join-Path $output $shot.File)
-            Write-Host "  -> $code/$($shot.File)  ($size)" -ForegroundColor Green
         }
     }
 }

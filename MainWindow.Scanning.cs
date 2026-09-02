@@ -2,11 +2,12 @@
 using System.Windows.Threading;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
+using ParallelScope.Views;
 
 namespace ParallelScope;
 
-/// <summary>フルスキャン・フォルダ単位スキャンの実行制御。</summary>
-public partial class MainWindow
+/// <summary>フルスキャン・フォルダ単位スキャンの実行制御。ペインからのスキャン要求もここで受ける。</summary>
+public partial class MainWindow : IBrowserPaneHost
 {
     private readonly DispatcherTimer _scheduledFullScanTimer;
     private bool _hasStartedAutomaticFullScan;
@@ -17,14 +18,9 @@ public partial class MainWindow
     private readonly SingleFlightCoalescer<FullScanRequest> _fullScanCoalescer;
     private CancellationTokenSource? _fullScanCts;
 
-    // コンテキストメニューから、選択フォルダ配下の個別スキャンを実行する
-    private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    // ペイン（ツリーのコンテキストメニュー）から要求された、フォルダ配下の個別スキャン
+    async Task IBrowserPaneHost.RunFolderScanAsync(FolderItemViewModel folderItem)
     {
-        if (sender is not FrameworkElement { DataContext: FolderItemViewModel folderItem })
-        {
-            return;
-        }
-
         if (folderItem.IsScanning)
         {
             return;
@@ -50,11 +46,13 @@ public partial class MainWindow
         {
             var scannedFolderCount = await _viewModel.ScanFolderSubtreeAsync(folderItem.Path);
 
-            if (PathNormalizer.IsAncestorOrSame(folderItem.Path, _viewModel.CurrentPath))
+            // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う。
+            // 表示していないタブは印だけ付けて、次に表示するときにキャッシュから読み直す
+            _viewModel.RefreshAfterScan(folderItem.Path);
+
+            foreach (var pane in _panes)
             {
-                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
-                _viewModel.RefreshCurrentFolder();
-                SyncTreeSelectionToCurrentPath();
+                pane.SyncTreeSelectionToCurrentPath();
             }
 
             MessageBox.Show(
@@ -118,11 +116,13 @@ public partial class MainWindow
         {
             var scannedFolderCount = await _viewModel.FullScanConfiguredRootsAsync(token);
 
-            if (!string.IsNullOrWhiteSpace(_viewModel.CurrentPath))
+            // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う。
+            // 表示していないタブは印だけ付けて、次に表示するときにキャッシュから読み直す
+            _viewModel.RefreshAfterScan();
+
+            foreach (var pane in _panes)
             {
-                // LoadFiles(CurrentPath) は NavigateTo の同一パス早期returnで何もしないため、再読み込み専用APIを使う
-                _viewModel.RefreshCurrentFolder();
-                SyncTreeSelectionToCurrentPath();
+                pane.SyncTreeSelectionToCurrentPath();
             }
 
             if (showCompletionMessage)
@@ -162,12 +162,9 @@ public partial class MainWindow
         _fullScanCts?.Cancel();
     }
 
-    // 全ルートフォルダのスキャン中表示フラグを一括で切り替える
+    // 全ルートフォルダのスキャン中表示フラグを一括で切り替える（ツリーはペインごとにある）
     private void SetRootScanningState(bool isScanning)
     {
-        foreach (var rootFolder in _viewModel.RootFolders)
-        {
-            rootFolder.IsScanning = isScanning;
-        }
+        _viewModel.SetRootScanningState(isScanning);
     }
 }

@@ -1,4 +1,5 @@
 ﻿using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Data;
@@ -7,35 +8,34 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>
-/// メインウィンドウのViewModel。フォルダツリー・ファイル一覧・検索・スキャンの状態を保持する。
-/// 各責務（設定/ナビゲーション/検索/スキャン/キャッシュ/表示アイテム管理）は partial クラスとしてファイル分割されている。
+/// メインウィンドウのViewModel（シェル）。アプリ全体で1つしかない状態 —— 設定・キャッシュDB・
+/// フォルダツリー・お気に入り／アクセス実績・スキャン —— を持つ。
+/// 現在パス・履歴・検索・ファイル一覧といった「1つの閲覧状態」は <see cref="BrowserTabViewModel"/> 側にあり、
+/// 画面（XAML・コードビハインド）から見えるプロパティはアクティブなタブへの委譲になっている。
+/// 各責務（設定/スキャン/お気に入り/タブの窓口）は partial クラスとしてファイル分割されている。
 /// </summary>
 public partial class MainWindowViewModel : ObservableObject
 {
-    private ObservableCollection<FolderItemViewModel> _rootFolders;
-    private ObservableCollection<FileItemViewModel> _fileItems;
-    private string _currentPath = string.Empty;
-    private string _addressInput = string.Empty;
-    private string _searchQuery = string.Empty;
-    private bool _isFlatFileViewEnabled;
-    private readonly Stack<string> _backHistory = new();
-    private readonly Stack<string> _forwardHistory = new();
+    // 変更通知を画面へ中継しているタブ（アクティブなタブが切り替わるたびに繋ぎ替える）
+    private BrowserTabViewModel _observedTab;
     private readonly FileCacheRepository _fileCacheRepository;
     private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
-    private int _navigationVersion;
-    private int _searchVersion;
-    private int _flatViewVersion;
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
     private AppThemeSetting _theme = AppThemeSetting.System;
     private AppLanguageSetting _language = AppLanguageSetting.System;
-    private List<FileItemViewModel> _currentDirectoryItems = new();
 
-    // バックグラウンド処理（横断検索・フラット表示・Roots一覧）から参照するルートパスの不変スナップショット。
-    // RootFolders（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
+    // 起動時の組み立て中は設定を書き出さない（読み込んだ内容を途中の状態で上書きしないため）
+    private bool _isInitialized;
+
+    // 設定されているルートパス（正規化済み。除外設定に該当するものも含む＝settings.jsonに保存する内容）
+    private List<string> _rootPaths = new();
+
+    // 実際にツリー・横断列挙の対象にするルートパス（除外設定に該当するものを除いた不変スナップショット）。
+    // ツリーのノード（ObservableCollection）はUIスレッド専用のため、コアレサーのハンドラから直接触らない
     private IReadOnlyList<string> _rootPathsSnapshot = Array.Empty<string>();
 
     /// <summary>
@@ -48,26 +48,6 @@ public partial class MainWindowViewModel : ObservableObject
         return kind == VirtualFolderKind.None
             ? new[] { path }
             : GetVirtualFolderPaths(kind);
-    }
-
-    /// <summary>
-    /// 対象パス同士が入れ子（例: D:\ と D:\Sub）になっているかどうか。
-    /// 横断列挙（All Files・横断検索）で同一エントリの重複除去が必要かの判定に使う。
-    /// </summary>
-    private static bool HasOverlappingPaths(IReadOnlyList<string> paths)
-    {
-        for (var i = 0; i < paths.Count; i++)
-        {
-            for (var j = 0; j < paths.Count; j++)
-            {
-                if (i != j && PathNormalizer.IsAncestorOrSame(paths[i], paths[j]))
-                {
-                    return true;
-                }
-            }
-        }
-
-        return false;
     }
 
     // ファイル一覧の列の並び順（列キー。Nameを含む）と、ユーザーが変更した列幅（列キー→ピクセル幅）。
@@ -85,105 +65,53 @@ public partial class MainWindowViewModel : ObservableObject
     private bool _showHiddenItems = true;
     private bool _showSystemItems = true;
 
-    // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
-    private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
-    private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
-    private readonly SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)> _folderSizeCoalescer;
-    private readonly SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)> _flatViewCoalescer;
+    /// <summary>閲覧ペイン（1画面なら1件、2画面表示なら2件）。</summary>
+    public ObservableCollection<BrowserPaneViewModel> Panes { get; } = new();
 
-    public ObservableCollection<FolderItemViewModel> RootFolders
-    {
-        get => _rootFolders;
-        set => SetProperty(ref _rootFolders, value);
-    }
+    /// <summary>操作対象のペインで表示中のタブ。</summary>
+    public BrowserTabViewModel ActiveTab => ActivePane.ActiveTab;
 
-    /// <summary>
-    /// フォルダツリーに表示する最上位ノード。全ルートを子に持つ仮想「Folders」ノード1件のみを含み、
-    /// ルートの増減は共有している RootFolders コレクション経由で自動的に反映される。
-    /// </summary>
-    public ObservableCollection<FolderItemViewModel> TreeRoots { get; } = new();
+    // ツリーはペインごとの持ち物。画面・テストから見えるこれらは操作対象のペインのものを指す
+    public ObservableCollection<FolderItemViewModel> RootFolders => ActivePane.RootFolders;
 
-    public ObservableCollection<FileItemViewModel> FileItems
-    {
-        get => _fileItems;
-        set => SetProperty(ref _fileItems, value);
-    }
+    public ObservableCollection<FolderItemViewModel> TreeRoots => ActivePane.TreeRoots;
 
-    public string CurrentPath
-    {
-        get => _currentPath;
-        set
-        {
-            if (SetProperty(ref _currentPath, value))
-            {
-                OnPropertyChanged(nameof(CanGoUp));
-            }
-        }
-    }
+    /// <summary>ツリー最上位の「Folders」ノード。</summary>
+    public FolderItemViewModel AllRootsNode => ActivePane.AllRootsNode;
+
+    /// <summary>開いているすべてのタブ（設定変更をタブ全体へ反映するために使う）。</summary>
+    private IEnumerable<BrowserTabViewModel> AllTabs => Panes.SelectMany(pane => pane.Tabs);
+
+    // ここから下は、アクティブなタブの状態をそのまま見せるための委譲。
+    // 画面のバインディングとコードビハインドは引き続きこのViewModelだけを見ればよい状態を保つ
+    public ObservableCollection<FileItemViewModel> FileItems => ActiveTab.FileItems;
+
+    public string CurrentPath => ActiveTab.CurrentPath;
 
     public string AddressInput
     {
-        get => _addressInput;
-        set => SetProperty(ref _addressInput, value);
+        get => ActiveTab.AddressInput;
+        set => ActiveTab.AddressInput = value;
     }
 
     public string SearchQuery
     {
-        get => _searchQuery;
-        set
-        {
-            if (!SetProperty(ref _searchQuery, value))
-            {
-                return;
-            }
-
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                ClearSearch();
-                return;
-            }
-
-            // 入力の都度、検索をリクエストする（インクリメンタルサーチ）
-            RequestSearch(value);
-        }
+        get => ActiveTab.SearchQuery;
+        set => ActiveTab.SearchQuery = value;
     }
 
     /// <summary>trueの場合、現在フォルダ直下ではなく配下の全ファイルを再帰的に表示する。</summary>
     public bool IsFlatFileViewEnabled
     {
-        get => _isFlatFileViewEnabled;
-        set
-        {
-            if (!SetProperty(ref _isFlatFileViewEnabled, value))
-            {
-                return;
-            }
-
-            SaveSettings(RootFolders.Select(x => x.Path));
-
-            if (!string.IsNullOrWhiteSpace(SearchQuery))
-            {
-                // 検索結果はモードによってフォルダの表示有無が変わるため、同じ検索語で再検索して反映する
-                RequestSearch(SearchQuery);
-                return;
-            }
-
-            if (value)
-            {
-                RequestFlatFileView();
-            }
-            else
-            {
-                ReplaceVisibleFileItems(_currentDirectoryItems);
-            }
-        }
+        get => ActiveTab.IsFlatFileViewEnabled;
+        set => ActiveTab.IsFlatFileViewEnabled = value;
     }
 
-    public bool CanGoBack => _backHistory.Count > 0;
+    public bool CanGoBack => ActiveTab.CanGoBack;
 
-    public bool CanGoForward => _forwardHistory.Count > 0;
+    public bool CanGoForward => ActiveTab.CanGoForward;
 
-    public bool CanGoUp => GetParentPath(CurrentPath) is not null;
+    public bool CanGoUp => ActiveTab.CanGoUp;
 
     public MainWindowViewModel()
         : this(new FileCacheRepository(), new AppSettingsRepository())
@@ -196,22 +124,72 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository)
     {
-        _rootFolders = new ObservableCollection<FolderItemViewModel>();
-        InitializeTreeNodes();
-        _fileItems = new ObservableCollection<FileItemViewModel>();
         _fileCacheRepository = fileCacheRepository;
         _appSettingsRepository = appSettingsRepository;
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
-        _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(
-            request => RefreshFromFileSystemInBackground(request.FolderPath, request.NavigationVersion));
-        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)>(
-            request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion, request.FilesOnly));
-        _folderSizeCoalescer = new SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)>(
-            request => ApplyCachedFolderSizesInBackground(request.FolderPath, request.Entries, request.NavigationVersion));
-        _flatViewCoalescer = new SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)>(
-            request => ApplyFlatFileView(request.FolderPath, request.FlatViewVersion));
+        // 設定の読み込みはペインのツリーとタブへ反映されるため、ペインを先に用意する
+        var pane = CreatePane();
+        pane.IsActive = true;
+        Panes.Add(pane);
+        _observedTab = pane.ActiveTab;
+        _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
         InitializeRootFolders();
+        _isInitialized = true;
+    }
+
+    // タブ側の状態変化を、そのまま同名プロパティの変更通知として画面へ流す
+    private void ActiveTab_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        OnPropertyChanged(e.PropertyName);
+    }
+
+    /// <summary>全ペインのツリーで、ルートフォルダのスキャン中表示を一括で切り替える。</summary>
+    public void SetRootScanningState(bool isScanning)
+    {
+        foreach (var rootFolder in Panes.SelectMany(pane => pane.RootFolders))
+        {
+            rootFolder.IsScanning = isScanning;
+        }
+    }
+
+    /// <summary>
+    /// スキャン完了後の一覧の作り直し。表示中のタブ（各ペインのアクティブタブ）はその場で読み直し、
+    /// 表示していないタブには印だけ付けて次に表示するときに読み直す（全タブを同時に再取得しないため）。
+    /// </summary>
+    /// <param name="scannedPath">
+    /// スキャンしたフォルダ。指定した場合、その配下を表示しているタブだけを読み直す（nullなら全ルート＝全て対象）。
+    /// </param>
+    public void RefreshAfterScan(string? scannedPath = null)
+    {
+        foreach (var tab in Panes.Select(pane => pane.ActiveTab))
+        {
+            if (string.IsNullOrWhiteSpace(tab.CurrentPath))
+            {
+                continue;
+            }
+
+            if (scannedPath is not null && !PathNormalizer.IsAncestorOrSame(scannedPath, tab.CurrentPath))
+            {
+                continue;
+            }
+
+            tab.RefreshCurrentFolder();
+        }
+
+        foreach (var tab in AllTabs.Where(tab => !tab.IsActive))
+        {
+            tab.MarkStale();
+        }
+    }
+
+    /// <summary>言語切り替え後に、仮想ノードを開いているタブの見出しを引き直す。</summary>
+    private void RefreshLocalizedTabNames()
+    {
+        foreach (var tab in AllTabs)
+        {
+            tab.RefreshLocalizedDisplayName();
+        }
     }
 }

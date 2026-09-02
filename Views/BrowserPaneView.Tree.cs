@@ -6,24 +6,56 @@ using System.Windows.Media;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
-namespace ParallelScope;
+namespace ParallelScope.Views;
 
 /// <summary>フォルダツリーの操作（選択の同期・展開・コンテキストメニュー）に関する処理。</summary>
-public partial class MainWindow
+public partial class BrowserPaneView
 {
     // 右クリックで押されたツリーノード（マウスを離す時点でカーソル直下が変わっても対象を保つため）
     private TreeViewItem? _rightClickedTreeViewItem;
 
-    // Plus機能（ツリーのお気に入り・最近・よく使うノードと、一覧のCSV書き出し）を購読状態に合わせて出し分ける
-    private void ApplyPlusFeatures()
-    {
-        var isActive = _storeLicenseService.IsPlusActive;
+    // パス→TreeViewItem の対応表。ツリーはペインごとに別インスタンスなので、この表もペインごとに持つ
+    private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
 
-        _viewModel.SetPlusFeaturesEnabled(isActive);
-        ExportCsvMenuItem.IsEnabled = isActive;
+    // ツリーの開閉が使えるか。未購読の間はfalse（開いたまま固定）
+    private bool _isTreeCollapseEnabled;
+
+    // 畳む直前のツリー幅。開き直したときに元の幅へ戻すために控える
+    private GridLength _expandedTreeWidth = new(200);
+
+    /// <summary>ツリーの開閉（Plus機能）の有効/無効を購読状態に合わせて切り替える。</summary>
+    internal void SetTreeCollapseEnabled(bool isEnabled)
+    {
+        _isTreeCollapseEnabled = isEnabled;
+        TreeToggleButton.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
+        ApplyTreeVisibility();
     }
 
-    private readonly Dictionary<string, TreeViewItem> _treeItemMap = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>ツリーの開閉状態を画面へ反映する（未購読の間は畳まず常に開く）。</summary>
+    internal void ApplyTreeVisibility()
+    {
+        var isVisible = !_isTreeCollapseEnabled || _paneViewModel.IsTreeVisible;
+        if (isVisible == (TreeBorder.Visibility == Visibility.Visible))
+        {
+            return;
+        }
+
+        if (isVisible)
+        {
+            TreeColumn.MinWidth = 120;
+            TreeColumn.Width = _expandedTreeWidth;
+        }
+        else
+        {
+            // 幅の下限を残したままだと列が縮みきらないため、畳む間だけ0にする
+            _expandedTreeWidth = new GridLength(TreeColumn.ActualWidth > 0 ? TreeColumn.ActualWidth : 200);
+            TreeColumn.MinWidth = 0;
+            TreeColumn.Width = new GridLength(0);
+        }
+
+        TreeBorder.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+        TreeSplitter.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     // 生成されたTreeViewItemをパスで引けるように記録する（ツリー選択の同期に使用）
     private void FolderTreeViewItem_Loaded(object sender, RoutedEventArgs e)
@@ -72,7 +104,7 @@ public partial class MainWindow
     {
         if (e.NewValue is FolderItemViewModel folderItem)
         {
-            _viewModel.LoadFiles(folderItem.Path);
+            ActiveTab.LoadFiles(folderItem.Path);
         }
     }
 
@@ -87,10 +119,10 @@ public partial class MainWindow
         switch (VirtualFolders.GetKind(folderItem.Path))
         {
             case VirtualFolderKind.Frequent:
-                _viewModel.RefreshFrequentFolders();
+                _paneViewModel.RefreshFrequentFolders();
                 return;
             case VirtualFolderKind.Recent:
-                _viewModel.RefreshRecentFolders();
+                _paneViewModel.RefreshRecentFolders();
                 return;
         }
 
@@ -154,6 +186,34 @@ public partial class MainWindow
             DataContext = folderItem,
             PlacementTarget = treeViewItem
         };
+
+        // タブはPlus機能のため、未購読の間はメニューにも出さない
+        if (_areTabsEnabled)
+        {
+            var openInNewTabMenuItem = new MenuItem
+            {
+                Header = UiText.Get("Context.OpenInNewTab"),
+                DataContext = folderItem,
+                IsEnabled = _paneViewModel.CanAddTab
+            };
+            openInNewTabMenuItem.Click += OpenFolderInNewTabMenuItem_Click;
+
+            contextMenu.Items.Add(openInNewTabMenuItem);
+
+            // 1画面のときは反対側のペインが無いが、その場合はクリック時に分割して開くので選べる状態にする
+            var otherPane = _viewModel.GetOtherPane(_paneViewModel);
+            var openInOtherPaneMenuItem = new MenuItem
+            {
+                Header = UiText.Get("Context.OpenInOtherPane"),
+                DataContext = folderItem,
+                IsEnabled = otherPane?.CanAddTab ?? true
+            };
+            openInOtherPaneMenuItem.Click += OpenFolderInOtherPaneMenuItem_Click;
+            contextMenu.Items.Add(openInOtherPaneMenuItem);
+
+            contextMenu.Items.Add(new Separator());
+        }
+
         contextMenu.Items.Add(scanMenuItem);
 
         // お気に入りはPlus機能のため、未購読の間はメニューにも出さない
@@ -171,6 +231,16 @@ public partial class MainWindow
             contextMenu.Items.Add(favoriteMenuItem);
         }
 
+        // 「このペインを閉じる」は2画面のときしか意味が無いので、1画面ではメニューに出さない
+        if (_viewModel.IsSplitViewEnabled)
+        {
+            var closePaneMenuItem = new MenuItem { Header = UiText.Get("Context.ClosePane") };
+            closePaneMenuItem.Click += ClosePaneMenuItem_Click;
+
+            contextMenu.Items.Add(new Separator());
+            contextMenu.Items.Add(closePaneMenuItem);
+        }
+
         if (isKeyboardInvoked)
         {
             contextMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
@@ -179,6 +249,36 @@ public partial class MainWindow
         // テーマ・言語のリソースを引けるよう、開く前に論理ツリーへ繋いでおく
         treeViewItem.ContextMenu = contextMenu;
         contextMenu.IsOpen = true;
+    }
+
+    // コンテキストメニューから、選択フォルダ配下の個別スキャンを要求する
+    // （スキャンはアプリ全体で1本に統合されているため、実行はウィンドウ側に委ねる）
+    private async void ScanFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            return;
+        }
+
+        await _host.RunFolderScanAsync(folderItem);
+    }
+
+    // ツリーのコンテキストメニューから、選択フォルダを新しいタブで開く
+    private void OpenFolderInNewTabMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            OpenPathInNewTab(folderItem.Path);
+        }
+    }
+
+    // ツリーのコンテキストメニューから、選択フォルダを反対側のペインで開く
+    private void OpenFolderInOtherPaneMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is FrameworkElement { DataContext: FolderItemViewModel folderItem })
+        {
+            OpenPathInOtherPane(folderItem.Path);
+        }
     }
 
     // コンテキストメニューから、選択フォルダのお気に入り登録/解除を切り替える
@@ -217,9 +317,9 @@ public partial class MainWindow
     }
 
     // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
-    private void SyncTreeSelectionToCurrentPath()
+    internal void SyncTreeSelectionToCurrentPath()
     {
-        var path = PathNormalizer.Normalize(_viewModel.CurrentPath);
+        var path = PathNormalizer.Normalize(ActiveTab.CurrentPath);
         if (string.IsNullOrWhiteSpace(path))
         {
             return;
@@ -233,7 +333,7 @@ public partial class MainWindow
             return;
         }
 
-        var rootFolder = _viewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
+        var rootFolder = _paneViewModel.RootFolders.FirstOrDefault(root => PathNormalizer.IsAncestorOrSame(root.Path, path));
         if (rootFolder is null)
         {
             return;
@@ -250,7 +350,7 @@ public partial class MainWindow
 
         // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
         // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
-        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_viewModel.AllRootsNode) is not TreeViewItem allRootsItem)
+        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_paneViewModel.AllRootsNode) is not TreeViewItem allRootsItem)
         {
             return;
         }

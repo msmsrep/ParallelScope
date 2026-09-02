@@ -11,18 +11,58 @@
                 <ResourceDictionary Source="pack://application:,,,/PresentationFramework.Fluent;component/Themes/Fluent.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- 選択行・トグルON状態の色。Fluent既定はアクセント色を不透明でそのまま敷くため
-                 （ダークでは #99EBFF や #4CC2FF ＋反転文字）主張が強すぎるので、薄く敷くだけにする。
-                 アクセント色は明暗テーマに依らず同じなので、これらの定義を両テーマで共用できる。
-                 文字色はMainWindow側で通常の色に戻している（選択行はCellStyle、トグルはContent） -->
+            <!-- 選択行・タブ・トグルON状態の面の色。アクセント色を敷くと薄い水色が主張して古びて見えるため、
+                 面はテーマ追従のニュートラル（本文色を薄く敷いたグレー）にし、ONであることは
+                 面の濃さと太字で示す（アクセント色の文字も青が強く出るため使わない）。
+                 TextFillColorPrimary は明暗テーマで反転するので、
+                 ライトではグレー、ダークでは白の薄敷きになり、どちらでも面が沈まない -->
+            <SolidColorBrush x:Key="SelectionNeutralFillBrush"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
+            <SolidColorBrush x:Key="SelectionNeutralHoverFillBrush"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.06"/>
+            <SolidColorBrush x:Key="SelectionNeutralPressedFillBrush"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
+
+            <!-- Fluent既定のトグルON状態（アクセント色べた塗り＋反転文字）を上の面色に差し替える。
+                 文字色はテンプレートが直接指定してくるため、各トグルのContent側で
+                 ToggleButtonContentTextStyle を使って上書きする -->
+            <!-- 別名（<StaticResource x:Key=.../>）で束ねると DynamicResource 参照側でブラシとして
+                 解決されず、Fluent既定のアクセント色に戻ってしまうため、キーごとに実体を定義する -->
             <SolidColorBrush x:Key="DataGridRowSelectedBackgroundThemeBrush"
-                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.25"/>
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
             <SolidColorBrush x:Key="ToggleButtonBackgroundChecked"
-                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.25"/>
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver"
-                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.35"/>
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.20"/>
             <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed"
-                             Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}" Opacity="0.2"/>
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.10"/>
+
+            <!-- トグルの中身。ONのときは太字にするだけで、文字色は通常のまま（色を足さず濃淡で示す）。
+                 Fluent既定のテンプレートはON時に文字色を反転させてくるため、ここで戻している -->
+            <Style x:Key="ToggleButtonContentTextStyle" TargetType="TextBlock">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsChecked, RelativeSource={RelativeSource AncestorType=ToggleButton}}" Value="True">
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
+            <!-- ツリーの選択・ホバーの濃さを、一覧の選択行やタブと揃える
+                 （Fluent既定は薄すぎて、同じ画面の他の選択表示と釣り合わない） -->
+            <SolidColorBrush x:Key="TreeViewItemBackgroundSelected"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
+            <SolidColorBrush x:Key="TreeViewItemBackgroundPointerOver"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.06"/>
+
+            <!-- Fluent既定はフォーカス中のテキストボックスの下線とツリー選択の目印をアクセント色（濃い青）で描く。
+                 青を画面から無くすため、どちらも本文色を薄く敷いたグレーに差し替える -->
+            <SolidColorBrush x:Key="TextControlFocusedBorderBrush"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.55"/>
+            <SolidColorBrush x:Key="TextControlElevationBorderFocusedBrush"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.55"/>
+            <SolidColorBrush x:Key="TreeViewItemSelectionIndicatorForeground"
+                             Color="{DynamicResource TextFillColorPrimary}" Opacity="0.55"/>
 
             <Style x:Key="CardBorderStyle" TargetType="Border">
                 <Setter Property="CornerRadius" Value="10"/>

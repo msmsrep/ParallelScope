@@ -7,7 +7,7 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>FileItems（画面表示用コレクション）の差分更新とキャッシュエントリ→ViewModel変換。</summary>
-public partial class MainWindowViewModel
+public partial class BrowserTabViewModel
 {
     /// <summary>差分がこの件数を超えたらコレクションごと差し替える（All Filesモードの切り替え等で数万件の通知がUIスレッドを塞ぐのを防ぐ）。</summary>
     private const int BulkReplaceThreshold = 200;
@@ -134,7 +134,7 @@ public partial class MainWindowViewModel
 
             // プールされたSQLite接続が抱えるページキャッシュ（接続あたり最大16MB）のネイティブメモリも返却する
             // （使用中の接続には影響せず、次回アクセス時の再接続はローカルファイルでは数ms程度）
-            _fileCacheRepository.ReleasePooledConnections();
+            _host.FileCacheRepository.ReleasePooledConnections();
 
             // Aggressive はLOHを含む全ヒープを圧縮し、空き領域をOSへ返却する
             GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive);
@@ -199,8 +199,8 @@ public partial class MainWindowViewModel
     /// </summary>
     private IEnumerable<FileItemViewModel> ToViewModels(IEnumerable<CachedFileSystemEntry> entries)
     {
-        var showHidden = _showHiddenItems;
-        var showSystem = _showSystemItems;
+        var showHidden = _host.ShowHiddenItems;
+        var showSystem = _host.ShowSystemItems;
 
         return entries
             .Where(entry => HiddenItemVisibility.IsVisible(entry.Attributes, showHidden, showSystem))

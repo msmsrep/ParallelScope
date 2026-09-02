@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ParallelScope User Guide</title>
-<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, Favorites, Recent and Frequently Used folders, CSV export, the English / Japanese display language, hidden and system items, and how scanning and the cache work — with screenshots.">
+<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, tabs and the split view, Favorites, Recent and Frequently Used folders, CSV export, the English / Japanese display language, hidden and system items, and how scanning and the cache work — with screenshots.">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -35,6 +35,7 @@
     <li><a href="#favorites">Favorites, Recent and Frequently Used</a></li>
     <li><a href="#search">Searching</a></li>
     <li><a href="#allfiles">All Files mode</a></li>
+    <li><a href="#tabs">Tabs and split view</a></li>
     <li><a href="#contextmenu">Right-click menus</a></li>
     <li><a href="#scan">Scanning and the cache</a></li>
     <li><a href="#customize">Customizing the view</a></li>
@@ -75,7 +76,7 @@
     <span class="pin" style="left:60%;   top:85%">7</span>
   </figure>
   <ol class="legend">
-    <li><span><strong>Menu</strong> — opens the settings window, exports the current list to CSV, and links to this user guide.</span></li>
+    <li><span><strong>Menu</strong> — sits in the title bar, to the left of the app name. It opens the settings window, exports the current list to CSV, and links to this user guide.</span></li>
     <li><span><strong>← Back / Forward → / ↑ Up</strong> — move through your navigation history, or go to the parent folder.</span></li>
     <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
     <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
@@ -122,7 +123,9 @@
     <li><strong>Double-click</strong> — double-clicking a folder in the list moves into it; double-clicking a file opens it in the default application.</li>
     <li><strong>Back / Forward / Up</strong> — navigation history works the way it does in a browser.</li>
     <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there.</li>
+    <li><strong>Folder tree toggle</strong> — the "☰" button left of "Back" collapses the folder tree so the file list gets the full width, and brings it back. This is a ParallelScope Plus feature; see <a href="#tabs">Tabs and split view</a>.</li>
     <li><strong>Sorting</strong> — click a column header such as "Name", "Size", or "Modified". Sizes and timestamps are compared as raw values rather than as displayed text, so <code>9 KB</code> and <code>12 MB</code> sort correctly.</li>
+    <li><strong>Scrolling sideways</strong> — when the columns are wider than the list, a horizontal scroll bar appears at the bottom. <kbd>Shift</kbd> + the mouse wheel scrolls sideways too.</li>
   </ul>
 
   <h3>The "Folders" node</h3>
@@ -207,8 +210,78 @@
     <li>This view is also built from the cache, so it reflects the most recent scan.</li>
     <li>Selecting another folder while it is on switches the flat list to that folder.</li>
     <li>Searching while it is on returns files only.</li>
-    <li>The on/off state is saved and restored the next time you start the app.</li>
+    <li>The on/off state is saved per tab and restored the next time you start the app.</li>
   </ul>
+</section>
+
+<section id="tabs">
+  <h2>Tabs and split view (Plus features)</h2>
+  <p>
+    Tabs and the split view let you keep several folders open and move between them.
+    Both are ParallelScope Plus features: without a subscription the tab strip is hidden, "Split View" in the menu stays greyed out, and the folder tree of a pane cannot be collapsed.
+  </p>
+
+  <h3>Tabs</h3>
+  <figure>
+    <a href="images/12-tabs.png"><img src="images/12-tabs.png" alt="A pane with four tabs open"></a>
+    <figcaption>The tab strip sits above the pane. The tab you are looking at is filled in and shown in bold.</figcaption>
+  </figure>
+  <ul>
+    <li>The tab strip sits at the top of the pane. "＋" at its right end opens a new tab at the folder you are currently viewing.</li>
+    <li>Close a tab with its "✕" or a middle click. While the window shows a single pane, the last remaining tab cannot be closed. While it is split, closing the last tab of a pane closes that pane too and goes back to a single pane.</li>
+    <li>Drag a tab to reorder it.</li>
+    <li>Each tab keeps its own current folder, back/forward history, search text, All Files mode, and list sort order.</li>
+    <li>A pane holds up to 20 tabs.</li>
+    <li>You can also right-click a folder in the tree and choose "Open in New Tab", or middle-click a folder row in the list.</li>
+  </ul>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Shortcut</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Ctrl + T</td><td>Open a new tab</td></tr>
+        <tr><td>Ctrl + W</td><td>Close the current tab</td></tr>
+        <tr><td>Ctrl + Shift + T</td><td>Reopen a closed tab (the last 10, for as long as the app is running)</td></tr>
+        <tr><td>Ctrl + Tab / Ctrl + Shift + Tab</td><td>Go to the next / previous tab</td></tr>
+        <tr><td>Ctrl + 1 to 8</td><td>Go to that tab, counting from the left</td></tr>
+        <tr><td>Ctrl + 9</td><td>Go to the rightmost tab</td></tr>
+        <tr><td>F6</td><td>(while split) Switch which pane you are working in</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Split view</h3>
+  <figure>
+    <a href="images/13-split-view.png"><img src="images/13-split-view.png" alt="The window split into two panes side by side"></a>
+    <figcaption>Two panes side by side, each with its own tabs, address box and file list. The right pane has its folder tree collapsed.</figcaption>
+  </figure>
+  <ul>
+    <li>"Menu &gt; Split View" splits the window in two. Choose "Side by Side" or "Top and Bottom" for the direction.</li>
+    <li>Each side (pane) gets its own folder tree, address box, search box, tab strip and file list, so you can put two folders next to each other.</li>
+    <li>The pane you are working in is outlined. Click it or press F6 to switch. Menu actions such as the CSV export apply to that pane.</li>
+    <li>Drag the divider to change how the space is shared. The ratio is remembered.</li>
+    <li>Drag a tab onto the other pane to move it there, or use "Open in Other Pane" from the tree or list right-click menu (when the window is not split yet, that command splits it for you).</li>
+    <li>When you turn the split off, the tabs of the closing pane move to the end of the remaining one. "Close This Pane" in the tree or list right-click menu closes just that pane the same way.</li>
+    <li>A pane added by splitting starts with its folder tree collapsed, because each side is only half as wide. Open it again with the "☰" button whenever you need it.</li>
+  </ul>
+
+  <h3>Collapsing the folder tree</h3>
+  <figure>
+    <a href="images/14-tree-collapsed.png"><img src="images/14-tree-collapsed.png" alt="The window with the folder tree collapsed"></a>
+    <figcaption>With the tree collapsed, the file list uses the whole width. The "☰" button left of "Back" brings it back.</figcaption>
+  </figure>
+  <ul>
+    <li>The "☰" button left of "Back" collapses that pane's folder tree and gives the whole width to the file list. Press it again to bring the tree back at the width it had.</li>
+    <li>Each pane keeps its own state, so you can leave the tree open on one side and collapsed on the other.</li>
+    <li>The state is saved and restored the next time you start the app.</li>
+    <li>Without a Plus subscription the button is not shown and the tree always stays open.</li>
+  </ul>
+  <div class="note">
+    <p>The file list columns, their widths and their order are one shared setting across both panes. If you resize a column on one side while split, that width is saved as the shared setting.</p>
+  </div>
+  <p>
+    Your open tabs and the split state are saved and restored the next time you start the app (search text is not restored).
+    A tab whose folder no longer exists opens at your first root folder instead.
+  </p>
 </section>
 
 <section id="contextmenu">
@@ -231,6 +304,9 @@
         <tr><td>Copy File Name</td><td>Copies just the file name as text.</td></tr>
         <tr><td>Copy Full Path</td><td>Copies the full path as text.</td></tr>
         <tr><td>Open Parent Folder</td><td>Opens the parent folder in Explorer with the item selected.</td></tr>
+        <tr><td>Open in New Tab</td><td>Opens the folder in a <a href="#tabs">new tab</a>. A Plus feature — not available without a subscription.</td></tr>
+        <tr><td>Open in Other Pane</td><td>Opens the folder in the <a href="#tabs">other pane</a>. If the window is not split yet, it splits the window and opens the folder in the new pane. A Plus feature, so it is unavailable without a subscription.</td></tr>
+        <tr><td>Close This Pane</td><td>Closes the pane you right-clicked and goes back to a single pane. Its tabs move to the end of the remaining pane. Shown only while the window is split.</td></tr>
         <tr><td>Scan everything under this folder</td><td>(tree) Scans just that subtree and refreshes its cache.</td></tr>
         <tr><td>★ Add to Favorites / ☆ Remove from Favorites</td><td>(tree) Adds the folder to "★ Favorites", or takes it out again. A Plus feature — the item is not shown without a subscription.</td></tr>
       </tbody>
@@ -350,9 +426,11 @@
       <ul>
         <li><a href="#favorites">"★ Favorites", "🕘 Recent" and "🕒 Frequently Used"</a> in the folder tree</li>
         <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
-        <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
         <li><a href="#customize">Customizing the file list columns</a> — which columns, their order, and their widths</li>
         <li><a href="#csv">Exporting the file list to CSV</a></li>
+        <li><a href="#tabs">Multiple tabs</a></li>
+        <li><a href="#tabs">Split view (two panes)</a></li>
+        <li><a href="#tabs">Collapsing the folder tree of a pane</a></li>
       </ul>
       Everything else is free.</li>
     <li>Purchase, billing, and cancellation are handled entirely by the Microsoft Store. "Manage / Cancel subscription" opens the subscriptions page of your Microsoft account.</li>
@@ -401,6 +479,9 @@
 
   <h3>My column widths went back to the defaults</h3>
   <p>Widths and the header order are written out when the app closes, so a forced shutdown loses the last change. They are also ignored while you have no Plus subscription — the saved layout returns once it is active again.</p>
+
+  <h3>There is no tab strip, and "Split View" is greyed out</h3>
+  <p><a href="#tabs">Tabs and the split view</a> are ParallelScope Plus features; they appear once you subscribe. A saved tab layout is left untouched while you are not subscribed, so subscribing brings it back.</p>
 
   <h3>"Favorites", "Recent" and "Frequently Used" are missing from the tree</h3>
   <p>All three are Plus features. They appear as soon as the subscription is confirmed, which can take a moment after the app starts.</p>

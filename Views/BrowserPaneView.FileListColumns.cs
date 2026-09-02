@@ -1,11 +1,12 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using ParallelScope.Utilities;
+using ParallelScope.ViewModels;
 
-namespace ParallelScope;
+namespace ParallelScope.Views;
 
 /// <summary>ファイル一覧の表示列（見出し・表示/非表示・並び順・列幅）に関する処理。</summary>
-public partial class MainWindow
+public partial class BrowserPaneView
 {
     // XAML定義の既定の列幅。設定画面の「Reset column widths」で戻すため、保存済み幅を反映する前に控えておく
     private readonly Dictionary<string, DataGridLength> _defaultFileListColumnWidths;
@@ -29,7 +30,7 @@ public partial class MainWindow
     }
 
     // 設定された表示列に合わせて、ファイル一覧のオプション列の表示/非表示を切り替える（Name列は常時表示）
-    private void ApplyFileListColumnVisibility()
+    internal void ApplyFileListColumnVisibility()
     {
         var visibleColumns = GetEffectiveVisibleColumns().ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -63,7 +64,7 @@ public partial class MainWindow
 
     // 保存済みの列の並び順・列幅を反映する。どちらもPlus機能のため、
     // 未購読（購読期限切れ含む）の間は保存済み設定を無視してXAML定義のままにする
-    private void ApplyFileListColumnLayout()
+    internal void ApplyFileListColumnLayout()
     {
         if (!_storeLicenseService.IsPlusActive)
         {
@@ -92,7 +93,7 @@ public partial class MainWindow
     }
 
     // 保存済みの列幅を破棄し、ファイル一覧の列幅をXAML定義の既定値へ戻す
-    private void ResetFileListColumnWidths()
+    internal void ResetFileListColumnWidths()
     {
         _viewModel.ResetColumnWidths();
 
@@ -107,7 +108,7 @@ public partial class MainWindow
 
     // 現在の列の並び順・列幅を保存する。ヘッダーのドラッグ操作は個別に拾わず、
     // ウィンドウを閉じる時に最終状態をまとめて保存する
-    private void SaveFileListColumnLayout()
+    internal void SaveFileListColumnLayout()
     {
         if (!_storeLicenseService.IsPlusActive)
         {

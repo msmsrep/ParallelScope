@@ -51,6 +51,24 @@ public sealed class AppSettings
     /// <summary>表示言語（AppLanguageSettingの名前）。nullは未設定＝Windowsの表示言語に追従。</summary>
     public string? Language { get; set; }
 
+    /// <summary>2画面（分割表示）が有効か。</summary>
+    public bool IsSplitViewEnabled { get; set; }
+
+    /// <summary>分割の向き（PaneSplitOrientationの名前）。nullは未設定＝左右に分割。</summary>
+    public string? SplitOrientation { get; set; }
+
+    /// <summary>分割時の1つ目のペインの比率（0.1〜0.9）。nullは未設定＝半々。</summary>
+    public double? SplitRatio { get; set; }
+
+    /// <summary>表示していたペインの位置（0 or 1）。</summary>
+    public int ActivePaneIndex { get; set; }
+
+    /// <summary>
+    /// ペインごとのタブ構成（要素0が左/上、1が右/下）。nullは未設定＝1ペイン1タブ。
+    /// タブと分割はPlus機能のため、未購読の間は復元せず、保存済みの内容もそのまま残す。
+    /// </summary>
+    public List<PaneStateSettings>? Panes { get; set; }
+
     /// <summary>
     /// 開発者専用: Plus機能をStoreの購読なしで解放するためのキー。通常はnull。
     /// 正しいキーかどうかはStoreLicenseServiceが埋め込みハッシュとの照合で判定する。

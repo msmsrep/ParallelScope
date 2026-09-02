@@ -5,7 +5,7 @@ using ParallelScope.Utilities;
 namespace ParallelScope.ViewModels;
 
 /// <summary>「フォルダ以下のすべてのファイルを表示する」モード（再帰的なフラット表示）に関する処理。</summary>
-public partial class MainWindowViewModel
+public partial class BrowserTabViewModel
 {
     /// <summary>現在フォルダ配下の全ファイルをキャッシュから再帰的に取得するようリクエストする。</summary>
     private void RequestFlatFileView()
@@ -35,7 +35,7 @@ public partial class MainWindowViewModel
             results = await Task.Run(() =>
                 ToViewModels(
                     GetFlatViewFiles(folderPath)
-                        .Where(x => !IsExcludedNormalizedPath(x.FullPath)))
+                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath)))
                     .ToList());
         }
         catch
@@ -48,7 +48,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _uiContext.Post(_ =>
+        _host.UiContext.Post(_ =>
         {
             if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
             {
@@ -63,14 +63,14 @@ public partial class MainWindowViewModel
     /// <remarks>数十万件規模のため List 化せず、リポジトリの逐次読み出しをそのまま流す（ピークメモリ削減）。</remarks>
     private IEnumerable<CachedFileSystemEntry> GetFlatViewFiles(string folderPath)
     {
-        var traversalPaths = GetTraversalPaths(folderPath);
+        var traversalPaths = _host.GetTraversalPaths(folderPath);
         if (traversalPaths.Count == 1)
         {
-            return _fileCacheRepository.EnumerateFilesUnderPath(traversalPaths[0]);
+            return _host.FileCacheRepository.EnumerateFilesUnderPath(traversalPaths[0]);
         }
 
         var files = traversalPaths
-            .SelectMany(root => _fileCacheRepository.EnumerateFilesUnderPath(root));
+            .SelectMany(root => _host.FileCacheRepository.EnumerateFilesUnderPath(root));
 
         // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成で全ファイル分の FullPath 文字列を判定セットに同時保持しないため）
