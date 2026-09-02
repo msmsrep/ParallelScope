@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -123,7 +123,9 @@
     <li><strong>Double-click</strong> — double-clicking a folder in the list moves into it; double-clicking a file opens it in the default application.</li>
     <li><strong>Back / Forward / Up</strong> — navigation history works the way it does in a browser.</li>
     <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there.</li>
+    <li><strong>Folder tree toggle</strong> — the "☰" button left of "Back" collapses the folder tree so the file list gets the full width, and brings it back. This is a ParallelScope Plus feature; see <a href="#tabs">Tabs and split view</a>.</li>
     <li><strong>Sorting</strong> — click a column header such as "Name", "Size", or "Modified". Sizes and timestamps are compared as raw values rather than as displayed text, so <code>9 KB</code> and <code>12 MB</code> sort correctly.</li>
+    <li><strong>Scrolling sideways</strong> — when the columns are wider than the list, a horizontal scroll bar appears at the bottom. <kbd>Shift</kbd> + the mouse wheel scrolls sideways too.</li>
   </ul>
 
   <h3>The "Folders" node</h3>
@@ -216,10 +218,14 @@
   <h2>Tabs and split view (Plus features)</h2>
   <p>
     Tabs and the split view let you keep several folders open and move between them.
-    Both are ParallelScope Plus features: without a subscription the tab strip is hidden and "Split View" in the menu stays greyed out.
+    Both are ParallelScope Plus features: without a subscription the tab strip is hidden, "Split View" in the menu stays greyed out, and the folder tree of a pane cannot be collapsed.
   </p>
 
   <h3>Tabs</h3>
+  <figure>
+    <a href="images/12-tabs.png"><img src="images/12-tabs.png" alt="A pane with four tabs open"></a>
+    <figcaption>The tab strip sits above the pane. The tab you are looking at is filled in and shown in bold.</figcaption>
+  </figure>
   <ul>
     <li>The tab strip sits at the top of the pane. "＋" at its right end opens a new tab at the folder you are currently viewing.</li>
     <li>Close a tab with its "✕" or a middle click. While the window shows a single pane, the last remaining tab cannot be closed. While it is split, closing the last tab of a pane closes that pane too and goes back to a single pane.</li>
@@ -244,6 +250,10 @@
   </div>
 
   <h3>Split view</h3>
+  <figure>
+    <a href="images/13-split-view.png"><img src="images/13-split-view.png" alt="The window split into two panes side by side"></a>
+    <figcaption>Two panes side by side, each with its own tabs, address box and file list. The right pane has its folder tree collapsed.</figcaption>
+  </figure>
   <ul>
     <li>"Menu &gt; Split View" splits the window in two. Choose "Side by Side" or "Top and Bottom" for the direction.</li>
     <li>Each side (pane) gets its own folder tree, address box, search box, tab strip and file list, so you can put two folders next to each other.</li>
@@ -251,6 +261,19 @@
     <li>Drag the divider to change how the space is shared. The ratio is remembered.</li>
     <li>Drag a tab onto the other pane to move it there, or use "Open in Other Pane" from the tree or list right-click menu (when the window is not split yet, that command splits it for you).</li>
     <li>When you turn the split off, the tabs of the closing pane move to the end of the remaining one. "Close This Pane" in the tree or list right-click menu closes just that pane the same way.</li>
+    <li>A pane added by splitting starts with its folder tree collapsed, because each side is only half as wide. Open it again with the "☰" button whenever you need it.</li>
+  </ul>
+
+  <h3>Collapsing the folder tree</h3>
+  <figure>
+    <a href="images/14-tree-collapsed.png"><img src="images/14-tree-collapsed.png" alt="The window with the folder tree collapsed"></a>
+    <figcaption>With the tree collapsed, the file list uses the whole width. The "☰" button left of "Back" brings it back.</figcaption>
+  </figure>
+  <ul>
+    <li>The "☰" button left of "Back" collapses that pane's folder tree and gives the whole width to the file list. Press it again to bring the tree back at the width it had.</li>
+    <li>Each pane keeps its own state, so you can leave the tree open on one side and collapsed on the other.</li>
+    <li>The state is saved and restored the next time you start the app.</li>
+    <li>Without a Plus subscription the button is not shown and the tree always stays open.</li>
   </ul>
   <div class="note">
     <p>The file list columns, their widths and their order are one shared setting across both panes. If you resize a column on one side while split, that width is saved as the shared setting.</p>
@@ -407,6 +430,7 @@
         <li><a href="#csv">Exporting the file list to CSV</a></li>
         <li><a href="#tabs">Multiple tabs</a></li>
         <li><a href="#tabs">Split view (two panes)</a></li>
+        <li><a href="#tabs">Collapsing the folder tree of a pane</a></li>
       </ul>
       Everything else is free.</li>
     <li>Purchase, billing, and cancellation are handled entirely by the Microsoft Store. "Manage / Cancel subscription" opens the subscriptions page of your Microsoft account.</li>
