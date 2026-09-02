@@ -129,7 +129,10 @@ public partial class MainWindowViewModel
     /// <summary>settings.json へ書き出す操作対象ペインの位置（復元前は読み込んだ値のまま）。</summary>
     private int GetPersistedActivePaneIndex() => _hasRestoredPanes ? _activePaneIndex : _savedActivePaneIndex;
 
-    /// <summary>ペインを2つに増やす。2つ目は現在のタブと同じ場所を開いた状態で始める。</summary>
+    /// <summary>
+    /// ペインを2つに増やす。2つ目は現在のタブと同じ場所を開いた状態で始める。
+    /// 横幅が半分になるためツリーは畳んだ状態から始める（保存済み状態からの復元では呼び出し側が上書きする）。
+    /// </summary>
     public BrowserPaneViewModel EnableSplitView()
     {
         if (_isSplitViewEnabled)
@@ -139,6 +142,7 @@ public partial class MainWindowViewModel
 
         var pane = CreatePane();
         pane.ActiveTab.NavigateTo(ActiveTab.CurrentPath, false);
+        pane.InitializeTreeVisible(false);
         Panes.Add(pane);
 
         _isSplitViewEnabled = true;
