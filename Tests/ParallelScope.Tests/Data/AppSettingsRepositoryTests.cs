@@ -134,4 +134,41 @@ public class AppSettingsRepositoryTests
         Assert.True(settings.ShowHiddenItems);
         Assert.True(settings.ShowSystemItems);
     }
+
+    [Fact]
+    public void Load_KeepsTheOtherSettingsWhenOnePropertyHasTheWrongType()
+    {
+        using var temp = new TempDirectory();
+        // Panes だけ型が合わない（配列であるべきところがオブジェクト）settings.json
+        File.WriteAllText(Path.Combine(temp.Path, "settings.json"), """
+            {
+              "RootPaths": ["C:\\Root"],
+              "FullScanIntervalHours": 12,
+              "Theme": "Dark",
+              "Panes": { "Tabs": [], "ActiveTabIndex": 0 }
+            }
+            """);
+
+        var settings = new AppSettingsRepository(temp.Path).Load();
+
+        // 壊れているのは Panes だけなので、他の設定は残る
+        Assert.Equal(new[] { @"C:\Root" }, settings.RootPaths);
+        Assert.Equal(12, settings.FullScanIntervalHours);
+        Assert.Equal("Dark", settings.Theme);
+        Assert.Null(settings.Panes);
+    }
+
+    [Fact]
+    public void Load_ReturnsDefaultsAndKeepsACopyWhenTheFileIsNotValidJson()
+    {
+        using var temp = new TempDirectory();
+        var path = Path.Combine(temp.Path, "settings.json");
+        File.WriteAllText(path, "{ これは JSON ではない");
+
+        var settings = new AppSettingsRepository(temp.Path).Load();
+
+        Assert.Empty(settings.RootPaths);
+        // 原因を追えるよう、読めなかったファイルは退避しておく
+        Assert.True(File.Exists(Path.Combine(temp.Path, "settings.broken.json")));
+    }
 }
