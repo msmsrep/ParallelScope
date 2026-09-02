@@ -51,6 +51,9 @@
     <!-- アプリ左上のアイコン -->
     <Resource Include="Assets/logo.ico" />
 
+    <!-- タイトルバーに並べるロゴ -->
+    <Resource Include="Assets/icon-44.png" />
+
   </ItemGroup>
 
 

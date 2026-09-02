@@ -137,14 +137,21 @@
         <Grid Grid.Row="0" Height="36" Background="Transparent">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
+            <!-- ロゴ。IsHitTestVisibleInChrome を付けないのは意図的で、
+                 押しどころではなくウィンドウのドラッグ領域のままにするため -->
+            <Image Grid.Column="0" Source="Assets/icon-44.png" Width="20" Height="20"
+                   Margin="10,0,0,0" VerticalAlignment="Center"
+                   RenderOptions.BitmapScalingMode="HighQuality"/>
+
             <!-- メニューは Menu/MenuItem ではなくボタン＋ContextMenu で出す。
                  FluentテーマのMenuItemは内側の余白が固定（枠4px＋内容10px）で高さ50px程度を要求し、
                  36pxのタイトルバーに置くと文字が潰れて読めなくなるため -->
-            <Button Grid.Column="0" x:Name="TitleBarMenuButton" Style="{StaticResource TitleBarMenuButtonStyle}"
+            <Button Grid.Column="1" x:Name="TitleBarMenuButton" Style="{StaticResource TitleBarMenuButtonStyle}"
                     WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBarMenuButton_Click">
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="{loc:Loc Menu}" VerticalAlignment="Center"/>
@@ -174,7 +181,7 @@
             </Button>
 
             <!-- アプリ名＋バージョン。非アクティブ時はWindows標準に倣って薄く表示する -->
-            <TextBlock Grid.Column="1" VerticalAlignment="Center" Margin="12,0,12,0"
+            <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,12,0"
                        TextTrimming="CharacterEllipsis"
                        Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}">
                 <TextBlock.Style>
@@ -189,7 +196,7 @@
                 </TextBlock.Style>
             </TextBlock>
 
-            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Top"
+            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top"
                         WindowChrome.IsHitTestVisibleInChrome="True">
                 <Button Style="{StaticResource CaptionButtonStyle}" Content="&#xE921;"
                         ToolTip="{loc:Loc TitleBar.Minimize}" Click="MinimizeButton_Click"/>
