@@ -49,8 +49,9 @@
                     <DataTrigger Binding="{Binding ShowsActiveHighlight}" Value="True">
                         <Setter Property="BorderBrush">
                             <Setter.Value>
-                                <!-- SystemColors はダークモードに追従しないが、アクセント色のキーは配色に依らず使える -->
-                                <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.AccentColorLight2Key}}"/>
+                                <!-- アクセント色（青）は主張が強いので、本文色を薄く敷いた
+                                     テーマ追従のグレーで枠を出す -->
+                                <SolidColorBrush Color="{DynamicResource TextFillColorPrimary}" Opacity="0.45"/>
                             </Setter.Value>
                         </Setter>
                     </DataTrigger>
@@ -129,10 +130,10 @@
                                                 <Style.Triggers>
                                                     <!-- 表示中のタブの強調は、ホバーより後ろに置いて優先させる -->
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource ToggleButtonBackgroundCheckedPointerOver}"/>
+                                                        <Setter Property="Background" Value="{StaticResource SelectionNeutralHoverFillBrush}"/>
                                                     </Trigger>
                                                     <DataTrigger Binding="{Binding IsActive}" Value="True">
-                                                        <Setter Property="Background" Value="{StaticResource ToggleButtonBackgroundChecked}"/>
+                                                        <Setter Property="Background" Value="{StaticResource SelectionNeutralFillBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -148,8 +149,19 @@
                                         </Border.ContextMenu>
                                         <StackPanel Orientation="Horizontal">
                                             <TextBlock Text="{Binding DisplayName}" MaxWidth="160"
-                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                                                       Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center">
+                                                <TextBlock.Style>
+                                                    <!-- 表示中のタブは色を足さず、面の濃さと太字で示す -->
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
                                             <!-- 1画面では最後の1つを閉じられないため、閉じるボタン自体を出さない
                                                  （2画面のときは最後の1つも閉じられ、そのペインごと畳む） -->
                                             <Button Content="✕" Margin="6,0,0,0" Padding="3,0" FontSize="10"
@@ -200,10 +212,13 @@
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
                     <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
                     <ToggleButton Name="TreeToggleButton" Width="36" Padding="0" Margin="0,0,6,0"
-                                  Visibility="Collapsed" Content="&#xE700;"
-                                  FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                                  Visibility="Collapsed"
                                   ToolTip="{loc:Loc Nav.ToggleTree}"
-                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}"/>
+                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
+                        <TextBlock Text="&#xE700;" FontSize="14"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   Style="{StaticResource ToggleButtonContentTextStyle}"/>
+                    </ToggleButton>
                     <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
                     <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
                             IsEnabled="{Binding ActiveTab.CanGoBack}"/>
@@ -317,10 +332,10 @@
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
                 <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
                               IsChecked="{Binding ActiveTab.IsFlatFileViewEnabled}">
-                    <!-- ON時の背景を薄くした（App.xaml参照）ので、文字色も通常の色にする。
-                         テンプレート側がON時の文字色を直接指定してくるため、スタイルではなく
-                         Contentに置いたTextBlockのローカル値で上書きする -->
-                    <TextBlock Text="{loc:Loc FileList.AllFiles}" Foreground="{DynamicResource TextFillColorPrimaryBrush}"/>
+                    <!-- ON時の背景をニュートラルにした（App.xaml参照）ぶん、文字色でONを示す。
+                         テンプレート側がON時の文字色を直接指定してくるため、Contentに置いた
+                         TextBlock側のスタイルで上書きする -->
+                    <TextBlock Text="{loc:Loc FileList.AllFiles}" Style="{StaticResource ToggleButtonContentTextStyle}"/>
                 </ToggleButton>
             </Grid>
 
