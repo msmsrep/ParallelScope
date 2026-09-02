@@ -49,6 +49,9 @@ param(
     [int]$WindowHeight = 940,
     # 起動後、初回フルスキャンが終わるのを待つ時間
     [int]$ScanSeconds = 8,
+    # 撮り直す1枚を指定する（ファイル名の一部。省略時は全部）。
+    # PowerShellの変数名は大文字小文字を区別しないため、ループ変数 $shot と衝突しない名前にする
+    [string[]]$Only,
     # ビルド済みのexeがあっても作り直す
     [switch]$Rebuild,
     # 撮るだけで、掲載用の仕立てを行わない
@@ -256,13 +259,18 @@ $shots = @(
         Columns  = @('Size', 'Modified')
         Widths   = @{ Name = 420; Size = 90; Modified = 160 }
         Flat     = $false
+        # タブ列が主役の1枚なので、一覧の空白を詰めて縦を短く撮る
+        Height   = 620
         # タブ構成は保存済みの設定として与える（Plus有効なら起動時に復元される）。
         # 移動も検索も要らないので Navigate は置かない
         Panes    = @(
             @{
-                Tabs = @("$sample\Projects\Apollo\src", "$sample\Reports\2026",
-                         "$sample\Design\Mockups", "$sample\Projects\Borealis")
-                ActiveTabIndex = 0
+                Tabs = @("$sample\Projects\Apollo\src", "$sample\Projects\Apollo\docs",
+                         "$sample\Projects\Borealis", "$sample\Projects\Cascade",
+                         "$sample\Reports\2026", "$sample\Reports\Drafts",
+                         "$sample\Design\Mockups")
+                # 開いているタブの中身が見えるよう、真ん中あたりのタブを表示中にする
+                ActiveTabIndex = 4
                 IsTreeVisible  = $true
             }
         )
@@ -359,6 +367,8 @@ try {
         New-Item -ItemType Directory -Path $output -Force | Out-Null
 
         foreach ($shot in $shots) {
+            if ($Only -and -not ($Only | Where-Object { $shot.File -like "*$_*" })) { continue }
+
             <#
               初回起動はDBの作成と最初のフルスキャンが重なり、UIオートメーションの問い合わせが
               空振りしたまま返ることがある（アプリのUIスレッドが応答しきれないため）。
@@ -419,12 +429,13 @@ try {
                     $window = Get-Window $process.Id
 
                     # 画面の中央へ置く。SWP_NOZORDER 以外は指定しない（0x0004 = NOZORDER）
-                    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+                            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+                    $shotHeight = if ($shot.Height) { $shot.Height } else { $WindowHeight }
                     $handle = [IntPtr]$window.Current.NativeWindowHandle
                     [void][Win]::SetWindowPos(
                         $handle, [IntPtr]::Zero,
-                        [int](($screen.Width - $WindowWidth) / 2), [int](($screen.Height - $WindowHeight) / 2),
-                        $WindowWidth, $WindowHeight, 0x0004)
+                        [int](($screen.Width - $WindowWidth) / 2), [int](($screen.Height - $shotHeight) / 2),
+                        $WindowWidth, $shotHeight, 0x0004)
                     [void][Win]::SetForegroundWindow($handle)
 
                     # 起動直後のフルスキャンを待つ。検索と All Files はキャッシュだけを見るので、
