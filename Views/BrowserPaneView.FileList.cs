@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
@@ -13,6 +14,42 @@ namespace ParallelScope.Views;
 /// <summary>ファイル一覧（ダブルクリック・ソート・コンテキストメニュー・CSV出力）に関する処理。</summary>
 public partial class BrowserPaneView
 {
+    // Shift+ホイールで横スクロールする（WPFのScrollViewerは既定では縦にしか反応しない）
+    private void FileListDataGrid_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Shift)
+        {
+            return;
+        }
+
+        if (FindScrollViewer(FileListDataGrid) is not { } scrollViewer)
+        {
+            return;
+        }
+
+        scrollViewer.ScrollToHorizontalOffset(scrollViewer.HorizontalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    // DataGridのテンプレート内にあるScrollViewerを探す（横スクロールの操作対象）
+    private static ScrollViewer? FindScrollViewer(DependencyObject root)
+    {
+        if (root is ScrollViewer found)
+        {
+            return found;
+        }
+
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            if (FindScrollViewer(VisualTreeHelper.GetChild(root, index)) is { } scrollViewer)
+            {
+                return scrollViewer;
+            }
+        }
+
+        return null;
+    }
+
     // 表示中のファイル一覧（検索結果・All Files表示・通常一覧のいずれも、ソート順と表示列のまま）をCSVへ書き出す。
     // Plus機能のため、未購読の間はメニュー項目自体を無効にしている（ここは念のための安全弁）
     internal async Task ExportCsvAsync()

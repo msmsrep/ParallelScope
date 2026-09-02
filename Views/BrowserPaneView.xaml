@@ -345,6 +345,8 @@
                       EnableRowVirtualization="True" EnableColumnVirtualization="True"
                       VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
                       ScrollViewer.CanContentScroll="True"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      PreviewMouseWheel="FileListDataGrid_PreviewMouseWheel"
                       MouseDoubleClick="FileListDataGrid_MouseDoubleClick"
                       PreviewMouseRightButtonDown="FileListDataGrid_PreviewMouseRightButtonDown"
                       PreviewMouseDown="FileListDataGrid_PreviewMouseDown"
@@ -407,7 +409,9 @@
                          （DataGridColumn は表示ツリーの外にあり、マークアップ拡張のバインディングを避けている） -->
                     <!-- テンプレート列は SortMemberPath が無いとヘッダークリックがソート対象にならない
                          （実際の比較はコードビハインドのカスタムソートで行う） -->
-                    <DataGridTemplateColumn x:Name="NameColumn" Width="*" SortMemberPath="Name">
+                    <!-- 名前列を「*」にすると列幅の合計が常に表示幅ぴったりになり、横スクロールが出せない。
+                         他の列と同じ固定幅（ドラッグで変更・保存できる）にする -->
+                    <DataGridTemplateColumn x:Name="NameColumn" Width="300" MinWidth="120" SortMemberPath="Name">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <StackPanel Orientation="Horizontal">
