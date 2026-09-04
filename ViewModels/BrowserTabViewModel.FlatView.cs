@@ -24,30 +24,68 @@ public partial class BrowserTabViewModel
         _flatViewCoalescer.Request((folderPath, flatViewVersion));
     }
 
+    /// <summary>取得の途中経過を最初に画面へ出す件数。</summary>
+    private const int FlatViewFirstBatchSize = 2_000;
+
+    /// <summary>途中経過を出すたびに、次に出すまでの件数をこの倍率で広げる（件数が増えるほど間引く）。</summary>
+    private const int FlatViewBatchGrowthFactor = 8;
+
     /// <summary>キャッシュDBから配下の全ファイルを取得し、結果を画面へ反映する。</summary>
+    /// <remarks>
+    /// 全件が揃うまで待たず、貯まった分から順に表示する（段階表示）。ドライブ直下のように
+    /// 百万件規模になる場所では取得だけで数秒かかり、その間ずっと古い一覧のままになるため。
+    /// 表示のたびにコレクションを差し替える（＝一覧の先頭へ戻る）ので、件数が増えるほど
+    /// 表示の間隔を広げ、回数を数回に抑えている。
+    /// </remarks>
     private async Task ApplyFlatFileView(string folderPath, int flatViewVersion)
     {
-        List<FileItemViewModel> results;
-
-        try
+        await Task.Run(() =>
         {
-            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
-            results = await Task.Run(() =>
-                ToViewModels(
+            var items = new List<FileItemViewModel>();
+            var nextPublishCount = FlatViewFirstBatchSize;
+
+            try
+            {
+                // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
+                foreach (var item in ToViewModels(
                     GetFlatViewFiles(folderPath)
-                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath)))
-                    .ToList());
-        }
-        catch
-        {
-            results = new List<FileItemViewModel>();
-        }
+                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
+                {
+                    items.Add(item);
 
-        if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
-        {
-            return;
-        }
+                    if (items.Count < nextPublishCount)
+                    {
+                        continue;
+                    }
 
+                    if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
+                    {
+                        return;
+                    }
+
+                    // 途中経過はこの後も追記が続くため、渡すのは複製
+                    PublishFlatFileView(folderPath, flatViewVersion, items.ToList());
+                    nextPublishCount = items.Count * FlatViewBatchGrowthFactor;
+                }
+            }
+            catch
+            {
+                // 途中で失敗しても、そこまでに読めた分は表示する
+                // （読み出しの開始時点で失敗した場合は空一覧になり、従来と同じ）
+            }
+
+            if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
+            {
+                return;
+            }
+
+            PublishFlatFileView(folderPath, flatViewVersion, items);
+        });
+    }
+
+    /// <summary>フラット表示の取得結果（途中経過を含む）を画面へ反映する。</summary>
+    private void PublishFlatFileView(string folderPath, int flatViewVersion, List<FileItemViewModel> items)
+    {
         _host.UiContext.Post(_ =>
         {
             if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
@@ -55,7 +93,7 @@ public partial class BrowserTabViewModel
                 return;
             }
 
-            ReplaceVisibleFileItems(results, forceBulkReplace: true);
+            ReplaceVisibleFileItems(items, forceBulkReplace: true);
         }, null);
     }
 
