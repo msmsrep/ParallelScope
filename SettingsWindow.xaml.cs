@@ -387,41 +387,62 @@ public partial class SettingsWindow : Window
     // Microsoft Storeのサブスクリプションはアプリ内から解約できないため、Microsoftアカウントの管理ページへ誘導する
     private readonly string _manageSubscriptionUrl = "https://account.microsoft.com/services";
 
+    /// <summary>
+    /// 左メニューの項目と、対応する設定ページの対応表。ページを足すときはここへ1行足す。
+    /// InitializeComponent の途中（初期選択の適用時）はまだ生成されていないパネルがあるため、
+    /// 1つでも未生成なら null を返して切り替えを見送らせる。
+    /// </summary>
+    private IReadOnlyList<(ListBoxItem MenuItem, FrameworkElement Panel)>? GetSettingsPages()
+    {
+        var pages = new (ListBoxItem? MenuItem, FrameworkElement? Panel)[]
+        {
+            (RootFoldersMenuItem, RootSettingsPanel),
+            (TreeNodesMenuItem, TreeNodeSettingsPanel),
+            (ColumnsMenuItem, ColumnSettingsPanel),
+            (SearchMenuItem, SearchPanel),
+            (ThemeMenuItem, ThemePanel),
+            (LanguageMenuItem, LanguagePanel),
+            (SubscriptionMenuItem, SubscriptionPanel),
+            (SupportMenuItem, SupportPanel)
+        };
+
+        return pages.Any(page => page.MenuItem is null || page.Panel is null)
+            ? null
+            : pages.Select(page => (page.MenuItem!, page.Panel!)).ToList();
+    }
+
     // 左メニューの選択に応じて右側の設定ページを切り替える
     private void SettingsMenuListBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // InitializeComponent中（初期選択の適用時）はパネルがまだ生成されていない
-        if (RootSettingsPanel is null || ColumnSettingsPanel is null || TreeNodeSettingsPanel is null || ThemePanel is null
-            || LanguagePanel is null || SubscriptionPanel is null || SupportPanel is null)
+        if (GetSettingsPages() is not { } pages)
         {
             return;
         }
 
+        // 表示するのは選択中のページ1つだけ。以前は「どのページでもなければルートフォルダ」という
+        // 書き方をしていて、ページを足したときに除外を足し忘れると2ページが重なって表示された
         var selectedMenuItem = SettingsMenuListBox.SelectedItem;
-        var showColumns = ReferenceEquals(selectedMenuItem, ColumnsMenuItem);
-        var showTreeNodes = ReferenceEquals(selectedMenuItem, TreeNodesMenuItem);
-        var showSearch = ReferenceEquals(selectedMenuItem, SearchMenuItem);
-        var showTheme = ReferenceEquals(selectedMenuItem, ThemeMenuItem);
-        var showLanguage = ReferenceEquals(selectedMenuItem, LanguageMenuItem);
-        var showSubscription = ReferenceEquals(selectedMenuItem, SubscriptionMenuItem);
-        var showSupport = ReferenceEquals(selectedMenuItem, SupportMenuItem);
-        var showRoot = !showColumns && !showTreeNodes && !showTheme && !showLanguage && !showSubscription && !showSupport;
-        RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
-        ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
-        TreeNodeSettingsPanel.Visibility = showTreeNodes ? Visibility.Visible : Visibility.Collapsed;
-        SearchPanel.Visibility = showSearch ? Visibility.Visible : Visibility.Collapsed;
-        ThemePanel.Visibility = showTheme ? Visibility.Visible : Visibility.Collapsed;
-        LanguagePanel.Visibility = showLanguage ? Visibility.Visible : Visibility.Collapsed;
-        SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
-        SupportPanel.Visibility = showSupport ? Visibility.Visible : Visibility.Collapsed;
+        var shownMenuItem = pages.Any(page => ReferenceEquals(page.MenuItem, selectedMenuItem))
+            ? selectedMenuItem
+            : RootFoldersMenuItem;
+
+        foreach (var (menuItem, panel) in pages)
+        {
+            panel.Visibility = ReferenceEquals(menuItem, shownMenuItem) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        var showRoot = ReferenceEquals(shownMenuItem, RootFoldersMenuItem);
         SaveAndFullScanButton.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
-        // Theme/Language/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、Save/Cancelボタンも非表示にする
-        var hasSaveTarget = showRoot || showColumns || showTreeNodes;
+
+        // Search/Theme/Language/Subscription/SupportページはSaveボタン経由で保存する設定を持たないため、
+        // Save/Cancelボタンも非表示にする（それぞれの操作はその場で適用・保存される）
+        var hasSaveTarget = showRoot
+            || ReferenceEquals(shownMenuItem, ColumnsMenuItem)
+            || ReferenceEquals(shownMenuItem, TreeNodesMenuItem);
         SaveButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
         CancelButton.Visibility = hasSaveTarget ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    // テーマの切り替え。プレビューを兼ねるため、Saveボタンを待たずに即座に適用・保存する
     // ファイル名索引の切り替え。テーマ・言語と同じく、Saveボタンを待たずに即座に適用・保存する
     // （索引の組み立て／破棄が伴うため、Cancelで閉じても元に戻さない）
     private void NameIndexCheckBox_Changed(object sender, RoutedEventArgs e)
@@ -434,6 +455,7 @@ public partial class SettingsWindow : Window
         _applyNameIndexEnabled(NameIndexCheckBox.IsChecked == true);
     }
 
+    // テーマの切り替え。プレビューを兼ねるため、Saveボタンを待たずに即座に適用・保存する
     private void ThemeRadioButton_Checked(object sender, RoutedEventArgs e)
     {
         if (sender is not RadioButton radioButton || radioButton.Tag is not string themeName)
