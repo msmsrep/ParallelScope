@@ -133,7 +133,7 @@
                     <StackPanel Name="TreeNodeCheckBoxesPanel">
                         <TextBlock Text="{loc:Loc Settings.TreeNodes.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
                         <TextBlock Text="{loc:Loc Settings.TreeNodes.Note}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -161,8 +161,7 @@
                         <Button Name="ResetTreeNodesButton" Content="{loc:Loc Settings.TreeNodes.Reset}" HorizontalAlignment="Left"
                                 Margin="0,12,0,0" Padding="8,6" Click="ResetTreeNodesButton_Click"/>
                         <TextBlock Name="ResetTreeNodesHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
-                                   Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="{loc:Loc Settings.TreeNodes.ResetHint}"/>
+                                   Margin="0,6,0,0" Text="{loc:Loc Settings.TreeNodes.ResetHint}"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -198,7 +197,7 @@
                         <StackPanel Name="ColumnCheckBoxesPanel">
                             <TextBlock Text="{loc:Loc Settings.Columns.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
                             <TextBlock Text="{loc:Loc Settings.Columns.Note}"
-                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                                       TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -227,8 +226,7 @@
                             <Button Name="ResetColumnsButton" Content="{loc:Loc Settings.Columns.Reset}" HorizontalAlignment="Left"
                                     Margin="0,12,0,0" Padding="8,6" Click="ResetColumnsButton_Click"/>
                             <TextBlock Name="ResetColumnsHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
-                                       Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="{loc:Loc Settings.Columns.ResetHint}"/>
+                                       Margin="0,6,0,0" Text="{loc:Loc Settings.Columns.ResetHint}"/>
                         </StackPanel>
                     </Border>
 
@@ -237,7 +235,7 @@
                         <StackPanel Name="HiddenItemsPanel">
                             <TextBlock Text="{loc:Loc Settings.HiddenItems.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                             <TextBlock Text="{loc:Loc Settings.HiddenItems.Description}"
-                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+                                       TextWrapping="Wrap" Margin="0,0,0,10"/>
                             <CheckBox Name="ShowHiddenItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowHidden}"/>
                             <CheckBox Name="ShowSystemItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowSystem}" Margin="0,8,0,0"/>
                         </StackPanel>
@@ -308,8 +306,7 @@
                         <RadioButton Name="DarkThemeRadioButton" GroupName="Theme" Tag="Dark"
                                      Content="{loc:Loc Settings.Theme.Dark}" Margin="0,8,0,0" Checked="ThemeRadioButton_Checked"/>
 
-                        <TextBlock Text="{loc:Loc Settings.Theme.Note}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,12,0,0"/>
+                        <TextBlock Text="{loc:Loc Settings.Theme.Note}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -336,8 +333,7 @@
                         <RadioButton Name="JapaneseLanguageRadioButton" GroupName="Language" Tag="Japanese"
                                      Content="{loc:Loc Settings.Language.Japanese}" Margin="0,8,0,0" Checked="LanguageRadioButton_Checked"/>
 
-                        <TextBlock Text="{loc:Loc Settings.Language.Note}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,12,0,0"/>
+                        <TextBlock Text="{loc:Loc Settings.Language.Note}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -363,7 +359,7 @@
                             <!-- 価格を取得できたら、コードビハインドが金額入りの文言へ差し替える -->
                             <Button Name="SubscribePlusButton" Content="{loc:Loc Settings.Subscription.Subscribe}" HorizontalAlignment="Left"
                                     Padding="8,6" Click="SubscribePlusButton_Click"/>
-                            <TextBlock Name="PlusStatusTextBlock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                            <TextBlock Name="PlusStatusTextBlock" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
@@ -391,8 +387,7 @@
                 <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock TextWrapping="Wrap" Text="{loc:Loc Settings.Support.Body}"/>
-                        <TextBlock TextWrapping="Wrap" Margin="0,12,0,12" Text="{loc:Loc Settings.Support.Note}"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,12,0,12" Text="{loc:Loc Settings.Support.Note}"/>
                         <Button Name="KofiButton" Content="{loc:Loc Settings.Support.Kofi}" HorizontalAlignment="Left"
                                 Padding="8,6" Click="KofiButton_Click"/>
                         <Button Name="GitHubSponsorsButton" Content="{loc:Loc Settings.Support.GitHubSponsors}" HorizontalAlignment="Left"
