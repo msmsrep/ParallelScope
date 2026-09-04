@@ -115,11 +115,9 @@ internal static class UiTextResources
         ["Settings.Search.PlusUpsell"] = "Keeping the file name index in memory is a Plus feature. Subscribe to unlock it.",
         ["Settings.Search.NameIndex.Header"] = "Keep the file name index in memory",
         ["Settings.Search.NameIndex.Enable"] = "Speed up search by keeping file names in memory",
-        ["Settings.Search.NameIndex.Description"] = "Normally each search reads the file names from the cache database on disk. This option loads every file name into memory instead, so searching does not touch the disk at all.",
-        ["Settings.Search.NameIndex.Faster"] = "Faster search: on a drive with about 1.5 million files, roughly 400 ms per search becomes roughly 20 ms.",
-        ["Settings.Search.NameIndex.Memory"] = "More memory: about 160 MB for 1.5 million files. Memory use grows with the number of files, and is released as soon as you turn this off.",
-        ["Settings.Search.NameIndex.Build"] = "The index is built in the background (about 1 second for 1.5 million files) and is rebuilt after each scan. Search keeps working while it is being built.",
-        ["Settings.Search.NameIndex.Accuracy"] = "Results are the same either way: folders whose contents changed after the index was built are re-read from the cache database.",
+        ["Settings.Search.NameIndex.Faster"] = "Search gets faster: about 400 ms to about 20 ms for 1.5 million files.",
+        ["Settings.Search.NameIndex.Memory"] = "Memory use goes up: about 160 MB for 1.5 million files. Released when you turn this off.",
+        ["Settings.Search.NameIndex.Note"] = "The index is built in the background and rebuilt after each scan. Search results do not change.",
 
         // 設定画面: ルートフォルダ
         ["Settings.Root.Header"] = "Target Root Folders",
@@ -304,11 +302,9 @@ internal static class UiTextResources
         ["Settings.Search.PlusUpsell"] = "ファイル名の索引をメモリに保持する機能は Plus の機能です。サブスクリプションに登録すると使えます。",
         ["Settings.Search.NameIndex.Header"] = "ファイル名の索引をメモリに保持する",
         ["Settings.Search.NameIndex.Enable"] = "ファイル名をメモリに保持して検索を速くする",
-        ["Settings.Search.NameIndex.Description"] = "通常、検索のたびにディスク上のキャッシュデータベースからファイル名を読み出します。この設定を有効にすると、ファイル名をすべてメモリに載せるため、検索でディスクを読まなくなります。",
-        ["Settings.Search.NameIndex.Faster"] = "検索が速くなります: ファイルが約150万件あるドライブで、1回あたり約400ミリ秒だったものが約20ミリ秒になります。",
-        ["Settings.Search.NameIndex.Memory"] = "メモリ使用量が増えます: 150万件でおよそ160MBです。ファイル数に応じて増え、この設定を無効にするとすぐに解放されます。",
-        ["Settings.Search.NameIndex.Build"] = "索引はバックグラウンドで作られ（150万件で約1秒）、スキャンのたびに作り直されます。作成中も検索はこれまでどおり使えます。",
-        ["Settings.Search.NameIndex.Accuracy"] = "検索結果は有効・無効で変わりません。索引を作った後に中身が変わったフォルダは、キャッシュデータベースから読み直します。",
+        ["Settings.Search.NameIndex.Faster"] = "検索が速くなります: 150万件で約400ミリ秒 → 約20ミリ秒。",
+        ["Settings.Search.NameIndex.Memory"] = "メモリ使用量が増えます: 150万件で約160MB。無効にすると解放されます。",
+        ["Settings.Search.NameIndex.Note"] = "索引はバックグラウンドで作られ、スキャンのたびに作り直されます。検索結果は変わりません。",
 
         // 設定画面: ルートフォルダ
         ["Settings.Root.Header"] = "対象のルートフォルダー",

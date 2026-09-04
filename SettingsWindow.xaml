@@ -272,21 +272,16 @@
                 <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
                 <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
                     <StackPanel Name="NameIndexPanel">
-                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Description}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Header}" FontWeight="SemiBold" Margin="0,0,0,10"/>
 
                         <CheckBox Name="NameIndexCheckBox" Content="{loc:Loc Settings.Search.NameIndex.Enable}"
                                   Checked="NameIndexCheckBox_Changed" Unchecked="NameIndexCheckBox_Changed"/>
 
-                        <!-- 有効にすると何が変わるかの内訳。速さと引き換えにメモリが増えることを明示する -->
+                        <!-- 有効にすると何が変わるか。速さと引き換えにメモリが増えることを明示する -->
                         <StackPanel Margin="0,12,0,0">
                             <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Faster}" TextWrapping="Wrap" Margin="0,0,0,6"/>
                             <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Memory}" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Build}" TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
-                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Accuracy}" TextWrapping="Wrap"
-                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Note}" TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
