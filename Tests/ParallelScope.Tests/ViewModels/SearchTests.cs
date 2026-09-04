@@ -124,6 +124,58 @@ public class SearchTests : IDisposable
         Assert.Equal("file000042.txt", tab.FileItems[0].Name);
     }
 
+    // 全件そろうのを待たず、貯まった分から順に出す（All Filesの段階表示と同じ）
+    [Fact]
+    public void Search_ShowsPartialResultsBeforeTheWholeSearchFinishes()
+    {
+        const int fileCount = 17_000;
+        SeedCachedFiles(fileCount);
+        var tab = CreateTabAtRoot();
+
+        // 一覧が差し替わるたびの件数を控える
+        var observedCounts = new List<int>();
+        tab.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(BrowserTabViewModel.FileItems))
+            {
+                lock (observedCounts)
+                {
+                    observedCounts.Add(tab.FileItems.Count);
+                }
+            }
+        };
+
+        tab.SearchQuery = "file";
+
+        WaitForItemCount(tab, fileCount);
+
+        lock (observedCounts)
+        {
+            // 最初の2,000件と、その8倍の16,000件の時点で表示されている
+            Assert.Contains(2_000, observedCounts);
+            Assert.Contains(16_000, observedCounts);
+        }
+    }
+
+    // 途中経過から絞り込むと結果が欠けるため、絞り込みに使ってよいのは全件そろった結果だけ
+    [Fact]
+    public void Search_DoesNotNarrowFromAPartialResult()
+    {
+        const int fileCount = 17_000;
+        SeedCachedFiles(fileCount);
+        var tab = CreateTabAtRoot();
+
+        tab.SearchQuery = "file";
+        WaitForItemCount(tab, fileCount);
+
+        // "file" の全件（17,000件）から絞り込める。途中経過（2,000件など）が控えられていると取りこぼす。
+        // file016000〜file016099 の100件が該当する
+        tab.SearchQuery = "file0160";
+
+        WaitForItemCount(tab, 100);
+        Assert.All(tab.FileItems, item => Assert.StartsWith("file0160", item.Name));
+    }
+
     // 検索語を足した場合、新しい結果は必ず前回の結果の部分集合になるので、
     // キャッシュDBを引き直さずに前回の結果から絞り込む。結果が引き直した場合と同じであること
     [Fact]

@@ -56,6 +56,12 @@ public partial class BrowserTabViewModel
     /// <summary>取得を続けてよいか（検索語の変更・フォルダ移動が起きていないか）を確認する間隔（件数）。</summary>
     private const int SearchAbortCheckInterval = 1_000;
 
+    /// <summary>取得の途中経過を最初に画面へ出す件数（All Filesの段階表示と同じ考え方）。</summary>
+    private const int SearchFirstBatchSize = 2_000;
+
+    /// <summary>途中経過を出すたびに、次に出すまでの件数をこの倍率で広げる（件数が増えるほど間引く）。</summary>
+    private const int SearchBatchGrowthFactor = 8;
+
     /// <summary>
     /// 直前に完了した検索の、表示していた結果一式。検索語を足しただけならここから絞り込めるため、
     /// キャッシュDBを引き直さずに済む（ドライブ直下では1回あたり数百msかかる）。
@@ -111,7 +117,7 @@ public partial class BrowserTabViewModel
         // （1文字の検索語の結果は数十万件あり、その絞り込みをUIスレッドでやると入力が引っかかる）
         if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, query, filesOnly)) is { } narrowedResults)
         {
-            PublishSearchResults(rootPath, query, searchVersion, filesOnly, narrowedResults);
+            PublishSearchResults(rootPath, query, searchVersion, filesOnly, narrowedResults, isComplete: true);
             return;
         }
 
@@ -122,6 +128,7 @@ public partial class BrowserTabViewModel
             cacheResults = await Task.Run(() =>
             {
                 var results = new List<FileItemViewModel>();
+                var nextPublishCount = SearchFirstBatchSize;
 
                 // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
                 foreach (var item in ToViewModels(
@@ -131,16 +138,32 @@ public partial class BrowserTabViewModel
                 {
                     results.Add(item);
 
+                    var isPublishPoint = results.Count >= nextPublishCount;
+
                     // 1文字の検索語では数十万件ヒットしうる一方、インクリメンタルサーチは
                     // 1キー入力ごとに要求が来て、キューは直列実行される。打ち切らないと
                     // 次の入力の検索が、用済みになった列挙の後ろで待たされてしまう
-                    if (results.Count % SearchAbortCheckInterval == 0
-                        && !IsSearchResultStillValid(rootPath, query, searchVersion))
+                    if (!isPublishPoint && results.Count % SearchAbortCheckInterval != 0)
+                    {
+                        continue;
+                    }
+
+                    if (!IsSearchResultStillValid(rootPath, query, searchVersion))
                     {
                         // 打ち切った時点の状態は下の確認でも同じく不一致になるので、そのまま返して弾かせる
                         // （検索バージョンは要求のたびに増えるだけで、一度ずれたら戻らない）
                         return results;
                     }
+
+                    if (!isPublishPoint)
+                    {
+                        continue;
+                    }
+
+                    // 全件そろうのを待たず、貯まった分を先に見せる（結果は並べ替え済みで返ってくるので、
+                    // 途中経過は最終結果の先頭部分そのものになる）。この後も追記が続くため渡すのは複製
+                    PublishSearchResults(rootPath, query, searchVersion, filesOnly, results.ToList(), isComplete: false);
+                    nextPublishCount = results.Count * SearchBatchGrowthFactor;
                 }
 
                 return results;
@@ -151,11 +174,12 @@ public partial class BrowserTabViewModel
             cacheResults = new List<FileItemViewModel>();
         }
 
-        PublishSearchResults(rootPath, query, searchVersion, filesOnly, cacheResults);
+        PublishSearchResults(rootPath, query, searchVersion, filesOnly, cacheResults, isComplete: true);
     }
 
-    /// <summary>検索結果を画面へ反映し、次の入力で絞り込めるよう控える。</summary>
-    private void PublishSearchResults(string rootPath, string query, int searchVersion, bool filesOnly, List<FileItemViewModel> results)
+    /// <summary>検索結果を画面へ反映する。全件そろった結果だけ、次の入力で絞り込めるよう控える。</summary>
+    private void PublishSearchResults(
+        string rootPath, string query, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete)
     {
         if (!IsSearchResultStillValid(rootPath, query, searchVersion))
         {
@@ -171,9 +195,13 @@ public partial class BrowserTabViewModel
 
             ReplaceVisibleFileItems(results);
 
-            // 控えるのは実際に表示したインスタンス。ReplaceVisibleFileItems は既存の行を
+            // 途中経過から絞り込むと結果が欠けるため、控えるのは全件そろったときだけ。
+            // 控えるのは実際に表示したインスタンス —— ReplaceVisibleFileItems は既存の行を
             // 使い回すため、渡した results をそのまま控えると同じ行を二重に抱えることになる
-            Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, query, filesOnly, FileItems.ToList()));
+            if (isComplete)
+            {
+                Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, query, filesOnly, FileItems.ToList()));
+            }
         }, null);
     }
 
