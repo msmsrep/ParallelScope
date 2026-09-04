@@ -22,6 +22,7 @@ public partial class SettingsWindow : Window
     // テーマ・言語はSaveボタンを待たず即時適用・保存するため、結果値ではなくコールバックで呼び出し元へ渡す
     private readonly Action<AppThemeSetting> _applyTheme;
     private readonly Action<AppLanguageSetting> _applyLanguage;
+    private readonly Action<bool> _applyNameIndexEnabled;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -97,12 +98,15 @@ public partial class SettingsWindow : Window
         StoreLicenseService storeLicenseService,
         bool currentShowHiddenItems,
         bool currentShowSystemItems,
+        bool currentNameIndexEnabled,
+        Action<bool> applyNameIndexEnabled,
         bool startOnSubscriptionPage = false)
     {
         InitializeComponent();
 
         _applyTheme = applyTheme;
         _applyLanguage = applyLanguage;
+        _applyNameIndexEnabled = applyNameIndexEnabled;
         _storeLicenseService = storeLicenseService;
         ApplyPlusLicenseState();
 
@@ -153,7 +157,15 @@ public partial class SettingsWindow : Window
 
         ShowHiddenItemsCheckBox.IsChecked = currentShowHiddenItems;
         ShowSystemItemsCheckBox.IsChecked = currentShowSystemItems;
+
+        // 配色テーマ・表示言語と同じく、切り替えはSaveを待たずにその場で確定させる。
+        // ここでChangedハンドラが走らないよう、初期値を入れてから購読する
+        NameIndexCheckBox.IsChecked = currentNameIndexEnabled;
+        _isNameIndexInitialized = true;
     }
+
+    // 初期値を入れる間はチェック変更ハンドラを働かせない（同じ値で保存が走るのを防ぐ）
+    private bool _isNameIndexInitialized;
 
     // 言語切り替え時、XAMLのバインディングでは追従しない箇所を貼り替える
     private void AppLanguage_Changed(object? sender, EventArgs e)
@@ -307,6 +319,8 @@ public partial class SettingsWindow : Window
         PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
         TreeNodeCheckBoxesPanel.IsEnabled = isActive;
         TreeNodesPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        NameIndexPanel.IsEnabled = isActive;
+        SearchPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
 
         // Subscriptionページ: 購読済みなら状態表示のみ、未購読なら購入ボタンを表示する
         PlusActiveTextBlock.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
@@ -386,6 +400,7 @@ public partial class SettingsWindow : Window
         var selectedMenuItem = SettingsMenuListBox.SelectedItem;
         var showColumns = ReferenceEquals(selectedMenuItem, ColumnsMenuItem);
         var showTreeNodes = ReferenceEquals(selectedMenuItem, TreeNodesMenuItem);
+        var showSearch = ReferenceEquals(selectedMenuItem, SearchMenuItem);
         var showTheme = ReferenceEquals(selectedMenuItem, ThemeMenuItem);
         var showLanguage = ReferenceEquals(selectedMenuItem, LanguageMenuItem);
         var showSubscription = ReferenceEquals(selectedMenuItem, SubscriptionMenuItem);
@@ -394,6 +409,7 @@ public partial class SettingsWindow : Window
         RootSettingsPanel.Visibility = showRoot ? Visibility.Visible : Visibility.Collapsed;
         ColumnSettingsPanel.Visibility = showColumns ? Visibility.Visible : Visibility.Collapsed;
         TreeNodeSettingsPanel.Visibility = showTreeNodes ? Visibility.Visible : Visibility.Collapsed;
+        SearchPanel.Visibility = showSearch ? Visibility.Visible : Visibility.Collapsed;
         ThemePanel.Visibility = showTheme ? Visibility.Visible : Visibility.Collapsed;
         LanguagePanel.Visibility = showLanguage ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionPanel.Visibility = showSubscription ? Visibility.Visible : Visibility.Collapsed;
@@ -406,6 +422,18 @@ public partial class SettingsWindow : Window
     }
 
     // テーマの切り替え。プレビューを兼ねるため、Saveボタンを待たずに即座に適用・保存する
+    // ファイル名索引の切り替え。テーマ・言語と同じく、Saveボタンを待たずに即座に適用・保存する
+    // （索引の組み立て／破棄が伴うため、Cancelで閉じても元に戻さない）
+    private void NameIndexCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isNameIndexInitialized)
+        {
+            return;
+        }
+
+        _applyNameIndexEnabled(NameIndexCheckBox.IsChecked == true);
+    }
+
     private void ThemeRadioButton_Checked(object sender, RoutedEventArgs e)
     {
         if (sender is not RadioButton radioButton || radioButton.Tag is not string themeName)

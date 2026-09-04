@@ -128,6 +128,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _fileCacheRepository = fileCacheRepository;
         _appSettingsRepository = appSettingsRepository;
+        _fileNameIndex = new FileNameIndex(fileCacheRepository);
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         // 設定の読み込みはペインのツリーとタブへ反映されるため、ペインを先に用意する
@@ -165,6 +166,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// </param>
     public void RefreshAfterScan(string? scannedPath = null)
     {
+        // キャッシュが入れ替わったので、ファイル名索引も作り直す（引き直し対象の親フォルダもここで消える）
+        ApplyNameIndexState();
+
         foreach (var tab in Panes.Select(pane => pane.ActiveTab))
         {
             if (string.IsNullOrWhiteSpace(tab.CurrentPath))

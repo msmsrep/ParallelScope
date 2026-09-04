@@ -204,6 +204,8 @@ public partial class MainWindow : Window
             _storeLicenseService,
             _viewModel.GetShowHiddenItems(),
             _viewModel.GetShowSystemItems(),
+            _viewModel.GetNameIndexEnabled(),
+            _viewModel.SetNameIndexEnabled,
             startOnSubscriptionPage)
         {
             Owner = this

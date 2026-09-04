@@ -45,6 +45,12 @@ public sealed class AppSettings
     /// <summary>「Frequently Used」の並び順を決めるフォルダごとのアクセス実績。</summary>
     public List<FolderUsageEntry> FolderUsages { get; set; } = new();
 
+    /// <summary>
+    /// ファイル名索引（検索用にファイル名をメモリへ載せる）を使うか。Plus機能のため、未購読の間は無視される。
+    /// 既定は無効（メモリ使用量が増えるため、利用者が選んだときだけ有効にする）。
+    /// </summary>
+    public bool IsNameIndexEnabled { get; set; }
+
     /// <summary>配色テーマ（AppThemeSettingの名前）。nullは未設定＝Windowsの設定に追従。</summary>
     public string? Theme { get; set; }
 

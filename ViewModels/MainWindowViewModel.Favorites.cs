@@ -1,4 +1,4 @@
-using ParallelScope.Data;
+﻿using ParallelScope.Data;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
@@ -109,6 +109,8 @@ public partial class MainWindowViewModel
             RefreshUsageFolders();
         }
 
+        // ファイル名索引もPlus機能。購読が切れたらここで捨ててメモリを返す
+        ApplyNameIndexState();
         RebuildTreeRoots();
     }
 

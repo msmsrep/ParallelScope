@@ -347,6 +347,116 @@ public class FileCacheRepository
         }
     }
 
+    /// <summary>ファイル名索引を組み立てるための最小限の行（行ID・親パス・名前）。</summary>
+    public readonly record struct NameIndexRow(int Id, string ParentPath, string Name);
+
+    /// <summary>
+    /// ファイル名索引の材料を全件列挙する（<see cref="FileNameIndex"/> 用）。
+    /// 索引に要るのは行ID・親パス・名前だけなので、他の列は読まない。
+    /// 百万件規模になるため List 化せず1件ずつ返す。
+    /// </summary>
+    public IEnumerable<NameIndexRow> EnumerateNameIndexRows()
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Id, ParentPath, Name FROM FileSystemEntries";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new NameIndexRow(reader.GetInt32(0), reader.GetString(1), reader.GetString(2));
+        }
+    }
+
+    /// <summary>行IDを指定してエントリ本体を取り出す（索引で絞り込んだ結果の肉付けに使う）。</summary>
+    /// <remarks>並び順は指定しない（呼び出し側が表示順に並べ替えるため）。</remarks>
+    public List<CachedFileSystemEntry> GetEntriesByIds(IReadOnlyList<int> ids)
+    {
+        var result = new List<CachedFileSystemEntry>(ids.Count);
+        if (ids.Count == 0)
+        {
+            return result;
+        }
+
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        // 同じ親フォルダの行数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ共有する
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // SQLiteのパラメータ数には上限があるうえ、IN句が長すぎると解析コスト自体が効いてくるため小分けにする
+        for (var start = 0; start < ids.Count; start += IdLookupChunkSize)
+        {
+            var chunkLength = Math.Min(IdLookupChunkSize, ids.Count - start);
+
+            using var cmd = conn.CreateCommand();
+            // 値は自前の索引が持つ行IDそのもの（外部入力ではない）だが、組み立ては数値化を通して行う
+            cmd.CommandText = @"
+                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+                FROM FileSystemEntries
+                WHERE Id IN (" + string.Join(",", ids.Skip(start).Take(chunkLength).Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + ")";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(ReadEntry(reader, parentPathPool));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>1回のIN句にまとめる行IDの数。</summary>
+    private const int IdLookupChunkSize = 900;
+
+    /// <summary>指定した親フォルダ直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
+    public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, string nameQuery)
+    {
+        var normalizedParentPath = PathNormalizer.Normalize(parentPath);
+
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+            FROM FileSystemEntries
+            WHERE ParentPath = @parentPath
+              AND Name LIKE @namePattern ESCAPE '~'";
+        AddParameter(cmd, "@parentPath", normalizedParentPath);
+        AddParameter(cmd, "@namePattern", "%" + EscapeLikePattern(nameQuery) + "%");
+
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = new List<CachedFileSystemEntry>();
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(ReadEntry(reader, parentPathPool));
+        }
+
+        return result;
+    }
+
+    /// <summary>ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes の並びで1行読む。</summary>
+    private static CachedFileSystemEntry ReadEntry(DbDataReader reader, Dictionary<string, string> parentPathPool)
+    {
+        return new CachedFileSystemEntry(
+            GetPooledString(parentPathPool, reader.GetString(0)),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetBoolean(3),
+            reader.IsDBNull(4) ? null : reader.GetInt64(4),
+            reader.GetDateTime(5),
+            reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+            reader.IsDBNull(7) ? null : reader.GetInt32(7));
+    }
+
     /// <summary>この文字数以上の検索語のときだけ、FullPath による粗い絞り込みを挟む。</summary>
     private const int SearchPathPreFilterMinQueryLength = 3;
 

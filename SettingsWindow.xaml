@@ -25,6 +25,7 @@
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
                     <ListBoxItem Name="RootFoldersMenuItem" Content="{loc:Loc Settings.Menu.RootFolders}" IsSelected="True" Padding="8,6"/>
                     <ListBoxItem Name="TreeNodesMenuItem" Content="{loc:Loc Settings.Menu.TreeNodes}" Padding="8,6"/>
+                    <ListBoxItem Name="SearchMenuItem" Content="{loc:Loc Settings.Menu.Search}" Padding="8,6"/>
                     <ListBoxItem Name="ColumnsMenuItem" Content="{loc:Loc Settings.Menu.Columns}" Padding="8,6"/>
                     <ListBoxItem Name="ThemeMenuItem" Content="{loc:Loc Settings.Menu.Theme}" Padding="8,6"/>
                     <ListBoxItem Name="LanguageMenuItem" Content="{loc:Loc Settings.Menu.Language}" Padding="8,6"/>
@@ -244,6 +245,51 @@
 
                 </StackPanel>
                 </ScrollViewer>
+            </Grid>
+
+            <!-- 右側: 検索のページ。ファイル名索引の切り替えはその場で適用・保存されるためSave/Cancelボタンは経由しない -->
+            <Grid Grid.Column="1" Name="SearchPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{loc:Loc Settings.Search.Header}" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
+                <Border Grid.Row="1" Name="SearchPlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="{loc:Loc Settings.Search.PlusUpsell}"/>
+                        <Button Name="GoToSubscriptionFromSearchButton" Content="{loc:Loc Settings.GoToSubscription}" HorizontalAlignment="Left"
+                                Padding="8,6" Click="GoToSubscriptionButton_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
+                <Border Grid.Row="2" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
+                    <StackPanel Name="NameIndexPanel">
+                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Description}"
+                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+
+                        <CheckBox Name="NameIndexCheckBox" Content="{loc:Loc Settings.Search.NameIndex.Enable}"
+                                  Checked="NameIndexCheckBox_Changed" Unchecked="NameIndexCheckBox_Changed"/>
+
+                        <!-- 有効にすると何が変わるかの内訳。速さと引き換えにメモリが増えることを明示する -->
+                        <StackPanel Margin="0,12,0,0">
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Faster}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Memory}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Build}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Accuracy}" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
 
             <!-- 右側: 配色テーマのページ。切り替えは即座に適用・保存されるためSave/Cancelボタンは出さない -->

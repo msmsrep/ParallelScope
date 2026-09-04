@@ -14,6 +14,11 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     FileCacheRepository IBrowserTabHost.FileCacheRepository => _fileCacheRepository;
 
+    FileNameIndex? IBrowserTabHost.NameIndex => GetUsableNameIndex();
+
+    // 索引はキャッシュDBの写しなので、書き換わった親フォルダは検索時にDBから引き直させる
+    void IBrowserTabHost.OnCachedFolderChanged(string folderPath) => _fileNameIndex.MarkParentChanged(folderPath);
+
     bool IBrowserTabHost.ShowHiddenItems => _showHiddenItems;
 
     bool IBrowserTabHost.ShowSystemItems => _showSystemItems;

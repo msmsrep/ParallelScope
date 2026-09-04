@@ -16,6 +16,12 @@ internal interface IBrowserTabHost
     /// <summary>ファイル一覧のキャッシュDB（アプリ全体で1インスタンス）。</summary>
     FileCacheRepository FileCacheRepository { get; }
 
+    /// <summary>検索に使えるファイル名索引（Plus機能。無効・未完成なら null で、キャッシュDBへの検索に切り替える）。</summary>
+    FileNameIndex? NameIndex { get; }
+
+    /// <summary>1フォルダ分のキャッシュが書き換わったことを通知する（ファイル名索引の引き直し対象になる）。</summary>
+    void OnCachedFolderChanged(string folderPath);
+
     /// <summary>隠し属性のファイル/フォルダを一覧に出すか。</summary>
     bool ShowHiddenItems { get; }
 

@@ -189,14 +189,22 @@ public partial class BrowserTabViewModel
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
     private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
     {
+        // ファイル名索引（Plus機能）が使えるならそちらで探す。無効・未完成なら null が返るのでDBへ問い合わせる
+        var nameIndex = _host.NameIndex;
+
+        IEnumerable<CachedFileSystemEntry> SearchUnder(string path)
+        {
+            return nameIndex?.SearchUnderPath(path, query)
+                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, query);
+        }
+
         var traversalPaths = _host.GetTraversalPaths(rootPath);
         if (traversalPaths.Count == 1)
         {
-            return _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(traversalPaths[0], query);
+            return SearchUnder(traversalPaths[0]);
         }
 
-        var results = traversalPaths
-            .SelectMany(root => _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
+        var results = traversalPaths.SelectMany(SearchUnder);
 
         // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成でヒット全件分の FullPath 文字列を判定セットに同時保持しないため）

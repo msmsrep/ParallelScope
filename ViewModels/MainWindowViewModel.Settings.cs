@@ -21,6 +21,8 @@ public partial class MainWindowViewModel
         _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
         _showHiddenItems = settings.ShowHiddenItems;
         _showSystemItems = settings.ShowSystemItems;
+        // 索引の組み立ては購読状態が確定してから（SetPlusFeaturesEnabled）なので、ここでは値を読むだけ
+        _isNameIndexEnabled = settings.IsNameIndexEnabled;
         ApplyHiddenItemVisibilityToTree();
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
@@ -327,6 +329,7 @@ public partial class MainWindowViewModel
             CsvExportSizeInBytes = _csvExportSizeInBytes,
             ShowHiddenItems = _showHiddenItems,
             ShowSystemItems = _showSystemItems,
+            IsNameIndexEnabled = _isNameIndexEnabled,
             Theme = _theme.ToString(),
             Language = _language.ToString(),
             IsSplitViewEnabled = GetPersistedIsSplitViewEnabled(),

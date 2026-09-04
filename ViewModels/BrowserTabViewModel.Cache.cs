@@ -142,6 +142,12 @@ public partial class BrowserTabViewModel
             cacheChanged = true;
         }
 
+        if (cacheChanged)
+        {
+            // 索引はキャッシュDBの写しなので、書き換えたフォルダは検索時に引き直させる
+            _host.OnCachedFolderChanged(folderPath);
+        }
+
         if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, folderPath))
         {
             return;
