@@ -328,7 +328,20 @@
                 <TextBox Grid.Column="0" Margin="0,0,8,0"
                          Text="{Binding ActiveTab.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
-                         VerticalContentAlignment="Center"/>
+                         VerticalContentAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                            <Style.Triggers>
+                                <!-- 正規表現が書きかけで成立しない間は一覧を据え置くため、
+                                     入力欄の枠だけで「まだ検索していない」ことを示す -->
+                                <DataTrigger Binding="{Binding ActiveTab.IsSearchQueryInvalid}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{StaticResource InvalidInputBorderBrush}"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
                 <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
                               IsChecked="{Binding ActiveTab.IsFlatFileViewEnabled}">

@@ -51,6 +51,11 @@ public sealed class AppSettings
     /// </summary>
     public bool IsNameIndexEnabled { get; set; }
 
+    /// <summary>
+    /// 検索語を正規表現として扱うか。Plus機能のため、未購読の間は無視される。
+    /// </summary>
+    public bool IsRegexSearchEnabled { get; set; }
+
     /// <summary>配色テーマ（AppThemeSettingの名前）。nullは未設定＝Windowsの設定に追従。</summary>
     public string? Theme { get; set; }
 

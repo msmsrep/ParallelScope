@@ -112,12 +112,17 @@ internal static class UiTextResources
 
         // 設定画面: 検索（ファイル名索引）
         ["Settings.Search.Header"] = "Search",
-        ["Settings.Search.PlusUpsell"] = "Keeping the file name index in memory is a Plus feature. Subscribe to unlock it.",
+        ["Settings.Search.PlusUpsell"] = "Regular expression search and keeping the file name index in memory are Plus features. Subscribe to unlock them.",
         ["Settings.Search.NameIndex.Header"] = "Keep the file name index in memory",
         ["Settings.Search.NameIndex.Enable"] = "Speed up search by keeping file names in memory",
         ["Settings.Search.NameIndex.Faster"] = "Search gets faster: about 400 ms to about 20 ms for 1.5 million files.",
         ["Settings.Search.NameIndex.Memory"] = "Memory use goes up: about 160 MB for 1.5 million files. Released when you turn this off.",
         ["Settings.Search.NameIndex.Note"] = "The index is built in the background and rebuilt after each scan. Search results do not change.",
+        ["Settings.Search.Regex.Header"] = "Search with regular expressions",
+        ["Settings.Search.Regex.Enable"] = "Treat the search box text as a regular expression",
+        ["Settings.Search.Regex.Syntax"] = ".NET regular expression syntax. The pattern is matched against the file name, not the full path.",
+        ["Settings.Search.Regex.IgnoreCase"] = "Uppercase and lowercase are not distinguished, same as the normal search.",
+        ["Settings.Search.Regex.Invalid"] = "While the pattern is incomplete, the file list stays as it was and the search box turns red.",
 
         // 設定画面: ルートフォルダ
         ["Settings.Root.Header"] = "Target Root Folders",
@@ -299,12 +304,17 @@ internal static class UiTextResources
 
         // 設定画面: 検索（ファイル名索引）
         ["Settings.Search.Header"] = "検索",
-        ["Settings.Search.PlusUpsell"] = "ファイル名の索引をメモリに保持する機能は Plus の機能です。サブスクリプションに登録すると使えます。",
+        ["Settings.Search.PlusUpsell"] = "正規表現での検索と、ファイル名の索引をメモリに保持する機能は Plus の機能です。サブスクリプションに登録すると使えます。",
         ["Settings.Search.NameIndex.Header"] = "ファイル名の索引をメモリに保持する",
         ["Settings.Search.NameIndex.Enable"] = "ファイル名をメモリに保持して検索を速くする",
         ["Settings.Search.NameIndex.Faster"] = "検索が速くなります: 150万件で約400ミリ秒 → 約20ミリ秒。",
         ["Settings.Search.NameIndex.Memory"] = "メモリ使用量が増えます: 150万件で約160MB。無効にすると解放されます。",
         ["Settings.Search.NameIndex.Note"] = "索引はバックグラウンドで作られ、スキャンのたびに作り直されます。検索結果は変わりません。",
+        ["Settings.Search.Regex.Header"] = "正規表現で検索する",
+        ["Settings.Search.Regex.Enable"] = "検索欄の入力を正規表現として扱う",
+        ["Settings.Search.Regex.Syntax"] = ".NET の正規表現の書き方です。判定の対象はファイル名で、フルパスではありません。",
+        ["Settings.Search.Regex.IgnoreCase"] = "通常の検索と同じく、大文字と小文字は区別しません。",
+        ["Settings.Search.Regex.Invalid"] = "書きかけで式が成立しない間は一覧をそのまま保ち、検索欄を赤く表示します。",
 
         // 設定画面: ルートフォルダ
         ["Settings.Root.Header"] = "対象のルートフォルダー",

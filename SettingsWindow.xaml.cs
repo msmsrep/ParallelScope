@@ -23,6 +23,7 @@ public partial class SettingsWindow : Window
     private readonly Action<AppThemeSetting> _applyTheme;
     private readonly Action<AppLanguageSetting> _applyLanguage;
     private readonly Action<bool> _applyNameIndexEnabled;
+    private readonly Action<bool> _applyRegexSearchEnabled;
     private int _fullScanIntervalHours;
 
     public IReadOnlyList<string> ResultRootPaths => _rootPaths.ToList();
@@ -100,6 +101,8 @@ public partial class SettingsWindow : Window
         bool currentShowSystemItems,
         bool currentNameIndexEnabled,
         Action<bool> applyNameIndexEnabled,
+        bool currentRegexSearchEnabled,
+        Action<bool> applyRegexSearchEnabled,
         bool startOnSubscriptionPage = false)
     {
         InitializeComponent();
@@ -107,6 +110,7 @@ public partial class SettingsWindow : Window
         _applyTheme = applyTheme;
         _applyLanguage = applyLanguage;
         _applyNameIndexEnabled = applyNameIndexEnabled;
+        _applyRegexSearchEnabled = applyRegexSearchEnabled;
         _storeLicenseService = storeLicenseService;
         ApplyPlusLicenseState();
 
@@ -161,11 +165,12 @@ public partial class SettingsWindow : Window
         // 配色テーマ・表示言語と同じく、切り替えはSaveを待たずにその場で確定させる。
         // ここでChangedハンドラが走らないよう、初期値を入れてから購読する
         NameIndexCheckBox.IsChecked = currentNameIndexEnabled;
-        _isNameIndexInitialized = true;
+        RegexSearchCheckBox.IsChecked = currentRegexSearchEnabled;
+        _isSearchOptionsInitialized = true;
     }
 
     // 初期値を入れる間はチェック変更ハンドラを働かせない（同じ値で保存が走るのを防ぐ）
-    private bool _isNameIndexInitialized;
+    private bool _isSearchOptionsInitialized;
 
     // 言語切り替え時、XAMLのバインディングでは追従しない箇所を貼り替える
     private void AppLanguage_Changed(object? sender, EventArgs e)
@@ -319,7 +324,7 @@ public partial class SettingsWindow : Window
         PlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
         TreeNodeCheckBoxesPanel.IsEnabled = isActive;
         TreeNodesPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
-        NameIndexPanel.IsEnabled = isActive;
+        SearchOptionsPanel.IsEnabled = isActive;
         SearchPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
 
         // Subscriptionページ: 購読済みなら状態表示のみ、未購読なら購入ボタンを表示する
@@ -447,12 +452,23 @@ public partial class SettingsWindow : Window
     // （索引の組み立て／破棄が伴うため、Cancelで閉じても元に戻さない）
     private void NameIndexCheckBox_Changed(object sender, RoutedEventArgs e)
     {
-        if (!_isNameIndexInitialized)
+        if (!_isSearchOptionsInitialized)
         {
             return;
         }
 
         _applyNameIndexEnabled(NameIndexCheckBox.IsChecked == true);
+    }
+
+    // 正規表現検索の切り替え。ファイル名索引と同じく、Saveボタンを待たずに即座に適用・保存する
+    private void RegexSearchCheckBox_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!_isSearchOptionsInitialized)
+        {
+            return;
+        }
+
+        _applyRegexSearchEnabled(RegexSearchCheckBox.IsChecked == true);
     }
 
     // テーマの切り替え。プレビューを兼ねるため、Saveボタンを待たずに即座に適用・保存する

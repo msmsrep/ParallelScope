@@ -38,7 +38,7 @@ public partial class BrowserTabViewModel : ObservableObject
 
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
-    private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
+    private readonly SingleFlightCoalescer<(string RootPath, NameSearchPattern Pattern, int SearchVersion, bool FilesOnly)> _searchCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)> _folderSizeCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)> _flatViewCoalescer;
 
@@ -48,8 +48,8 @@ public partial class BrowserTabViewModel : ObservableObject
 
         _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(
             request => RefreshFromFileSystemInBackground(request.FolderPath, request.NavigationVersion));
-        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)>(
-            request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion, request.FilesOnly));
+        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, NameSearchPattern Pattern, int SearchVersion, bool FilesOnly)>(
+            request => SearchInBackground(request.RootPath, request.Pattern, request.SearchVersion, request.FilesOnly));
         _folderSizeCoalescer = new SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)>(
             request => ApplyCachedFolderSizesInBackground(request.FolderPath, request.Entries, request.NavigationVersion));
         _flatViewCoalescer = new SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)>(
@@ -171,6 +171,18 @@ public partial class BrowserTabViewModel : ObservableObject
             RequestSearch(value);
         }
     }
+
+    /// <summary>
+    /// 検索語が正規表現として成立していないか（正規表現モードのときだけ真になりうる）。
+    /// 打ちかけの正規表現でも一覧は据え置くため、書きかけであることは入力欄の色で示す。
+    /// </summary>
+    public bool IsSearchQueryInvalid
+    {
+        get => _isSearchQueryInvalid;
+        private set => SetProperty(ref _isSearchQueryInvalid, value);
+    }
+
+    private bool _isSearchQueryInvalid;
 
     /// <summary>trueの場合、現在フォルダ直下ではなく配下の全ファイルを再帰的に表示する。</summary>
     public bool IsFlatFileViewEnabled

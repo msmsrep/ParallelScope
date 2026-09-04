@@ -1,5 +1,6 @@
-using ParallelScope.Data;
+﻿using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.Tests.Data;
 
@@ -67,11 +68,15 @@ public class FileNameIndexTests : IDisposable
         _repository.ReplaceEntriesByParentPath(@"C:\RootOther", new[] { File(@"C:\RootOther", "readme.txt") });
     }
 
+    /// <summary>従来どおりの部分一致で検索する照合器。</summary>
+    private static NameSearchPattern Substring(string query) => NameSearchPattern.Create(query, useRegex: false);
+
     /// <summary>索引での検索が、キャッシュDBへの検索と同じ内容・同じ並びになることを確かめる。</summary>
     private void AssertMatchesDatabaseSearch(string rootPath, string query)
     {
-        var expected = _repository.EnumerateSearchEntriesUnderPath(rootPath, query).ToList();
-        var actual = _index.SearchUnderPath(rootPath, query);
+        var pattern = Substring(query);
+        var expected = _repository.EnumerateSearchEntriesUnderPath(rootPath, pattern).ToList();
+        var actual = _index.SearchUnderPath(rootPath, pattern);
 
         Assert.NotNull(actual);
         Assert.Equal(
@@ -85,7 +90,7 @@ public class FileNameIndexTests : IDisposable
         SeedTree();
 
         Assert.False(_index.IsReady);
-        Assert.Null(_index.SearchUnderPath(@"C:\Root", "readme"));
+        Assert.Null(_index.SearchUnderPath(@"C:\Root", Substring("readme")));
     }
 
     [Theory]
@@ -118,8 +123,8 @@ public class FileNameIndexTests : IDisposable
         });
         _index.Build();
 
-        var expected = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "a").Select(x => x.Name).ToList();
-        var actual = _index.SearchUnderPath(@"C:\Root", "a")!.Select(x => x.Name).ToList();
+        var expected = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", Substring("a")).Select(x => x.Name).ToList();
+        var actual = _index.SearchUnderPath(@"C:\Root", Substring("a"))!.Select(x => x.Name).ToList();
 
         // フォルダが先に来ていること（並びが一致していれば、その中身も同じ規則で並んでいる）
         Assert.Equal(new[] { "Alpha", "zeta" }, actual.Take(2));
@@ -132,11 +137,32 @@ public class FileNameIndexTests : IDisposable
         SeedTree();
         _index.Build();
 
-        var hits = _index.SearchUnderPath(@"C:\Root", "readme");
+        var hits = _index.SearchUnderPath(@"C:\Root", Substring("readme"));
 
         // C:\RootOther\readme.txt は検索範囲の外
         Assert.NotNull(hits);
         Assert.Equal(new[] { @"C:\Root\readme.txt" }, hits!.Select(x => x.FullPath));
+    }
+
+    // 正規表現でも索引とキャッシュDBで同じ結果・同じ並びにならなければならない
+    // （索引は大文字へ寄せた名前しか持たないため、畳み方がずれると食い違う）
+    [Theory]
+    [InlineData(@"^report\d+\.xlsx$")]
+    [InlineData(@"\.txt$")]
+    [InlineData("^READ")]
+    [InlineData("e")]
+    public void SearchUnderPath_MatchesTheDatabaseSearchForRegularExpressions(string query)
+    {
+        SeedTree();
+        _index.Build();
+
+        var pattern = NameSearchPattern.Create(query, useRegex: true);
+        var expected = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", pattern).ToList();
+        var actual = _index.SearchUnderPath(@"C:\Root", pattern);
+
+        Assert.NotNull(actual);
+        Assert.NotEmpty(expected);
+        Assert.Equal(expected.Select(x => x.FullPath), actual!.Select(x => x.FullPath));
     }
 
     [Fact]
@@ -181,7 +207,7 @@ public class FileNameIndexTests : IDisposable
         }
 
         Assert.False(_index.IsReady);
-        Assert.Null(_index.SearchUnderPath(@"C:\Root", "readme"));
+        Assert.Null(_index.SearchUnderPath(@"C:\Root", Substring("readme")));
     }
 
     [Fact]
@@ -194,7 +220,7 @@ public class FileNameIndexTests : IDisposable
         _index.Clear();
 
         Assert.False(_index.IsReady);
-        Assert.Null(_index.SearchUnderPath(@"C:\Root", "readme"));
+        Assert.Null(_index.SearchUnderPath(@"C:\Root", Substring("readme")));
     }
 
     [Fact]

@@ -206,6 +206,8 @@ public partial class MainWindow : Window
             _viewModel.GetShowSystemItems(),
             _viewModel.GetNameIndexEnabled(),
             _viewModel.SetNameIndexEnabled,
+            _viewModel.GetRegexSearchEnabled(),
+            _viewModel.SetRegexSearchEnabled,
             startOnSubscriptionPage)
         {
             Owner = this

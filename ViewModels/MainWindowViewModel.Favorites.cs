@@ -111,6 +111,9 @@ public partial class MainWindowViewModel
 
         // ファイル名索引もPlus機能。購読が切れたらここで捨ててメモリを返す
         ApplyNameIndexState();
+
+        // 正規表現検索もPlus機能。切り替わると同じ検索語でも結果が変わるため、検索し直させる
+        NotifySearchModeChanged();
         RebuildTreeRoots();
     }
 

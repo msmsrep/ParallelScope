@@ -19,6 +19,9 @@ internal interface IBrowserTabHost
     /// <summary>検索に使えるファイル名索引（Plus機能。無効・未完成なら null で、キャッシュDBへの検索に切り替える）。</summary>
     FileNameIndex? NameIndex { get; }
 
+    /// <summary>検索語を正規表現として扱うか（Plus機能。未購読・無効なら false で従来の部分一致）。</summary>
+    bool UseRegexSearch { get; }
+
     /// <summary>1フォルダ分のキャッシュが書き換わったことを通知する（ファイル名索引の引き直し対象になる）。</summary>
     void OnCachedFolderChanged(string folderPath);
 

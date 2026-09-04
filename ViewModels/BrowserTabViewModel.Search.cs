@@ -27,6 +27,18 @@ public partial class BrowserTabViewModel
             return;
         }
 
+        // 照合方法（部分一致 or 正規表現）はリクエスト時点の設定で固定する
+        // （結果が届くまでに設定が変わっても、出す結果と判定を食い違わせないため）
+        var pattern = NameSearchPattern.Create(normalizedQuery, _host.UseRegexSearch);
+
+        // 正規表現は打ちかけの段階では壊れていること（開き括弧だけ、等）が普通なので、
+        // 結果を空にせず表示は据え置き、入力欄の色で書きかけであることだけ示す
+        IsSearchQueryInvalid = !pattern.IsValid;
+        if (!pattern.IsValid)
+        {
+            return;
+        }
+
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
@@ -35,7 +47,21 @@ public partial class BrowserTabViewModel
         var filesOnly = IsFlatFileViewEnabled;
 
         // 検索リクエストを統合するキューへ委譲
-        _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion, filesOnly));
+        _searchCoalescer.Request((searchRootPath, pattern, searchVersion, filesOnly));
+    }
+
+    /// <summary>
+    /// 検索モード（部分一致 or 正規表現）が切り替わったので、控えた結果を捨てて検索し直す。
+    /// 設定変更・購読状態の確定でシェルから呼ばれる。
+    /// </summary>
+    internal void OnSearchModeChanged()
+    {
+        ForgetCompletedSearch();
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            RequestSearch(SearchQuery);
+        }
     }
 
     /// <summary>検索状態を解除し、現在の表示モード（通常一覧 or フラット表示）に戻す。SearchQueryが空になった際に呼ばれる。</summary>
@@ -43,6 +69,7 @@ public partial class BrowserTabViewModel
     {
         Interlocked.Increment(ref _searchVersion);
         ForgetCompletedSearch();
+        IsSearchQueryInvalid = false;
 
         if (IsFlatFileViewEnabled)
         {
@@ -82,8 +109,14 @@ public partial class BrowserTabViewModel
     /// `%repo%` に一致する名前は必ず `%rep%` にも一致するので、検索語が前回の検索語を含んでいれば
     /// 新しい結果は必ず前回の結果の部分集合になる。
     /// </summary>
-    private List<FileItemViewModel>? TryNarrowCompletedSearch(string rootPath, string query, bool filesOnly)
+    private List<FileItemViewModel>? TryNarrowCompletedSearch(string rootPath, NameSearchPattern pattern, bool filesOnly)
     {
+        // 正規表現は打ち足しても結果が前回の部分集合になるとは限らないため、必ず引き直す
+        if (pattern.IsRegex)
+        {
+            return null;
+        }
+
         var completed = Volatile.Read(ref _completedSearch);
 
         // 検索語の包含判定は大文字小文字をそのまま見る（Ordinal）。
@@ -91,7 +124,7 @@ public partial class BrowserTabViewModel
         // 打ち足していく通常の操作では前回の検索語がそのまま前方に残るので、これで十分効く
         if (completed is null
             || completed.FilesOnly != filesOnly
-            || !query.Contains(completed.Query, StringComparison.Ordinal)
+            || !pattern.Text.Contains(completed.Query, StringComparison.Ordinal)
             || !PathNormalizer.AreSame(completed.RootPath, rootPath))
         {
             return null;
@@ -100,7 +133,7 @@ public partial class BrowserTabViewModel
         var narrowed = new List<FileItemViewModel>();
         foreach (var item in completed.Results)
         {
-            if (NameSearchMatcher.Contains(item.Name, query))
+            if (pattern.Matches(item.Name))
             {
                 narrowed.Add(item);
             }
@@ -110,14 +143,14 @@ public partial class BrowserTabViewModel
     }
 
     /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
-    private async Task SearchInBackground(string rootPath, string query, int searchVersion, bool filesOnly)
+    private async Task SearchInBackground(string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly)
     {
         // 直前の結果から絞り込めるならDBは引かない。ここはキューが空のとき要求元（UIスレッド）から
         // そのまま同期実行されるため、必ずバックグラウンドへ逃がす
         // （1文字の検索語の結果は数十万件あり、その絞り込みをUIスレッドでやると入力が引っかかる）
-        if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, query, filesOnly)) is { } narrowedResults)
+        if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, pattern, filesOnly)) is { } narrowedResults)
         {
-            PublishSearchResults(rootPath, query, searchVersion, filesOnly, narrowedResults, isComplete: true);
+            PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, narrowedResults, isComplete: true);
             return;
         }
 
@@ -132,7 +165,7 @@ public partial class BrowserTabViewModel
 
                 // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
                 foreach (var item in ToViewModels(
-                    SearchCacheEntries(rootPath, query)
+                    SearchCacheEntries(rootPath, pattern)
                         .Where(x => !(filesOnly && x.IsFolder))
                         .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
                 {
@@ -148,7 +181,7 @@ public partial class BrowserTabViewModel
                         continue;
                     }
 
-                    if (!IsSearchResultStillValid(rootPath, query, searchVersion))
+                    if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
                     {
                         // 打ち切った時点の状態は下の確認でも同じく不一致になるので、そのまま返して弾かせる
                         // （検索バージョンは要求のたびに増えるだけで、一度ずれたら戻らない）
@@ -162,7 +195,7 @@ public partial class BrowserTabViewModel
 
                     // 全件そろうのを待たず、貯まった分を先に見せる（結果は並べ替え済みで返ってくるので、
                     // 途中経過は最終結果の先頭部分そのものになる）。この後も追記が続くため渡すのは複製
-                    PublishSearchResults(rootPath, query, searchVersion, filesOnly, results.ToList(), isComplete: false);
+                    PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, results.ToList(), isComplete: false);
                     nextPublishCount = results.Count * SearchBatchGrowthFactor;
                 }
 
@@ -174,21 +207,21 @@ public partial class BrowserTabViewModel
             cacheResults = new List<FileItemViewModel>();
         }
 
-        PublishSearchResults(rootPath, query, searchVersion, filesOnly, cacheResults, isComplete: true);
+        PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, cacheResults, isComplete: true);
     }
 
     /// <summary>検索結果を画面へ反映する。全件そろった結果だけ、次の入力で絞り込めるよう控える。</summary>
     private void PublishSearchResults(
-        string rootPath, string query, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete)
+        string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete)
     {
-        if (!IsSearchResultStillValid(rootPath, query, searchVersion))
+        if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
         {
             return;
         }
 
         _host.UiContext.Post(_ =>
         {
-            if (!IsSearchResultStillValid(rootPath, query, searchVersion))
+            if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
             {
                 return;
             }
@@ -200,30 +233,30 @@ public partial class BrowserTabViewModel
             // 使い回すため、渡した results をそのまま控えると同じ行を二重に抱えることになる
             if (isComplete)
             {
-                Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, query, filesOnly, FileItems.ToList()));
+                Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, pattern.Text, filesOnly, FileItems.ToList()));
             }
         }, null);
     }
 
     /// <summary>結果が届いた時点でもまだ表示すべき状態か（検索語の変更・フォルダ移動が起きていないか）を確認する。</summary>
-    private bool IsSearchResultStillValid(string rootPath, string query, int searchVersion)
+    private bool IsSearchResultStillValid(string rootPath, NameSearchPattern pattern, int searchVersion)
     {
         return searchVersion == Volatile.Read(ref _searchVersion)
             && PathNormalizer.AreSame(CurrentPath, rootPath)
-            && string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal);
+            && string.Equals(SearchQuery.Trim(), pattern.Text, StringComparison.Ordinal);
     }
 
     /// <summary>検索起点が仮想ノードの場合は対象フォルダ群を横断検索し、それ以外は単一パス配下を検索する。</summary>
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
-    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
+    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, NameSearchPattern pattern)
     {
         // ファイル名索引（Plus機能）が使えるならそちらで探す。無効・未完成なら null が返るのでDBへ問い合わせる
         var nameIndex = _host.NameIndex;
 
         IEnumerable<CachedFileSystemEntry> SearchUnder(string path)
         {
-            return nameIndex?.SearchUnderPath(path, query)
-                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, query);
+            return nameIndex?.SearchUnderPath(path, pattern)
+                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern);
         }
 
         var traversalPaths = _host.GetTraversalPaths(rootPath);

@@ -1,4 +1,4 @@
-namespace ParallelScope.Utilities;
+﻿namespace ParallelScope.Utilities;
 
 /// <summary>
 /// ファイル名に検索語が含まれるかの判定。キャッシュDB側の `Name LIKE '%語%'` と結果が一致するよう、
@@ -44,8 +44,20 @@ public static class NameSearchMatcher
     }
 
     /// <summary>ASCIIの小文字だけを大文字へ寄せる（SQLiteのLIKEと同じ畳み方）。</summary>
-    private static char FoldAscii(char value)
+    public static char FoldAscii(char value)
     {
         return value is >= 'a' and <= 'z' ? (char)(value - ('a' - 'A')) : value;
+    }
+
+    /// <summary>文字列全体を <see cref="FoldAscii(char)"/> の規則で畳む。</summary>
+    public static string FoldAscii(string value)
+    {
+        return string.Create(value.Length, value, static (destination, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+            {
+                destination[i] = FoldAscii(source[i]);
+            }
+        });
     }
 }

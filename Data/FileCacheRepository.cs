@@ -1,6 +1,7 @@
 ﻿using System.Data.Common;
 using System.IO;
 using System.Text;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using ParallelScope.Utilities;
@@ -306,29 +307,27 @@ public class FileCacheRepository
     /// インクリメンタルサーチは1文字の検索語で数十万件ヒットしうるため、List へ全件マテリアライズせず
     /// 1件ずつ返して呼び出し側でViewModelへ直接変換させる（中間リストを持つとピークメモリがほぼ倍増する）。
     /// </remarks>
-    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, string nameQuery)
+    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, NameSearchPattern pattern)
     {
         using var db = CreateDbContext();
-        db.Database.OpenConnection();
+
+        // 正規表現の照合はSQLite側から呼ばせるため、接続を開く前に関数を登録する
         var conn = db.Database.GetDbConnection();
+        RegisterNameMatchFunction(conn, pattern);
+        db.Database.OpenConnection();
 
         var prefixFilter = BuildPathPrefixFilter(conn, rootPath);
-
-        // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
-        // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
-        var namePattern = "%" + EscapeLikePattern(nameQuery) + "%";
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
-            WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(nameQuery) + @"
-              AND Name LIKE @namePattern ESCAPE '~'
+            WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(pattern) + BuildNameMatchClause(pattern) + @"
             -- 並びはファイル名索引（ASCIIの大文字へ寄せて格納）と揃える。
             -- 揃えないと、索引の有効・無効で検索結果の並びが変わってしまう
             ORDER BY IsFolder DESC, Name COLLATE NOCASE";
         prefixFilter.AddParametersTo(cmd);
-        AddParameter(cmd, "@namePattern", namePattern);
+        AddNameMatchParametersTo(cmd, pattern);
 
         // 同じ親フォルダ内のヒット件数分だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
         // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
@@ -422,22 +421,23 @@ public class FileCacheRepository
     private const int IdLookupChunkSize = 5_000;
 
     /// <summary>指定した親フォルダ直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
-    public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, string nameQuery)
+    public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, NameSearchPattern pattern)
     {
         var normalizedParentPath = PathNormalizer.Normalize(parentPath);
 
         using var db = CreateDbContext();
-        db.Database.OpenConnection();
+
         var conn = db.Database.GetDbConnection();
+        RegisterNameMatchFunction(conn, pattern);
+        db.Database.OpenConnection();
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
-            WHERE ParentPath = @parentPath
-              AND Name LIKE @namePattern ESCAPE '~'";
+            WHERE ParentPath = @parentPath" + BuildNameMatchClause(pattern);
         AddParameter(cmd, "@parentPath", normalizedParentPath);
-        AddParameter(cmd, "@namePattern", "%" + EscapeLikePattern(nameQuery) + "%");
+        AddNameMatchParametersTo(cmd, pattern);
 
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
         var result = new List<CachedFileSystemEntry>();
@@ -477,13 +477,52 @@ public class FileCacheRepository
     /// ドライブ直下（150万行）では読み出しだけで1.6秒かかっていた（3文字以上でおよそ半分になる）。
     /// 1〜2文字ではほとんどの行が通過して二重判定になるだけなので、その場合は足さない。
     /// </summary>
-    private static string BuildSearchPathPreFilter(string nameQuery)
+    private static string BuildSearchPathPreFilter(NameSearchPattern pattern)
     {
-        return nameQuery.Length >= SearchPathPreFilterMinQueryLength
+        // 正規表現は名前の一部を含むとは限らないので、この粗い絞り込みは使えない
+        return !pattern.IsRegex && pattern.Text.Length >= SearchPathPreFilterMinQueryLength
             ? @"
               AND FullPath LIKE @namePattern ESCAPE '~'"
             : string.Empty;
     }
+
+    /// <summary>正規表現の照合をSQLから呼べるようにする（部分一致のときはLIKEで済むため何もしない）。</summary>
+    /// <remarks>
+    /// 絞り込みをC#側で行うと ORDER BY が配下の全行（ドライブ直下で150万行）へかかる。
+    /// SQLiteに関数として渡せば、並べ替えは一致した行だけで済む。
+    /// </remarks>
+    private static void RegisterNameMatchFunction(DbConnection connection, NameSearchPattern pattern)
+    {
+        if (!pattern.IsRegex || connection is not SqliteConnection sqliteConnection)
+        {
+            return;
+        }
+
+        sqliteConnection.CreateFunction(NameMatchFunctionName, (string? name) => name is not null && pattern.Matches(name));
+    }
+
+    /// <summary>名前の絞り込み条件（部分一致はLIKE、正規表現は登録した関数）。</summary>
+    private static string BuildNameMatchClause(NameSearchPattern pattern)
+    {
+        return pattern.IsRegex
+            ? @"
+              AND " + NameMatchFunctionName + "(Name)"
+            // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
+            // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
+            : @"
+              AND Name LIKE @namePattern ESCAPE '~'";
+    }
+
+    private static void AddNameMatchParametersTo(DbCommand command, NameSearchPattern pattern)
+    {
+        if (!pattern.IsRegex)
+        {
+            AddParameter(command, "@namePattern", "%" + EscapeLikePattern(pattern.Text) + "%");
+        }
+    }
+
+    /// <summary>正規表現の照合を行う、SQLiteへ登録する関数の名前。</summary>
+    private const string NameMatchFunctionName = "ps_name_matches";
 
     /// <summary>
     /// 単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。

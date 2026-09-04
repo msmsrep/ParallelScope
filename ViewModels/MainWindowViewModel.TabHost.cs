@@ -16,6 +16,8 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     FileNameIndex? IBrowserTabHost.NameIndex => GetUsableNameIndex();
 
+    bool IBrowserTabHost.UseRegexSearch => IsRegexSearchActive;
+
     // 索引はキャッシュDBの写しなので、書き換わった親フォルダは検索時にDBから引き直させる
     void IBrowserTabHost.OnCachedFolderChanged(string folderPath) => _fileNameIndex.MarkParentChanged(folderPath);
 

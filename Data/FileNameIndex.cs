@@ -98,7 +98,7 @@ public sealed class FileNameIndex
             // 比較のたびに畳まずに済むよう、格納時にASCIIの大文字へ寄せておく（NameSearchMatcherと同じ規則）
             foreach (var character in row.Name)
             {
-                packedNames.Add(FoldAscii(character));
+                packedNames.Add(NameSearchMatcher.FoldAscii(character));
             }
 
             nameOffsets.Add(packedNames.Count);
@@ -211,13 +211,13 @@ public sealed class FileNameIndex
     /// 結果は表示順のまま少しずつ返す（全件そろうのを待たない）。呼び出し側の段階表示が
     /// 最初のひとまとまりをすぐ画面へ出せるようにするため。
     /// </remarks>
-    public IEnumerable<CachedFileSystemEntry>? SearchUnderPath(string rootPath, string nameQuery)
+    public IEnumerable<CachedFileSystemEntry>? SearchUnderPath(string rootPath, NameSearchPattern pattern)
     {
         var snapshot = Volatile.Read(ref _snapshot);
-        return snapshot is null ? null : EnumerateMatches(snapshot, rootPath, nameQuery);
+        return snapshot is null ? null : EnumerateMatches(snapshot, rootPath, pattern);
     }
 
-    private IEnumerable<CachedFileSystemEntry> EnumerateMatches(Snapshot snapshot, string rootPath, string nameQuery)
+    private IEnumerable<CachedFileSystemEntry> EnumerateMatches(Snapshot snapshot, string rootPath, NameSearchPattern pattern)
     {
         var normalizedRoot = PathNormalizer.Normalize(rootPath);
         var rootPrefix = PathNormalizer.WithTrailingSeparator(normalizedRoot);
@@ -241,10 +241,9 @@ public sealed class FileNameIndex
         }
 
         // 索引を作ったあとに変わった親フォルダはDBから引き直し、索引側と同じ並びに揃えて混ぜる
-        var changedEntries = ReadChangedParents(changedParentPaths, normalizedRoot, rootPrefix, nameQuery);
+        var changedEntries = ReadChangedParents(changedParentPaths, normalizedRoot, rootPrefix, pattern);
         var changedIndex = 0;
 
-        var foldedQuery = FoldAscii(nameQuery);
         var batchRowIds = new List<int>(FetchBatchSize);
         var batchPositions = new Dictionary<int, int>(FetchBatchSize);
 
@@ -257,7 +256,7 @@ public sealed class FileNameIndex
 
             var nameStart = snapshot.NameOffsets[i];
             var nameLength = snapshot.NameOffsets[i + 1] - nameStart;
-            if (snapshot.PackedNames.AsSpan(nameStart, nameLength).IndexOf(foldedQuery.AsSpan()) < 0)
+            if (!pattern.MatchesFolded(snapshot.PackedNames.AsSpan(nameStart, nameLength)))
             {
                 continue;
             }
@@ -351,7 +350,7 @@ public sealed class FileNameIndex
 
     /// <summary>索引を作ったあとに変わった親フォルダぶんを引き直し、索引と同じ並びに揃える。</summary>
     private List<(CachedFileSystemEntry Entry, bool IsFolder, string FoldedName)> ReadChangedParents(
-        string[] changedParentPaths, string normalizedRoot, string rootPrefix, string nameQuery)
+        string[] changedParentPaths, string normalizedRoot, string rootPrefix, NameSearchPattern pattern)
     {
         var entries = new List<(CachedFileSystemEntry Entry, bool IsFolder, string FoldedName)>();
 
@@ -362,9 +361,9 @@ public sealed class FileNameIndex
                 continue;
             }
 
-            foreach (var entry in _repository.GetSearchEntriesInParent(changedParentPath, nameQuery))
+            foreach (var entry in _repository.GetSearchEntriesInParent(changedParentPath, pattern))
             {
-                entries.Add((entry, entry.IsFolder, FoldAscii(entry.Name)));
+                entries.Add((entry, entry.IsFolder, NameSearchMatcher.FoldAscii(entry.Name)));
             }
         }
 
@@ -385,20 +384,4 @@ public sealed class FileNameIndex
             || parentPath.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>ASCIIの小文字だけを大文字へ寄せる（SQLiteのLIKE・NameSearchMatcherと同じ畳み方）。</summary>
-    private static char FoldAscii(char value)
-    {
-        return value is >= 'a' and <= 'z' ? (char)(value - ('a' - 'A')) : value;
-    }
-
-    private static string FoldAscii(string value)
-    {
-        return string.Create(value.Length, value, static (destination, source) =>
-        {
-            for (var i = 0; i < source.Length; i++)
-            {
-                destination[i] = FoldAscii(source[i]);
-            }
-        });
-    }
 }

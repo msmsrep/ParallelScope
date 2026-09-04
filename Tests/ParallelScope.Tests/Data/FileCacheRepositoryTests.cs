@@ -1,4 +1,5 @@
 ﻿using ParallelScope.Data;
+using ParallelScope.Utilities;
 using ParallelScope.Tests.TestSupport;
 
 namespace ParallelScope.Tests.Data;
@@ -23,6 +24,9 @@ public class FileCacheRepositoryTests : IDisposable
         _repository.ReleasePooledConnections();
         _temp.Dispose();
     }
+
+    /// <summary>従来どおりの部分一致で検索する照合器。</summary>
+    private static NameSearchPattern Substring(string query) => NameSearchPattern.Create(query, useRegex: false);
 
     private static CachedFileSystemEntry File(string parentPath, string name, long sizeBytes = 100)
     {
@@ -199,7 +203,7 @@ public class FileCacheRepositoryTests : IDisposable
     {
         SeedTree();
 
-        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "DEEP").ToList();
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", Substring("DEEP")).ToList();
 
         Assert.Equal(new[] { "Deep", "deep.txt" }, hits.Select(h => h.Name));
         // フォルダが先、その後に名前昇順
@@ -218,9 +222,9 @@ public class FileCacheRepositoryTests : IDisposable
 
         // LIKEのワイルドカード（_ %）が素通りすると "a_b" が "axb" にもヒットしてしまう
         Assert.Equal(new[] { "a_b.txt" },
-            _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "a_b").Select(e => e.Name));
+            _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", Substring("a_b")).Select(e => e.Name));
         Assert.Equal(new[] { "100%.txt" },
-            _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "100%").Select(e => e.Name));
+            _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", Substring("100%")).Select(e => e.Name));
     }
 
     // 3文字以上の検索語では、テーブル本体を読む前にFullPathで粗く絞る（Nameの判定はその後）。
@@ -236,10 +240,41 @@ public class FileCacheRepositoryTests : IDisposable
             File(@"C:\Root\Subway", "Subtotal.txt")
         });
 
-        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", query).ToList();
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", Substring(query)).ToList();
 
         // 親フォルダ名（Subway）が一致するだけの ticket.txt は含まれない
         Assert.Equal(new[] { "Subtotal.txt" }, hits.Select(h => h.Name));
+    }
+
+    // 正規表現での絞り込みはSQLiteへ登録した関数が行う（並べ替えを一致した行だけで済ませるため）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_FiltersWithARegularExpression()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            File(@"C:\Root", "report2026.xlsx"),
+            File(@"C:\Root", "report2027.xlsx"),
+            File(@"C:\Root", "notes.txt")
+        });
+
+        var hits = _repository
+            .EnumerateSearchEntriesUnderPath(@"C:\Root", NameSearchPattern.Create(@"^report\d+\.xlsx$", useRegex: true))
+            .ToList();
+
+        Assert.Equal(new[] { "report2026.xlsx", "report2027.xlsx" }, hits.Select(h => h.Name));
+    }
+
+    // 正規表現でも並びは部分一致と同じ（フォルダが先、その後に名前昇順）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_KeepsTheDisplayOrderForRegularExpressions()
+    {
+        SeedTree();
+
+        var hits = _repository
+            .EnumerateSearchEntriesUnderPath(@"C:\Root", NameSearchPattern.Create("^deep", useRegex: true))
+            .ToList();
+
+        Assert.Equal(new[] { "Deep", "deep.txt" }, hits.Select(h => h.Name));
     }
 
     [Fact]
@@ -247,7 +282,7 @@ public class FileCacheRepositoryTests : IDisposable
     {
         SeedTree();
 
-        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root\Sub", ".txt").ToList();
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root\Sub", Substring(".txt")).ToList();
 
         // 検索範囲の外にある C:\Root\a.txt は含まれない
         Assert.Equal(new[] { "b.txt", "deep.txt" }, hits.Select(h => h.Name));
@@ -385,7 +420,7 @@ public class FileCacheRepositoryTests : IDisposable
     {
         SeedTree();
 
-        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\root\sub", ".txt").ToList();
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\root\sub", Substring(".txt")).ToList();
 
         Assert.Equal(new[] { "b.txt", "deep.txt" }, hits.Select(h => h.Name));
     }
