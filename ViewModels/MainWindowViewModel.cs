@@ -23,6 +23,8 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly SynchronizationContext _uiContext;
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
+    // 除外判定用に、除外パスと「区切り文字付きの接頭辞」を作り置きした配列（SetExcludedPathsで更新）
+    private (string Path, string Prefix)[] _excludedPathMatchers = Array.Empty<(string, string)>();
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
     private AppThemeSetting _theme = AppThemeSetting.System;

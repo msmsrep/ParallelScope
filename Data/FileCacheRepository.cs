@@ -170,24 +170,19 @@ public class FileCacheRepository
     /// </remarks>
     public IEnumerable<CachedFileSystemEntry> EnumerateFilesUnderPath(string rootPath)
     {
-        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
-        var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
-
         using var db = CreateDbContext();
         db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
+
+        var prefixFilter = BuildPathPrefixFilter(conn, rootPath);
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
             WHERE IsFolder = 0
-                            AND FullPath LIKE @rootPattern";
-
-        var rootPatternParam = cmd.CreateParameter();
-        rootPatternParam.ParameterName = "@rootPattern";
-        rootPatternParam.Value = rootWithSeparator + "%";
-        cmd.Parameters.Add(rootPatternParam);
+              AND " + prefixFilter.WhereClause;
+        prefixFilter.AddParametersTo(cmd);
 
         // 同じ親フォルダのファイル数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
         // 共有する（結果はAll Files表示のViewModelから保持され続けるので、保持メモリに直結する）
@@ -206,6 +201,54 @@ public class FileCacheRepository
                 reader.IsDBNull(6) ? null : reader.GetDateTime(6),
                 reader.IsDBNull(7) ? null : reader.GetInt32(7));
         }
+    }
+
+    /// <summary>
+    /// 「FullPath が指定フォルダ配下か」を表すWHERE句と、そこへ渡すパラメータ。
+    /// 使う側は WhereClause を条件へ埋め込み、AddParametersTo でパラメータを積む。
+    /// </summary>
+    private sealed record PathPrefixFilter(string WhereClause, IReadOnlyList<(string Name, string Value)> Parameters)
+    {
+        public void AddParametersTo(DbCommand cmd)
+        {
+            foreach (var (name, value) in Parameters)
+            {
+                AddParameter(cmd, name, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// FullPath のプレフィックス絞り込み条件を組み立てる。
+    /// LIKE は既定でASCIIの大文字小文字を区別しない照合になり、FullPath のインデックス（BINARY照合）を
+    /// 使えないため、配下の件数に関わらずファイル行全件（百万件規模）のスキャンになる。
+    /// 代わりに「区切り文字 〜 その次の文字」のレンジ検索にするとインデックスで直接引ける
+    /// （区切り文字だけがこの範囲に入るため、LIKE と同じ結果になる）。
+    /// ただしレンジ検索はBINARY照合＝大文字小文字を区別するので、アドレス欄への手入力等で
+    /// キャッシュ内の表記と大文字小文字が食い違うと1件も引けない。そこで、その表記で1件でも
+    /// 存在するかをインデックス検索（数マイクロ秒）で先に確かめ、無い場合だけ従来のLIKEに戻す。
+    /// </summary>
+    private static PathPrefixFilter BuildPathPrefixFilter(DbConnection conn, string rootPath)
+    {
+        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
+        var lowerBound = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
+        var upperBound = lowerBound[..^1] + (char)(Path.DirectorySeparatorChar + 1);
+
+        using var probe = conn.CreateCommand();
+        probe.CommandText = "SELECT 1 FROM FileSystemEntries WHERE FullPath >= @lowerBound AND FullPath < @upperBound LIMIT 1";
+        AddParameter(probe, "@lowerBound", lowerBound);
+        AddParameter(probe, "@upperBound", upperBound);
+
+        if (probe.ExecuteScalar() is not null)
+        {
+            return new PathPrefixFilter(
+                "FullPath >= @lowerBound AND FullPath < @upperBound",
+                new[] { ("@lowerBound", lowerBound), ("@upperBound", upperBound) });
+        }
+
+        return new PathPrefixFilter(
+            "FullPath LIKE @prefixPattern ESCAPE '~'",
+            new[] { ("@prefixPattern", EscapeLikePattern(lowerBound) + "%") });
     }
 
     /// <summary>同一内容の文字列を1インスタンスへ共有するためのプール引き当て。</summary>
@@ -237,17 +280,15 @@ public class FileCacheRepository
                 continue;
             }
 
+            var prefixFilter = BuildPathPrefixFilter(conn, normalizedRootPath);
+
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT COALESCE(SUM(SizeBytes), 0)
                 FROM FileSystemEntries
                 WHERE IsFolder = 0
-                    AND FullPath LIKE @rootPattern";
-
-            var rootPatternParam = cmd.CreateParameter();
-            rootPatternParam.ParameterName = "@rootPattern";
-            rootPatternParam.Value = PathNormalizer.WithTrailingSeparator(normalizedRootPath) + "%";
-            cmd.Parameters.Add(rootPatternParam);
+                  AND " + prefixFilter.WhereClause;
+            prefixFilter.AddParametersTo(cmd);
 
             var total = Convert.ToInt64(cmd.ExecuteScalar());
             if (total > 0)
@@ -268,59 +309,80 @@ public class FileCacheRepository
     public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, string nameQuery)
     {
         using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
 
-        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
-        var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
+        var prefixFilter = BuildPathPrefixFilter(conn, rootPath);
 
         // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
         // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
         var namePattern = "%" + EscapeLikePattern(nameQuery) + "%";
 
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+            FROM FileSystemEntries
+            WHERE " + prefixFilter.WhereClause + @"
+              AND Name LIKE @namePattern ESCAPE '~'
+            ORDER BY IsFolder DESC, Name";
+        prefixFilter.AddParametersTo(cmd);
+        AddParameter(cmd, "@namePattern", namePattern);
+
         // 同じ親フォルダ内のヒット件数分だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
         // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        var rows = db.FileSystemEntries
-            .AsNoTracking()
-            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && EF.Functions.Like(x.Name, namePattern, "~"))
-            .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
-            .Select(x => new
-            {
-                x.ParentPath,
-                x.FullPath,
-                x.Name,
-                x.IsFolder,
-                x.SizeBytes,
-                x.LastWriteTimeUtc,
-                x.CreationTimeUtc,
-                x.Attributes
-            })
-            .AsEnumerable();
-
-        foreach (var x in rows)
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
         {
             yield return new CachedFileSystemEntry(
-                GetPooledString(parentPathPool, x.ParentPath),
-                x.FullPath,
-                x.Name,
-                x.IsFolder,
-                x.SizeBytes,
-                x.LastWriteTimeUtc,
-                x.CreationTimeUtc,
-                x.Attributes);
+                GetPooledString(parentPathPool, reader.GetString(0)),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetBoolean(3),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                reader.GetDateTime(5),
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7));
         }
     }
 
-    /// <summary>単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。</summary>
-    public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
+    /// <summary>
+    /// 単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。
+    /// キャッシュと内容が同一なら書き換えをスキップし、実際に書き換えたかどうかを返す。
+    /// </summary>
+    /// <remarks>
+    /// フォルダを開くたびに呼ばれる一方、中身が変わっていることは稀。無変化の場合まで
+    /// DELETE+INSERT（数万ファイルのフォルダでは数万行）を走らせるとフォルダ移動のたびに
+    /// 書き込みとWALの肥大が発生するため、フルスキャンと同じ差分判定を通す。
+    /// </remarks>
+    public bool ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
         var normalizedParentPath = PathNormalizer.Normalize(parentPath);
         var lockObject = ParentPathLockStripes[GetLockStripeIndex(normalizedParentPath)];
 
         lock (lockObject)
         {
+            var entriesByParentPath = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>(StringComparer.OrdinalIgnoreCase)
+            {
+                [normalizedParentPath] = entries
+            };
+
+            try
+            {
+                using var db = CreateDbContext();
+                if (SelectChangedParentPaths(db, entriesByParentPath).Count == 0)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                // 差分判定に失敗した場合は従来通り書き換える（書き漏らしの方が害が大きい）
+            }
+
             ReplaceEntriesByParentPathInternal(normalizedParentPath, entries);
+            return true;
         }
     }
 
@@ -692,18 +754,20 @@ public class FileCacheRepository
         db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
 
+        var prefixFilter = BuildPathPrefixFilter(conn, normalizedParentPath);
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT substr(FullPath, length(@prefix) + 1, instr(substr(FullPath, length(@prefix) + 1), @sep) - 1) AS FirstSegment,
                    SUM(COALESCE(SizeBytes, 0)) AS TotalSize
             FROM FileSystemEntries
             WHERE IsFolder = 0
-              AND FullPath LIKE @prefixPattern ESCAPE '~'
+              AND " + prefixFilter.WhereClause + @"
               AND instr(substr(FullPath, length(@prefix) + 1), @sep) > 0 -- 親直下のファイルは子フォルダ合計に含めない
             GROUP BY FirstSegment COLLATE NOCASE";
 
+        prefixFilter.AddParametersTo(cmd);
         AddParameter(cmd, "@prefix", parentWithSeparator);
-        AddParameter(cmd, "@prefixPattern", EscapeLikePattern(parentWithSeparator) + "%");
         AddParameter(cmd, "@sep", Path.DirectorySeparatorChar.ToString());
 
         using var reader = cmd.ExecuteReader();

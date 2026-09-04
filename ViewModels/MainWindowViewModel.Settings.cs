@@ -12,7 +12,7 @@ public partial class MainWindowViewModel
     {
         var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
-        _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SetExcludedPaths(settings.ExcludedPaths);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む
         ActiveTab.InitializeFlatFileViewEnabled(settings.IsFlatFileViewEnabled);
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
@@ -219,7 +219,7 @@ public partial class MainWindowViewModel
         _showHiddenItems = showHiddenItems;
         _showSystemItems = showSystemItems;
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
-        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SetExcludedPaths(excludedPaths);
         _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
         _columnOrder = NormalizeColumnOrder(columnOrder?.ToList());
         _visibleTreeNodes = NormalizeVisibleTreeNodes(visibleTreeNodes?.ToList());
@@ -545,18 +545,24 @@ public partial class MainWindowViewModel
         return IsExcludedNormalizedPath(normalizedPath);
     }
 
+    /// <summary>除外パスを正規化して保持し、配下判定に使う接頭辞（区切り文字付き）を作り置きする。</summary>
+    private void SetExcludedPaths(IEnumerable<string>? excludedPaths)
+    {
+        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _excludedPathMatchers = _excludedPaths
+            .Select(x => (Path: x, Prefix: PathNormalizer.WithTrailingSeparator(x)))
+            .ToArray();
+    }
+
     /// <summary>正規化済みパス用の除外判定。DBキャッシュ由来のパスは保存時に正規化済みのため、大量の結果行に対して再正規化のコストをかけずに使える。</summary>
     private bool IsExcludedNormalizedPath(string normalizedPath)
     {
-        foreach (var excludedPath in _excludedPaths)
+        // 除外パスと、その配下判定に使う「区切り文字付きの接頭辞」の組。接頭辞を毎行組み立てないため
+        // 除外設定の更新時に作り置きしている（All Files表示では数十万行に対して呼ばれる）
+        foreach (var (excludedPath, prefix) in _excludedPathMatchers)
         {
-            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            var prefix = PathNormalizer.WithTrailingSeparator(excludedPath);
-            if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase)
+                || normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

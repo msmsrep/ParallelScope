@@ -12,14 +12,20 @@ public partial class BrowserTabViewModel
     private async Task LoadFromCacheAsync(string folderPath, int navigationVersion)
     {
         List<CachedFileSystemEntry> cachedEntries;
+        List<FileItemViewModel> cachedItems;
 
         try
         {
-            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
-            cachedEntries = await Task.Run(() =>
-                _host.FileCacheRepository.GetEntriesByParentPath(folderPath)
+            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く。
+            // ViewModelの生成もここ（バックグラウンド）で済ませる —— 数万件のフォルダでは
+            // 生成そのものがUIスレッドの停止時間になるため、UIスレッドには出来上がった一覧だけを渡す
+            (cachedEntries, cachedItems) = await Task.Run(() =>
+            {
+                var entries = _host.FileCacheRepository.GetEntriesByParentPath(folderPath)
                     .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))
-                    .ToList());
+                    .ToList();
+                return (entries, ToViewModels(entries).ToList());
+            });
         }
         catch
         {
@@ -38,7 +44,12 @@ public partial class BrowserTabViewModel
                 return;
             }
 
-            UpdateCurrentDirectoryItems(ToViewModels(cachedEntries));
+            UpdateCurrentDirectoryItems(cachedItems);
+
+            // ライブ更新側（RefreshFromFileSystemInBackground）が、無変化なら一覧の作り直しを
+            // 省けるよう、キャッシュ由来の表示が済んだことを知らせる
+            Volatile.Write(ref _cacheAppliedNavigationVersion, navigationVersion);
+
             // キャッシュサイズ適用をリクエスト（統合）
             _folderSizeCoalescer.Request((folderPath, cachedEntries, navigationVersion));
         }, null);
@@ -120,16 +131,37 @@ public partial class BrowserTabViewModel
             return;
         }
 
+        bool cacheChanged;
         try
         {
-            await Task.Run(() => _host.FileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
+            cacheChanged = await Task.Run(() => _host.FileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
         }
         catch
         {
             // キャッシュ保存失敗時でも画面更新は継続する
+            cacheChanged = true;
         }
 
         if (navigationVersion != Volatile.Read(ref _navigationVersion) || !PathNormalizer.AreSame(CurrentPath, folderPath))
+        {
+            return;
+        }
+
+        // キャッシュと内容が同一で、そのキャッシュ由来の一覧を既に表示しているなら、
+        // 作り直しても結果は同じ。数万件のViewModel生成・差分適用・フォルダサイズ集計を丸ごと省く
+        // （フォルダ移動のたびに同じ内容で2回作り直していたのを1回にする）
+        if (!cacheChanged && navigationVersion == Volatile.Read(ref _cacheAppliedNavigationVersion))
+        {
+            return;
+        }
+
+        List<FileItemViewModel> liveItems;
+        try
+        {
+            // ViewModelの生成はバックグラウンドで済ませる（UIスレッドの停止時間を減らすため）
+            liveItems = await Task.Run(() => ToViewModels(liveEntries).ToList());
+        }
+        catch
         {
             return;
         }
@@ -141,7 +173,7 @@ public partial class BrowserTabViewModel
                 return;
             }
 
-            UpdateCurrentDirectoryItems(ToViewModels(liveEntries));
+            UpdateCurrentDirectoryItems(liveItems);
             // キャッシュサイズ適用をリクエスト（統合）
             _folderSizeCoalescer.Request((folderPath, liveEntries, navigationVersion));
         }, null);

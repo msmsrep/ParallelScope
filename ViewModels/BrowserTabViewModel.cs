@@ -27,6 +27,10 @@ public partial class BrowserTabViewModel : ObservableObject
     private int _navigationVersion;
     private int _searchVersion;
     private int _flatViewVersion;
+
+    // キャッシュ由来の一覧を表示し終えたナビゲーション番号。ライブ更新がキャッシュと同内容だった場合に
+    // 一覧の作り直しを省けるかどうかの判定に使う（BrowserTabViewModel.Cache.cs）
+    private int _cacheAppliedNavigationVersion = -1;
     private List<FileItemViewModel> _currentDirectoryItems = new();
     private bool _isActive;
     private bool _isSuspended;

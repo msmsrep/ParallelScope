@@ -346,6 +346,76 @@ public class FileCacheRepositoryTests : IDisposable
     }
 
     /// <summary>C:\Root - Sub - Deep の3階層に、各階層1ファイル（100バイト）を置く。</summary>
+    // 配下の絞り込みはインデックス（BINARY照合＝大文字小文字を区別）のレンジ検索で行い、
+    // その表記で1件も無いときだけ大文字小文字を区別しないLIKEに戻す。
+    // アドレス欄への手入力などで表記が食い違っても結果が変わらないことを確かめる
+    [Fact]
+    public void EnumerateFilesUnderPath_FindsFilesWhenRootCasingDiffersFromCache()
+    {
+        SeedTree();
+
+        var files = _repository.EnumerateFilesUnderPath(@"C:\root\sub").ToList();
+
+        Assert.Equal(
+            new[] { @"C:\Root\Sub\Deep\deep.txt", @"C:\Root\Sub\b.txt" }.OrderBy(x => x),
+            files.Select(f => f.FullPath).OrderBy(x => x));
+    }
+
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_FindsHitsWhenRootCasingDiffersFromCache()
+    {
+        SeedTree();
+
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\root\sub", ".txt").ToList();
+
+        Assert.Equal(new[] { "b.txt", "deep.txt" }, hits.Select(h => h.Name));
+    }
+
+    [Fact]
+    public void GetCachedFolderTotalSizes_SumsWhenParentCasingDiffersFromCache()
+    {
+        SeedTree();
+
+        var sizes = _repository.GetCachedFolderTotalSizes(@"C:\root", new[] { @"C:\Root\Sub" });
+
+        Assert.Equal(200, sizes[@"C:\Root\Sub"]);
+    }
+
+    [Fact]
+    public void GetCachedTotalSizesUnderPaths_SumsWhenRootCasingDiffersFromCache()
+    {
+        SeedTree();
+
+        var sizes = _repository.GetCachedTotalSizesUnderPaths(new[] { @"C:\root" });
+
+        Assert.Equal(300, sizes[@"C:\root"]);
+    }
+
+    // フォルダを開くたびに呼ばれるため、中身が変わっていない間はDELETE+INSERTを走らせない
+    [Fact]
+    public void ReplaceEntriesByParentPath_SkipsWriteWhenContentIsUnchanged()
+    {
+        var entries = new[] { File(@"C:\Root", "a.txt"), Folder(@"C:\Root", "Sub") };
+
+        Assert.True(_repository.ReplaceEntriesByParentPath(@"C:\Root", entries));
+        Assert.False(_repository.ReplaceEntriesByParentPath(@"C:\Root", entries));
+
+        Assert.Equal(
+            new[] { "Sub", "a.txt" },
+            _repository.GetEntriesByParentPath(@"C:\Root").Select(x => x.Name));
+    }
+
+    [Fact]
+    public void ReplaceEntriesByParentPath_WritesWhenContentChanged()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[] { File(@"C:\Root", "a.txt") });
+
+        Assert.True(_repository.ReplaceEntriesByParentPath(@"C:\Root", new[] { File(@"C:\Root", "a.txt", sizeBytes: 999) }));
+
+        var loaded = Assert.Single(_repository.GetEntriesByParentPath(@"C:\Root"));
+        Assert.Equal(999, loaded.SizeBytes);
+    }
+
     private void SeedTree()
     {
         _repository.BatchReplaceEntriesByParentPaths(new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>
