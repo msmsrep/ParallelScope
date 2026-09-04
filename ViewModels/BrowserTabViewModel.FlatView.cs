@@ -30,6 +30,9 @@ public partial class BrowserTabViewModel
     /// <summary>途中経過を出すたびに、次に出すまでの件数をこの倍率で広げる（件数が増えるほど間引く）。</summary>
     private const int FlatViewBatchGrowthFactor = 8;
 
+    /// <summary>取得を続けてよいか（フォルダ移動やモード解除が起きていないか）を確認する間隔（件数）。</summary>
+    private const int FlatViewAbortCheckInterval = 1_000;
+
     /// <summary>キャッシュDBから配下の全ファイルを取得し、結果を画面へ反映する。</summary>
     /// <remarks>
     /// 全件が揃うまで待たず、貯まった分から順に表示する（段階表示）。ドライブ直下のように
@@ -53,7 +56,12 @@ public partial class BrowserTabViewModel
                 {
                     items.Add(item);
 
-                    if (items.Count < nextPublishCount)
+                    var isPublishPoint = items.Count >= nextPublishCount;
+
+                    // 中断確認は表示のタイミングだけでは足りない —— 表示の間隔は件数が増えるほど
+                    // 広がるため、フォルダを移動されても次の表示件数（最大で数十万件先）に達するまで
+                    // 読み続けてしまい、移動先の取得もこの完了を待たされる（キューは直列実行）
+                    if (!isPublishPoint && items.Count % FlatViewAbortCheckInterval != 0)
                     {
                         continue;
                     }
@@ -61,6 +69,11 @@ public partial class BrowserTabViewModel
                     if (!IsFlatFileViewResultStillValid(folderPath, flatViewVersion))
                     {
                         return;
+                    }
+
+                    if (!isPublishPoint)
+                    {
+                        continue;
                     }
 
                     // 途中経過はこの後も追記が続くため、渡すのは複製
