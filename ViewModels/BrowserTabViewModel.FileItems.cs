@@ -45,7 +45,15 @@ public partial class BrowserTabViewModel
         var newItems = items as List<FileItemViewModel> ?? items.ToList();
         var replacedItemCount = Math.Max(FileItems.Count, newItems.Count);
 
-        if (forceBulkReplace)
+        // 件数が閾値を超えて増減していれば、差分を数えるまでもなく一括差し替えに決まる
+        // （重なるのは多くても少ない方の件数ぶんなので、追加と削除の合計は必ず件数差以上になる）。
+        // この近道が無いと、結論が決まっているのに全件ぶんのパスのハッシュ計算が
+        // UIスレッドで走ってしまう —— 97万件ヒットする検索や、そこから数件へ絞り込む場面がこれに当たる。
+        // 既存インスタンスの使い回しはここで諦めるが、フォルダの合計サイズは
+        // _currentDirectoryItems 側で引き継がれ、直後のキャッシュ集計でも入れ直される
+        var isBulkReplaceCertain = Math.Abs(newItems.Count - FileItems.Count) > BulkReplaceThreshold;
+
+        if (forceBulkReplace || isBulkReplaceCertain)
         {
             // モード切り替え時の大量データでは差分計算自体が高コストになるため、
             // 一括差し替えでUIスレッドのブロック時間を短縮する。

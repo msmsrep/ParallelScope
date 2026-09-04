@@ -410,8 +410,12 @@ public class FileCacheRepository
         return result;
     }
 
-    /// <summary>1回のIN句にまとめる行IDの数。</summary>
-    private const int IdLookupChunkSize = 900;
+    /// <summary>
+    /// 1回のIN句にまとめる行IDの数。
+    /// 小分けにしすぎると文の準備回数が効き（数千件のヒットで3倍遅い）、大きくしすぎると
+    /// IN句自体の解析が重くなる（20万件で3倍遅い）。実測でこの辺りが底。
+    /// </summary>
+    private const int IdLookupChunkSize = 5_000;
 
     /// <summary>指定した親フォルダ直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
     public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, string nameQuery)
