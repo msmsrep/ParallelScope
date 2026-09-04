@@ -223,6 +223,25 @@ public class FileCacheRepositoryTests : IDisposable
             _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "100%").Select(e => e.Name));
     }
 
+    // 3文字以上の検索語では、テーブル本体を読む前にFullPathで粗く絞る（Nameの判定はその後）。
+    // 粗い絞り込みが素通しするフォルダ名だけの一致を、Nameの判定がきちんと落とすことを見る
+    [Theory]
+    [InlineData("Sub")]   // 3文字＝粗い絞り込みが入る
+    [InlineData("Su")]    // 2文字＝入らない
+    public void EnumerateSearchEntriesUnderPath_DoesNotMatchOnTheFolderPartOfThePath(string query)
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root\Subway", new[]
+        {
+            File(@"C:\Root\Subway", "ticket.txt"),
+            File(@"C:\Root\Subway", "Subtotal.txt")
+        });
+
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", query).ToList();
+
+        // 親フォルダ名（Subway）が一致するだけの ticket.txt は含まれない
+        Assert.Equal(new[] { "Subtotal.txt" }, hits.Select(h => h.Name));
+    }
+
     [Fact]
     public void EnumerateSearchEntriesUnderPath_SearchesOnlyUnderTheGivenRoot()
     {

@@ -322,7 +322,7 @@ public class FileCacheRepository
         cmd.CommandText = @"
             SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
-            WHERE " + prefixFilter.WhereClause + @"
+            WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(nameQuery) + @"
               AND Name LIKE @namePattern ESCAPE '~'
             ORDER BY IsFolder DESC, Name";
         prefixFilter.AddParametersTo(cmd);
@@ -345,6 +345,26 @@ public class FileCacheRepository
                 reader.IsDBNull(6) ? null : reader.GetDateTime(6),
                 reader.IsDBNull(7) ? null : reader.GetInt32(7));
         }
+    }
+
+    /// <summary>この文字数以上の検索語のときだけ、FullPath による粗い絞り込みを挟む。</summary>
+    private const int SearchPathPreFilterMinQueryLength = 3;
+
+    /// <summary>
+    /// 検索語による絞り込みの前段として、FullPath 側の LIKE を足す（不要なら空文字を返す）。
+    /// Name は必ず FullPath の末尾なので、`Name LIKE '%語%'` が成り立つ行は必ず
+    /// `FullPath LIKE '%語%'` も成り立つ（条件としては安全な、広めの絞り込みになる）。
+    /// FullPath はインデックスに載っているため、ここで外れた行はテーブル本体を読まずに捨てられる。
+    /// Name の判定だけだと「1件もヒットしない検索語でも配下の全行を読む」ことになり、
+    /// ドライブ直下（150万行）では読み出しだけで1.6秒かかっていた（3文字以上でおよそ半分になる）。
+    /// 1〜2文字ではほとんどの行が通過して二重判定になるだけなので、その場合は足さない。
+    /// </summary>
+    private static string BuildSearchPathPreFilter(string nameQuery)
+    {
+        return nameQuery.Length >= SearchPathPreFilterMinQueryLength
+            ? @"
+              AND FullPath LIKE @namePattern ESCAPE '~'"
+            : string.Empty;
     }
 
     /// <summary>
