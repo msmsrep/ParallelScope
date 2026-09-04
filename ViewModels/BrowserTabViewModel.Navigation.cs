@@ -194,6 +194,9 @@ public partial class BrowserTabViewModel
     /// </summary>
     public void RefreshCurrentFolder()
     {
+        // 読み直す＝キャッシュが変わった可能性があるので、控えてある検索結果は使わない
+        ForgetCompletedSearch();
+
         var folderPath = CurrentPath;
         if (string.IsNullOrWhiteSpace(folderPath))
         {

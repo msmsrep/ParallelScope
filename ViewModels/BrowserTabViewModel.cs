@@ -231,6 +231,7 @@ public partial class BrowserTabViewModel : ObservableObject
         }
 
         _isSuspended = true;
+        ForgetCompletedSearch();
         _currentDirectoryItems = new List<FileItemViewModel>();
         FileItems = new ObservableCollection<FileItemViewModel>();
     }
@@ -242,6 +243,8 @@ public partial class BrowserTabViewModel : ObservableObject
     internal void MarkStale()
     {
         _isStale = true;
+        // キャッシュが変わった以上、控えてある検索結果からは絞り込めない
+        ForgetCompletedSearch();
     }
 
     /// <summary>再び表示する際に、手放していた一覧・古くなった一覧をキャッシュから読み直す。</summary>

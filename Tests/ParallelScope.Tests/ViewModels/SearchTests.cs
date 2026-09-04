@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.ViewModels;
@@ -54,10 +54,25 @@ public class SearchTests : IDisposable
 
     private static void WaitForItemCount(BrowserTabViewModel tab, int expectedCount)
     {
+        WaitFor(tab, () => tab.FileItems.Count == expectedCount, $"{expectedCount} 件になる");
+    }
+
+    /// <summary>件数が変わらない場合（1件→別の1件）は件数待ちでは素通りしてしまうため、中身で待つ。</summary>
+    private static void WaitForSingleItemNamed(BrowserTabViewModel tab, string expectedName)
+    {
+        WaitFor(
+            tab,
+            () => tab.FileItems.Count == 1 && tab.FileItems[0].Name == expectedName,
+            $"{expectedName} の1件だけになる");
+    }
+
+    /// <summary>取得はバックグラウンドで進むため、条件が満たされるまで待つ（満たされなければ失敗させる）。</summary>
+    private static void WaitFor(BrowserTabViewModel tab, Func<bool> condition, string description)
+    {
         var stopwatch = Stopwatch.StartNew();
         while (stopwatch.Elapsed < TimeSpan.FromSeconds(30))
         {
-            if (tab.FileItems.Count == expectedCount)
+            if (condition())
             {
                 return;
             }
@@ -65,7 +80,8 @@ public class SearchTests : IDisposable
             Thread.Sleep(20);
         }
 
-        Assert.Fail($"一覧が {expectedCount} 件になりませんでした（実際は {tab.FileItems.Count} 件）");
+        var names = string.Join(", ", tab.FileItems.Take(5).Select(x => x.Name));
+        Assert.Fail($"一覧が「{description}」になりませんでした（実際は {tab.FileItems.Count} 件: {names}）");
     }
 
     private BrowserTabViewModel CreateTabAtRoot()
@@ -108,6 +124,73 @@ public class SearchTests : IDisposable
         Assert.Equal("file000042.txt", tab.FileItems[0].Name);
     }
 
+    // 検索語を足した場合、新しい結果は必ず前回の結果の部分集合になるので、
+    // キャッシュDBを引き直さずに前回の結果から絞り込む。結果が引き直した場合と同じであること
+    [Fact]
+    public void Search_NarrowsFromThePreviousResultWhenTheQueryIsExtended()
+    {
+        SeedCachedFiles(10);
+        var tab = CreateTabAtRoot();
+
+        tab.SearchQuery = "file00000";
+        WaitForItemCount(tab, 10);
+
+        tab.SearchQuery = "file000004";
+
+        WaitForSingleItemNamed(tab, "file000004.txt");
+    }
+
+    // 前回の結果に無い行が必要になる検索語（打ち足しでない）は、絞り込みで済ませてはいけない
+    [Fact]
+    public void Search_QueriesAgainWhenTheNewQueryIsNotAnExtension()
+    {
+        SeedCachedFiles(10);
+        var tab = CreateTabAtRoot();
+
+        tab.SearchQuery = "file000004";
+        WaitForItemCount(tab, 1);
+
+        // 前回の結果（1件）には含まれない行が対象になる
+        tab.SearchQuery = "file000007";
+
+        WaitForSingleItemNamed(tab, "file000007.txt");
+    }
+
+    // フォルダを移動したら、前のフォルダの検索結果から絞り込んではいけない
+    [Fact]
+    public void Search_DoesNotReusePreviousResultsAfterMovingToAnotherFolder()
+    {
+        SeedCachedFiles(10);
+        var otherFolderPath = Path.Combine(_root.Path, "Other");
+        Directory.CreateDirectory(otherFolderPath);
+        // 検索はキャッシュだけを見るので行を入れておき、移動先のライブ読み込みで
+        // 上書きされても消えないよう実体も置く（どちらが先でも1件になる）
+        File.WriteAllText(Path.Combine(otherFolderPath, "file000004.txt"), "x");
+        _fileCacheRepository.ReplaceEntriesByParentPath(otherFolderPath, new[]
+        {
+            new CachedFileSystemEntry(
+                otherFolderPath,
+                Path.Combine(otherFolderPath, "file000004.txt"),
+                "file000004.txt",
+                IsFolder: false,
+                SizeBytes: 1,
+                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
+                CreationTimeUtc: null,
+                Attributes: 32)
+        });
+
+        var tab = CreateTabAtRoot();
+        // ルートからの検索は Sub の10件と Other の1件（同名の file000004.txt）を拾う
+        tab.SearchQuery = "file00000";
+        WaitForItemCount(tab, 11);
+
+        Assert.True(tab.NavigateTo(otherFolderPath, addToHistory: false));
+        tab.SearchQuery = "file000004";
+
+        WaitForSingleItemNamed(tab, "file000004.txt");
+        Assert.Equal(otherFolderPath, tab.FileItems[0].Location);
+    }
+
     [Fact]
     public void Search_RestoresTheDirectoryListingWhenCleared()
     {
@@ -119,9 +202,8 @@ public class SearchTests : IDisposable
 
         tab.SearchQuery = string.Empty;
 
-        // 検索前の直下一覧（Sub フォルダのみ）に戻る
-        WaitForItemCount(tab, 1);
-        Assert.Equal("Sub", tab.FileItems[0].Name);
+        // 検索前の直下一覧（Sub フォルダのみ）に戻る。件数が同じ1件なので中身で待つ
+        WaitForSingleItemNamed(tab, "Sub");
         Assert.True(tab.FileItems[0].IsFolder);
     }
 }

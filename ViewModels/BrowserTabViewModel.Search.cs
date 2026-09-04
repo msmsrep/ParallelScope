@@ -42,6 +42,7 @@ public partial class BrowserTabViewModel
     private void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
+        ForgetCompletedSearch();
 
         if (IsFlatFileViewEnabled)
         {
@@ -55,9 +56,65 @@ public partial class BrowserTabViewModel
     /// <summary>取得を続けてよいか（検索語の変更・フォルダ移動が起きていないか）を確認する間隔（件数）。</summary>
     private const int SearchAbortCheckInterval = 1_000;
 
+    /// <summary>
+    /// 直前に完了した検索の、表示していた結果一式。検索語を足しただけならここから絞り込めるため、
+    /// キャッシュDBを引き直さずに済む（ドライブ直下では1回あたり数百msかかる）。
+    /// 参照ごと差し替えるだけなので、UIスレッドとバックグラウンドの間はVolatileの読み書きで足りる。
+    /// </summary>
+    private sealed record CompletedSearch(string RootPath, string Query, bool FilesOnly, List<FileItemViewModel> Results);
+
+    private CompletedSearch? _completedSearch;
+
+    /// <summary>検索結果の使い回しをやめる（キャッシュが更新された・検索を終えた・一覧を手放した）。</summary>
+    private void ForgetCompletedSearch()
+    {
+        Volatile.Write(ref _completedSearch, null);
+    }
+
+    /// <summary>
+    /// 直前の検索結果から絞り込めるなら、その結果を返す（引き直しが必要なら null）。
+    /// `%repo%` に一致する名前は必ず `%rep%` にも一致するので、検索語が前回の検索語を含んでいれば
+    /// 新しい結果は必ず前回の結果の部分集合になる。
+    /// </summary>
+    private List<FileItemViewModel>? TryNarrowCompletedSearch(string rootPath, string query, bool filesOnly)
+    {
+        var completed = Volatile.Read(ref _completedSearch);
+
+        // 検索語の包含判定は大文字小文字をそのまま見る（Ordinal）。
+        // ここを寛容にすると、畳み方の違いでDBを引き直したときと結果が変わりうるため。
+        // 打ち足していく通常の操作では前回の検索語がそのまま前方に残るので、これで十分効く
+        if (completed is null
+            || completed.FilesOnly != filesOnly
+            || !query.Contains(completed.Query, StringComparison.Ordinal)
+            || !PathNormalizer.AreSame(completed.RootPath, rootPath))
+        {
+            return null;
+        }
+
+        var narrowed = new List<FileItemViewModel>();
+        foreach (var item in completed.Results)
+        {
+            if (NameSearchMatcher.Contains(item.Name, query))
+            {
+                narrowed.Add(item);
+            }
+        }
+
+        return narrowed;
+    }
+
     /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
     private async Task SearchInBackground(string rootPath, string query, int searchVersion, bool filesOnly)
     {
+        // 直前の結果から絞り込めるならDBは引かない。ここはキューが空のとき要求元（UIスレッド）から
+        // そのまま同期実行されるため、必ずバックグラウンドへ逃がす
+        // （1文字の検索語の結果は数十万件あり、その絞り込みをUIスレッドでやると入力が引っかかる）
+        if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, query, filesOnly)) is { } narrowedResults)
+        {
+            PublishSearchResults(rootPath, query, searchVersion, filesOnly, narrowedResults);
+            return;
+        }
+
         List<FileItemViewModel> cacheResults;
 
         try
@@ -94,6 +151,12 @@ public partial class BrowserTabViewModel
             cacheResults = new List<FileItemViewModel>();
         }
 
+        PublishSearchResults(rootPath, query, searchVersion, filesOnly, cacheResults);
+    }
+
+    /// <summary>検索結果を画面へ反映し、次の入力で絞り込めるよう控える。</summary>
+    private void PublishSearchResults(string rootPath, string query, int searchVersion, bool filesOnly, List<FileItemViewModel> results)
+    {
         if (!IsSearchResultStillValid(rootPath, query, searchVersion))
         {
             return;
@@ -106,7 +169,11 @@ public partial class BrowserTabViewModel
                 return;
             }
 
-            ReplaceVisibleFileItems(cacheResults);
+            ReplaceVisibleFileItems(results);
+
+            // 控えるのは実際に表示したインスタンス。ReplaceVisibleFileItems は既存の行を
+            // 使い回すため、渡した results をそのまま控えると同じ行を二重に抱えることになる
+            Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, query, filesOnly, FileItems.ToList()));
         }, null);
     }
 
