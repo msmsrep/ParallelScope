@@ -324,7 +324,9 @@ public class FileCacheRepository
             FROM FileSystemEntries
             WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(nameQuery) + @"
               AND Name LIKE @namePattern ESCAPE '~'
-            ORDER BY IsFolder DESC, Name";
+            -- 並びはファイル名索引（ASCIIの大文字へ寄せて格納）と揃える。
+            -- 揃えないと、索引の有効・無効で検索結果の並びが変わってしまう
+            ORDER BY IsFolder DESC, Name COLLATE NOCASE";
         prefixFilter.AddParametersTo(cmd);
         AddParameter(cmd, "@namePattern", namePattern);
 
@@ -347,8 +349,8 @@ public class FileCacheRepository
         }
     }
 
-    /// <summary>ファイル名索引を組み立てるための最小限の行（行ID・親パス・名前）。</summary>
-    public readonly record struct NameIndexRow(int Id, string ParentPath, string Name);
+    /// <summary>ファイル名索引を組み立てるための最小限の行（行ID・親パス・名前・フォルダかどうか）。</summary>
+    public readonly record struct NameIndexRow(int Id, string ParentPath, string Name, bool IsFolder);
 
     /// <summary>
     /// ファイル名索引の材料を全件列挙する（<see cref="FileNameIndex"/> 用）。
@@ -362,20 +364,22 @@ public class FileCacheRepository
         var conn = db.Database.GetDbConnection();
 
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT Id, ParentPath, Name FROM FileSystemEntries";
+        cmd.CommandText = "SELECT Id, ParentPath, Name, IsFolder FROM FileSystemEntries";
 
         using var reader = cmd.ExecuteReader();
         while (reader.Read())
         {
-            yield return new NameIndexRow(reader.GetInt32(0), reader.GetString(1), reader.GetString(2));
+            yield return new NameIndexRow(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3));
         }
     }
 
     /// <summary>行IDを指定してエントリ本体を取り出す（索引で絞り込んだ結果の肉付けに使う）。</summary>
-    /// <remarks>並び順は指定しない（呼び出し側が表示順に並べ替えるため）。</remarks>
-    public List<CachedFileSystemEntry> GetEntriesByIds(IReadOnlyList<int> ids)
+    /// <remarks>
+    /// 並び順は指定しない。呼び出し側が索引上の位置（＝表示順）へ並べ直せるよう、行IDを添えて返す。
+    /// </remarks>
+    public List<(int Id, CachedFileSystemEntry Entry)> GetEntriesByIds(IReadOnlyList<int> ids)
     {
-        var result = new List<CachedFileSystemEntry>(ids.Count);
+        var result = new List<(int Id, CachedFileSystemEntry Entry)>(ids.Count);
         if (ids.Count == 0)
         {
             return result;
@@ -396,14 +400,14 @@ public class FileCacheRepository
             using var cmd = conn.CreateCommand();
             // 値は自前の索引が持つ行IDそのもの（外部入力ではない）だが、組み立ては数値化を通して行う
             cmd.CommandText = @"
-                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes, Id
                 FROM FileSystemEntries
                 WHERE Id IN (" + string.Join(",", ids.Skip(start).Take(chunkLength).Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + ")";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                result.Add(ReadEntry(reader, parentPathPool));
+                result.Add((reader.GetInt32(8), ReadEntry(reader, parentPathPool)));
             }
         }
 

@@ -102,6 +102,30 @@ public class FileNameIndexTests : IDisposable
         AssertMatchesDatabaseSearch(@"C:\Root", query);
     }
 
+    // 索引は表示順（フォルダが先、次に名前の昇順）に並べて持ち、結果を上から順に流す。
+    // キャッシュDBへの検索と並びが食い違うと、索引の有効・無効で一覧の順番が変わってしまう
+    [Fact]
+    public void SearchUnderPath_ReturnsTheSameOrderAsTheDatabaseSearch()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            File(@"C:\Root", "beta.txt"),
+            File(@"C:\Root", "Alpha.txt"),
+            File(@"C:\Root", "ALPHA2.txt"),
+            File(@"C:\Root", "alpha1.txt"),
+            Folder(@"C:\Root", "zeta"),
+            Folder(@"C:\Root", "Alpha")
+        });
+        _index.Build();
+
+        var expected = _repository.EnumerateSearchEntriesUnderPath(@"C:\Root", "a").Select(x => x.Name).ToList();
+        var actual = _index.SearchUnderPath(@"C:\Root", "a")!.Select(x => x.Name).ToList();
+
+        // フォルダが先に来ていること（並びが一致していれば、その中身も同じ規則で並んでいる）
+        Assert.Equal(new[] { "Alpha", "zeta" }, actual.Take(2));
+        Assert.Equal(expected, actual);
+    }
+
     [Fact]
     public void SearchUnderPath_ExcludesSiblingsWithTheSameNamePrefix()
     {
