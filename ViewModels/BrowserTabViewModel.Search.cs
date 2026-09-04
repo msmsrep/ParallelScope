@@ -52,6 +52,9 @@ public partial class BrowserTabViewModel
         ReplaceVisibleFileItems(_currentDirectoryItems);
     }
 
+    /// <summary>取得を続けてよいか（検索語の変更・フォルダ移動が起きていないか）を確認する間隔（件数）。</summary>
+    private const int SearchAbortCheckInterval = 1_000;
+
     /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
     private async Task SearchInBackground(string rootPath, string query, int searchVersion, bool filesOnly)
     {
@@ -59,37 +62,60 @@ public partial class BrowserTabViewModel
 
         try
         {
-            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cacheResults = await Task.Run(() =>
-                ToViewModels(
+            {
+                var results = new List<FileItemViewModel>();
+
+                // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
+                foreach (var item in ToViewModels(
                     SearchCacheEntries(rootPath, query)
                         .Where(x => !(filesOnly && x.IsFolder))
-                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath)))
-                    .ToList());
+                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
+                {
+                    results.Add(item);
+
+                    // 1文字の検索語では数十万件ヒットしうる一方、インクリメンタルサーチは
+                    // 1キー入力ごとに要求が来て、キューは直列実行される。打ち切らないと
+                    // 次の入力の検索が、用済みになった列挙の後ろで待たされてしまう
+                    if (results.Count % SearchAbortCheckInterval == 0
+                        && !IsSearchResultStillValid(rootPath, query, searchVersion))
+                    {
+                        // 打ち切った時点の状態は下の確認でも同じく不一致になるので、そのまま返して弾かせる
+                        // （検索バージョンは要求のたびに増えるだけで、一度ずれたら戻らない）
+                        return results;
+                    }
+                }
+
+                return results;
+            });
         }
         catch
         {
             cacheResults = new List<FileItemViewModel>();
         }
 
-        if (searchVersion != Volatile.Read(ref _searchVersion)
-            || !PathNormalizer.AreSame(CurrentPath, rootPath)
-            || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+        if (!IsSearchResultStillValid(rootPath, query, searchVersion))
         {
             return;
         }
 
         _host.UiContext.Post(_ =>
         {
-            if (searchVersion != Volatile.Read(ref _searchVersion)
-                || !PathNormalizer.AreSame(CurrentPath, rootPath)
-                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+            if (!IsSearchResultStillValid(rootPath, query, searchVersion))
             {
                 return;
             }
 
             ReplaceVisibleFileItems(cacheResults);
         }, null);
+    }
+
+    /// <summary>結果が届いた時点でもまだ表示すべき状態か（検索語の変更・フォルダ移動が起きていないか）を確認する。</summary>
+    private bool IsSearchResultStillValid(string rootPath, string query, int searchVersion)
+    {
+        return searchVersion == Volatile.Read(ref _searchVersion)
+            && PathNormalizer.AreSame(CurrentPath, rootPath)
+            && string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal);
     }
 
     /// <summary>検索起点が仮想ノードの場合は対象フォルダ群を横断検索し、それ以外は単一パス配下を検索する。</summary>
