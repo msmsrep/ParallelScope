@@ -58,7 +58,7 @@ public partial class BrowserTabViewModel
             // モード切り替え時の大量データでは差分計算自体が高コストになるため、
             // 一括差し替えでUIスレッドのブロック時間を短縮する。
             FileItems = new ObservableCollection<FileItemViewModel>(newItems);
-            ScheduleMemoryTrim(replacedItemCount);
+            _host.RequestMemoryTrim(replacedItemCount);
             return;
         }
 
@@ -105,7 +105,7 @@ public partial class BrowserTabViewModel
             // 大量差分ではUIスレッドが数秒単位でブロックされる。コレクション差し替えなら再バインド1回で済み、
             // DataGridの行仮想化により生成されるのは可視行のみ。
             FileItems = new ObservableCollection<FileItemViewModel>(mergedItems);
-            ScheduleMemoryTrim(replacedItemCount);
+            _host.RequestMemoryTrim(replacedItemCount);
             return;
         }
 
@@ -120,41 +120,6 @@ public partial class BrowserTabViewModel
         {
             FileItems.Add(item);
         }
-    }
-
-    /// <summary>この件数を超える一覧の入れ替えの後は、メモリ返却のためのGCを予約する。</summary>
-    private const int MemoryTrimItemCountThreshold = 50_000;
-    private int _memoryTrimVersion;
-
-    /// <summary>
-    /// All Filesモード等での大量アイテム入れ替え後、不要になった旧一覧のメモリをOSへ返す。
-    /// 数十万件規模の入れ替えではGen2/LOHに旧一覧が残り、自然なGCまで（さらにGC後も
-    /// コミット済みのまま）ワーキングセットが積み上がるため、明示的に回収・返却する。
-    /// 連続ナビゲーション中に毎回ブロッキングGCが走らないよう、一定時間の静止後に最新の1回だけ実行する。
-    /// </summary>
-    private void ScheduleMemoryTrim(int replacedItemCount)
-    {
-        if (replacedItemCount < MemoryTrimItemCountThreshold)
-        {
-            return;
-        }
-
-        var version = Interlocked.Increment(ref _memoryTrimVersion);
-        _ = Task.Run(async () =>
-        {
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            if (version != Volatile.Read(ref _memoryTrimVersion))
-            {
-                return;
-            }
-
-            // プールされたSQLite接続が抱えるページキャッシュ（接続あたり最大16MB）のネイティブメモリも返却する
-            // （使用中の接続には影響せず、次回アクセス時の再接続はローカルファイルでは数ms程度）
-            _host.FileCacheRepository.ReleasePooledConnections();
-
-            // Aggressive はLOHを含む全ヒープを圧縮し、空き領域をOSへ返却する
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive);
-        });
     }
 
     /// <summary>既存アイテムのプロパティを新規アイテムの情報で更新する。</summary>

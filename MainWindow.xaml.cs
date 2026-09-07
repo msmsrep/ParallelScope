@@ -81,6 +81,9 @@ public partial class MainWindow : Window
             // 設定ファイルが書けない状況でも終了処理は続行する
         }
 
+        // 設定の書き出しは遅延させているため、終了前に保留分を書き切る
+        _viewModel.FlushPendingSettings();
+
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
         PreviewKeyDown -= MainWindow_PreviewKeyDown;

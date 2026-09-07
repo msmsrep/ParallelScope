@@ -44,9 +44,10 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Utilities/FileListCsvExporterTests` | `FileListCsvExporter` | 選択列どおりの見出し・行、生バイト出力時の `Size (bytes)` 見出し、RFC 4180のエスケープ（必要な場合だけ引用符で囲む）、UTF-8 BOM、キャンセル |
 | `ViewModels/FileItemViewModelTests` | `FileItemViewModel` | 表示用文字列（`SizeText` / `ModifiedTime` / `CreatedTime` / `FullPath`）の生成規則と、生値変更時の `PropertyChanged` 通知 |
 | `Data/FileCacheRepositoryTests` | `FileCacheRepository` | 一覧の並び順（フォルダ先・名前昇順）、全列のラウンドトリップ、差分書き込みの戻り値、配下ファイルの再帰列挙、検索のLIKEエスケープ、子フォルダ合計サイズ、`DeleteStaleEntries` の各分岐 |
-| `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック |
+| `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック、遅延書き出し（保存直後でも別インスタンスから読めること、`Flush` でファイルへ書き切ること、保存が無ければファイルを作らないこと） |
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
 | `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
+| `ViewModels/BrowserTabTests` | 1ペイン内のタブ操作 | 追加・複製・クローズ・切り替え・並べ替え・開き直しと、非表示タブが一覧を手放す基準がタブ数で絞られること |
 | `ViewModels/PaneRestoreTests` | タブ構成・分割状態の保存と復元 | 並び順・表示中のタブ・All Filesモード・2画面構成の復元、消えたフォルダのタブがルートへ寄ること、表示するタブ以外は初回表示まで読み込まないこと、未購読時は復元せず保存済みの構成も消さないこと |
 | `ViewModels/TreeNodeSettingsTests` | ツリー最上位ノードの表示/非表示・並び順 | 既定値、非表示にしたノードがツリーから消えること、Foldersは全て隠しても残ること、並び替えの反映、表示中のノードを隠したときの退避、保存と復元、旧設定・未知キーの補完 |
 | `Utilities/HiddenItemVisibilityTests` | `HiddenItemVisibility` | 属性で一覧から外れること、片方だけ許可しても両方の属性を持つ項目は出さないこと、属性未取得（旧キャッシュ行）は出すこと、常にReparsePointを飛ばすこと |

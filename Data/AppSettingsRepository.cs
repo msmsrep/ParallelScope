@@ -1,6 +1,7 @@
 ﻿using System.IO;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Threading;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.Data;
@@ -27,6 +28,9 @@ public class AppSettingsRepository
     /// <summary>設定ファイルを読み込む。存在しない、または読み込みに失敗した場合はデフォルト設定を返す。</summary>
     public AppSettings Load()
     {
+        // 書き出しは遅延させているため、読む前に保留分を反映しておく（書いた直後でも最新が読める）
+        Flush();
+
         if (!File.Exists(_settingsPath))
         {
             return new AppSettings();
@@ -124,8 +128,80 @@ public class AppSettingsRepository
         }
     }
 
-    /// <summary>設定をJSONファイルに書き出す。</summary>
+    /// <summary>
+    /// 書き出しをまとめるための待ち時間。フォルダ移動1回で「タブ構成」「アクセス実績」の2回、
+    /// タブの開閉ではさらに増えるため、そのたびにUIスレッドから同期I/Oを行わずに済ませる。
+    /// </summary>
+    private static readonly TimeSpan WriteDelay = TimeSpan.FromMilliseconds(300);
+
+    // 保留中の書き出しは settings.json のパス単位（プロセス全体）で持つ。
+    // 同じファイルを指すインスタンスが複数あっても「書いた直後に読める」ことを保証するため
+    private static readonly Dictionary<string, (long Sequence, AppSettings Settings)> PendingWrites =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly Dictionary<string, long> LastWrittenSequences =
+        new(StringComparer.OrdinalIgnoreCase);
+    private static readonly object PendingWritesGate = new();
+    private static readonly object WriteGate = new();
+    private static long _writeSequence;
+
+    /// <summary>
+    /// 設定の書き出しを予約する。実際にファイルへ書くのは <see cref="WriteDelay"/> 後で、
+    /// その間に来た保存は最後の1件にまとめられる。
+    /// 読み出し（<see cref="Load"/>）と終了時（<see cref="Flush"/>）は待たずに反映される。
+    /// </summary>
     public void Save(AppSettings settings)
+    {
+        var sequence = Interlocked.Increment(ref _writeSequence);
+        lock (PendingWritesGate)
+        {
+            PendingWrites[_settingsPath] = (sequence, settings);
+        }
+
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(WriteDelay).ConfigureAwait(false);
+            Flush();
+        });
+    }
+
+    /// <summary>
+    /// 保留中の書き出しがあれば今すぐファイルへ書く。読み出しの直前と、アプリの終了時に呼ぶ。
+    /// 書けなかった場合は黙って諦める（設定ファイルが一時的に書けないだけで操作を失敗させない）。
+    /// </summary>
+    public void Flush()
+    {
+        (long Sequence, AppSettings Settings) pending;
+        lock (PendingWritesGate)
+        {
+            if (!PendingWrites.Remove(_settingsPath, out pending))
+            {
+                return;
+            }
+        }
+
+        lock (WriteGate)
+        {
+            // 取り出す順とファイルへ書く順は必ずしも一致しないため、より新しい内容を古い内容で上書きしない
+            if (LastWrittenSequences.TryGetValue(_settingsPath, out var written) && written > pending.Sequence)
+            {
+                return;
+            }
+
+            LastWrittenSequences[_settingsPath] = pending.Sequence;
+
+            try
+            {
+                WriteToFile(pending.Settings);
+            }
+            catch
+            {
+                // 書けない状況（ディスクフル・権限など）でも操作は続行させる。
+                // 次の保存で改めて書き出されるため、ここでは諦めてよい
+            }
+        }
+    }
+
+    private void WriteToFile(AppSettings settings)
     {
         var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions
         {

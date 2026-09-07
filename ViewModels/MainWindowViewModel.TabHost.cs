@@ -17,6 +17,10 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     BackgroundWorkGate IBrowserTabHost.BackgroundGate => _backgroundWorkGate;
 
+    int IBrowserTabHost.TotalTabCount => AllTabs.Count();
+
+    void IBrowserTabHost.RequestMemoryTrim(int replacedItemCount) => RequestMemoryTrim(replacedItemCount);
+
     FileNameIndex? IBrowserTabHost.NameIndex => GetUsableNameIndex();
 
     bool IBrowserTabHost.UseRegexSearch => IsRegexSearchActive;

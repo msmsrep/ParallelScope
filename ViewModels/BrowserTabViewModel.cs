@@ -243,7 +243,8 @@ public partial class BrowserTabViewModel : ObservableObject
     /// </summary>
     internal void SuspendIfHeavy()
     {
-        if (FileItems.Count < SuspendItemCountThreshold && _currentDirectoryItems.Count < SuspendItemCountThreshold)
+        var threshold = GetSuspendItemCountThreshold();
+        if (FileItems.Count < threshold && _currentDirectoryItems.Count < threshold)
         {
             return;
         }
@@ -284,8 +285,26 @@ public partial class BrowserTabViewModel : ObservableObject
         RefreshCurrentFolder();
     }
 
-    /// <summary>この件数以上の一覧を持つタブは、非表示になった時点で一覧を手放す。</summary>
-    private const int SuspendItemCountThreshold = 5_000;
+    /// <summary>全タブ合わせて抱えたままにしてよい一覧の件数の目安（これをタブ数で割る）。</summary>
+    private const int RetainedItemBudget = 20_000;
+
+    /// <summary>1タブあたりの上限の下限・上限。</summary>
+    private const int MinSuspendItemCountThreshold = 1_000;
+    private const int MaxSuspendItemCountThreshold = 5_000;
+
+    /// <summary>
+    /// この件数以上の一覧を持つタブは、非表示になった時点で一覧を手放す。
+    /// タブが増えるほど1タブあたりの取り分を絞る —— 上限を一律にすると、開いているタブ数ぶんだけ
+    /// 一覧がそのまま積み上がるため。タブが数本のうちは従来どおり手放さない
+    /// （切り替えのたびに空表示を挟まないほうが体感がよく、その本数ぶんなら抱えても知れている）。
+    /// </summary>
+    internal int GetSuspendItemCountThreshold()
+    {
+        return Math.Clamp(
+            RetainedItemBudget / Math.Max(1, _host.TotalTabCount),
+            MinSuspendItemCountThreshold,
+            MaxSuspendItemCountThreshold);
+    }
 
     /// <summary>閉じたタブを開き直すために、復元に必要な状態を控える。</summary>
     internal ClosedTabState CreateClosedState(int index)

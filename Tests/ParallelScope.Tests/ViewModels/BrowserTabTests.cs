@@ -37,6 +37,28 @@ public class BrowserTabTests : IDisposable
         return new MainWindowViewModel(_fileCacheRepository, _settingsRepository).ActivePane;
     }
 
+    /// <summary>
+    /// 非表示のタブが一覧を手放す基準は、タブ数が増えるほど絞られることの確認
+    /// （上限を一律にすると、開いているタブ数ぶんだけ一覧が積み上がるため）。
+    /// </summary>
+    [Fact]
+    public void RetainedItemThreshold_ShrinksAsMoreTabsAreOpened()
+    {
+        var pane = CreatePane();
+
+        // タブが数本のうちは従来どおり手放さない（切り替えのたびに空表示を挟まないため）
+        Assert.Equal(5_000, pane.ActiveTab.GetSuspendItemCountThreshold());
+
+        while (pane.CanAddTab)
+        {
+            pane.OpenTab(_rootB.Path);
+        }
+
+        // 20タブでは 20,000 / 20 = 1,000 件まで
+        Assert.Equal(BrowserPaneViewModel.MaxTabCount, pane.Tabs.Count);
+        Assert.Equal(1_000, pane.ActiveTab.GetSuspendItemCountThreshold());
+    }
+
     [Fact]
     public void NewPane_HasSingleActiveTab()
     {

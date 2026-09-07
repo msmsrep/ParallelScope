@@ -315,6 +315,12 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ・お気に入り・アクセス実績）をsettings.jsonへ保存する。</summary>
+    /// <summary>
+    /// 遅延させている設定の書き出しを、待たずにファイルへ反映する（アプリの終了時に呼ぶ）。
+    /// 通常の読み出しはリポジトリ側が読む前に反映するため、ここを呼ぶ必要はない。
+    /// </summary>
+    public void FlushPendingSettings() => _appSettingsRepository.Flush();
+
     private void SaveSettings()
     {
         _appSettingsRepository.Save(new AppSettings

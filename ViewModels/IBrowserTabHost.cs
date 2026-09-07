@@ -20,6 +20,12 @@ internal interface IBrowserTabHost
     /// <summary>タブの背景処理の同時実行数を絞るゲート（アプリ全体で1インスタンス）。</summary>
     BackgroundWorkGate BackgroundGate { get; }
 
+    /// <summary>全ペイン合わせて開いているタブの本数（1タブが抱えてよい一覧の件数を決めるのに使う）。</summary>
+    int TotalTabCount { get; }
+
+    /// <summary>大量アイテムの入れ替えが起きたことを通知する（アプリ全体で1回にまとめてメモリを返すため）。</summary>
+    void RequestMemoryTrim(int replacedItemCount);
+
     /// <summary>検索に使えるファイル名索引（Plus機能。無効・未完成なら null で、キャッシュDBへの検索に切り替える）。</summary>
     FileNameIndex? NameIndex { get; }
 
