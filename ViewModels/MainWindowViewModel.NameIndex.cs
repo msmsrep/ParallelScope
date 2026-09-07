@@ -56,6 +56,10 @@ public partial class MainWindowViewModel
             try
             {
                 _fileNameIndex.Build();
+
+                // 並べ替え前の配列（150万件で80MB規模）はここで用済みになる。
+                // LOHに残ったままだとコミット済みのワーキングセットが積み上がるため回収を予約する
+                RequestMemoryTrim(_fileNameIndex.EntryCount);
             }
             catch
             {

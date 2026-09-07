@@ -131,6 +131,26 @@ public class FileNameIndexTests : IDisposable
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>
+    /// 索引の配列は事前に数えた見積もりで確保するが、SQLiteのlength()はコードポイント単位のため
+    /// サロゲートペア（絵文字など）を含む名前があると見積もりが足りなくなる。
+    /// その場合でも取りこぼさずに広げられることの確認。
+    /// </summary>
+    [Fact]
+    public void Build_HandlesNamesLongerThanTheSizeHint()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            File(@"C:\Root", "😀😀😀 surrogate.txt"),
+            File(@"C:\Root", "plain.txt")
+        });
+
+        _index.Build();
+
+        AssertMatchesDatabaseSearch(@"C:\Root", "surrogate");
+        AssertMatchesDatabaseSearch(@"C:\Root", "txt");
+    }
+
     [Fact]
     public void SearchUnderPath_ExcludesSiblingsWithTheSameNamePrefix()
     {

@@ -136,7 +136,16 @@ public class FileCacheRepository
     /// </summary>
     public void ReleasePooledConnections()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        try
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        }
+        catch
+        {
+            // ClearAllPools はプロセス全体のプールを走査し、その時点で別スレッドが使っている接続に
+            // 出くわすと SQLite Error 5 を投げることがある。メモリを返せるときに返すだけの処理なので、
+            // 失敗しても次の機会に任せる（ここで投げると呼び出し側のGCや後処理まで飛んでしまう）
+        }
     }
 
     /// <summary>指定した親パス直下のキャッシュ済みエントリ一覧を取得する。</summary>
@@ -350,6 +359,33 @@ public class FileCacheRepository
 
     /// <summary>ファイル名索引を組み立てるための最小限の行（行ID・親パス・名前・フォルダかどうか）。</summary>
     public readonly record struct NameIndexRow(int Id, string ParentPath, string Name, bool IsFolder);
+
+    /// <summary>
+    /// ファイル名索引の組み立て前に、必要な配列の大きさを見積もるための件数と名前の総文字数を返す。
+    /// これが無いと可変長リストの倍々確保になり、150万件では確保のたびに数十MBの旧配列がLOHへ残る。
+    /// 数えた後に行が増減しうるためあくまで見積もりで、足りなければ呼び出し側が広げる。
+    /// </summary>
+    public (int RowCount, int TotalNameLength) GetNameIndexSizeHint()
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(length(Name)), 0) FROM FileSystemEntries";
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+        {
+            return (0, 0);
+        }
+
+        // SQLiteのlength()はコードポイント単位なので、サロゲートペアを含む名前があると
+        // C#のstring.Length（UTF-16単位）より小さくなる。少なめに出る前提で扱う
+        var rowCount = (int)Math.Min(reader.GetInt64(0), int.MaxValue);
+        var totalNameLength = (int)Math.Min(reader.GetInt64(1), int.MaxValue);
+        return (rowCount, totalNameLength);
+    }
 
     /// <summary>
     /// ファイル名索引の材料を全件列挙する（<see cref="FileNameIndex"/> 用）。

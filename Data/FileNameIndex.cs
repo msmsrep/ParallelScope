@@ -54,12 +54,15 @@ public sealed class FileNameIndex
     /// <summary>索引が組み上がっていて検索に使えるか。</summary>
     public bool IsReady => Volatile.Read(ref _snapshot) is not null;
 
+    /// <summary>索引に載っているエントリ数（組み上がっていなければ0）。</summary>
+    public int EntryCount => Volatile.Read(ref _snapshot)?.EntryCount ?? 0;
+
     /// <summary>索引を作り直す（バックグラウンドから呼ぶこと。150万件で2秒強かかる）。</summary>
     public void Build()
     {
-        var (packedNames, nameOffsets, parentIds, rowIds, isFolders, parentPaths) = ReadAllEntries();
-        var displayOrder = BuildDisplayOrder(packedNames, nameOffsets, isFolders);
-        var snapshot = Reorder(packedNames, nameOffsets, parentIds, rowIds, isFolders, parentPaths, displayOrder);
+        var raw = ReadAllEntries();
+        var displayOrder = BuildDisplayOrder(raw);
+        var snapshot = Reorder(raw, displayOrder);
 
         lock (_changedParentPaths)
         {
@@ -69,22 +72,56 @@ public sealed class FileNameIndex
         Volatile.Write(ref _snapshot, snapshot);
     }
 
-    /// <summary>キャッシュDBの全行から、名前（ASCII大文字化して連結）と付随情報を読み出す。</summary>
-    private (List<char> PackedNames, List<int> NameOffsets, List<int> ParentIds, List<int> RowIds, List<bool> IsFolders, List<string> ParentPaths)
-        ReadAllEntries()
+    /// <summary>
+    /// 並べ替える前の、読み出したままの索引データ。
+    /// 名前の連結先だけで150万件80MB規模になるため、この段階から配列で持ち、
+    /// 並べ替え時もコピーを増やさずこのインスタンスをそのまま渡す。
+    /// </summary>
+    private sealed class RawEntries
     {
-        var packedNames = new List<char>();
-        var nameOffsets = new List<int> { 0 };
-        var parentIds = new List<int>();
-        var rowIds = new List<int>();
-        var isFolders = new List<bool>();
+        public char[] PackedNames = Array.Empty<char>();
+        public int[] NameOffsets = Array.Empty<int>();
+        public int[] ParentIds = Array.Empty<int>();
+        public int[] RowIds = Array.Empty<int>();
+        public bool[] IsFolders = Array.Empty<bool>();
+        public string[] ParentPaths = Array.Empty<string>();
+
+        /// <summary>読み出した行数（配列は見積もりで確保するため、実際の長さとは一致しない）。</summary>
+        public int Count;
+
+        /// <summary><see cref="PackedNames"/> のうち実際に使っている長さ。</summary>
+        public int PackedLength;
+    }
+
+    /// <summary>
+    /// キャッシュDBの全行から、名前（ASCII大文字化して連結）と付随情報を読み出す。
+    /// 配列の大きさは事前に数えた見積もりで一度に確保する —— 可変長リストの倍々確保だと、
+    /// 150万件では確保のたびに数十MBの旧配列がLOHへ残り、組み立て中のピークが倍以上になる。
+    /// </summary>
+    private RawEntries ReadAllEntries()
+    {
+        var (rowCountHint, nameLengthHint) = _repository.GetNameIndexSizeHint();
+
+        var raw = new RawEntries
+        {
+            PackedNames = new char[Math.Max(1, nameLengthHint)],
+            NameOffsets = new int[Math.Max(2, rowCountHint + 1)],
+            ParentIds = new int[Math.Max(1, rowCountHint)],
+            RowIds = new int[Math.Max(1, rowCountHint)],
+            IsFolders = new bool[Math.Max(1, rowCountHint)]
+        };
+
         var parentPaths = new List<string>();
         var parentIdByPath = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var row in _repository.EnumerateNameIndexRows())
         {
-            rowIds.Add(row.Id);
-            isFolders.Add(row.IsFolder);
+            // 見積もりは読み出しの前に数えたものなので、その後に行が増えていれば広げる
+            EnsureRowCapacity(raw, raw.Count + 1);
+            EnsureNameCapacity(raw, raw.PackedLength + row.Name.Length);
+
+            raw.RowIds[raw.Count] = row.Id;
+            raw.IsFolders[raw.Count] = row.IsFolder;
 
             if (!parentIdByPath.TryGetValue(row.ParentPath, out var parentId))
             {
@@ -93,26 +130,54 @@ public sealed class FileNameIndex
                 parentIdByPath[row.ParentPath] = parentId;
             }
 
-            parentIds.Add(parentId);
+            raw.ParentIds[raw.Count] = parentId;
 
             // 比較のたびに畳まずに済むよう、格納時にASCIIの大文字へ寄せておく（NameSearchMatcherと同じ規則）
             foreach (var character in row.Name)
             {
-                packedNames.Add(NameSearchMatcher.FoldAscii(character));
+                raw.PackedNames[raw.PackedLength++] = NameSearchMatcher.FoldAscii(character);
             }
 
-            nameOffsets.Add(packedNames.Count);
+            raw.Count++;
+            raw.NameOffsets[raw.Count] = raw.PackedLength;
         }
 
-        return (packedNames, nameOffsets, parentIds, rowIds, isFolders, parentPaths);
+        raw.ParentPaths = parentPaths.ToArray();
+        return raw;
+    }
+
+    private static void EnsureRowCapacity(RawEntries raw, int required)
+    {
+        if (required <= raw.RowIds.Length)
+        {
+            return;
+        }
+
+        var capacity = Math.Max(required, raw.RowIds.Length * 2);
+        Array.Resize(ref raw.RowIds, capacity);
+        Array.Resize(ref raw.IsFolders, capacity);
+        Array.Resize(ref raw.ParentIds, capacity);
+        Array.Resize(ref raw.NameOffsets, capacity + 1);
+    }
+
+    private static void EnsureNameCapacity(RawEntries raw, int required)
+    {
+        if (required <= raw.PackedNames.Length)
+        {
+            return;
+        }
+
+        Array.Resize(ref raw.PackedNames, Math.Max(required, raw.PackedNames.Length * 2));
     }
 
     /// <summary>表示順（フォルダが先、次に名前の昇順）へ並べ替える順番を求める。</summary>
-    private static int[] BuildDisplayOrder(List<char> packedNames, List<int> nameOffsets, List<bool> isFolders)
+    private static int[] BuildDisplayOrder(RawEntries raw)
     {
-        var names = packedNames.ToArray();
-        var offsets = nameOffsets;
-        var order = new int[isFolders.Count];
+        var names = raw.PackedNames;
+        var offsets = raw.NameOffsets;
+        var isFolders = raw.IsFolders;
+
+        var order = new int[raw.Count];
         for (var i = 0; i < order.Length; i++)
         {
             order[i] = i;
@@ -134,13 +199,14 @@ public sealed class FileNameIndex
     }
 
     /// <summary>求めた順番どおりに詰め直す（走査が連続アクセスになり、そのまま表示順に流せる）。</summary>
-    private static Snapshot Reorder(
-        List<char> packedNames, List<int> nameOffsets, List<int> parentIds, List<int> rowIds,
-        List<bool> isFolders, List<string> parentPaths, int[] displayOrder)
+    private static Snapshot Reorder(RawEntries raw, int[] displayOrder)
     {
         var count = displayOrder.Length;
-        var sourceNames = packedNames.ToArray();
-        var sortedNames = new char[sourceNames.Length];
+        var sourceNames = raw.PackedNames;
+        var nameOffsets = raw.NameOffsets;
+
+        // 出来上がりは実際に使っている長さちょうどで確保する（見積もりが多めに出ていても余りを抱えない）
+        var sortedNames = new char[raw.PackedLength];
         var sortedOffsets = new int[count + 1];
         var sortedParentIds = new int[count];
         var sortedRowIds = new int[count];
@@ -157,12 +223,12 @@ public sealed class FileNameIndex
             position += length;
 
             sortedOffsets[i + 1] = position;
-            sortedParentIds[i] = parentIds[source];
-            sortedRowIds[i] = rowIds[source];
-            sortedIsFolders[i] = isFolders[source];
+            sortedParentIds[i] = raw.ParentIds[source];
+            sortedRowIds[i] = raw.RowIds[source];
+            sortedIsFolders[i] = raw.IsFolders[source];
         }
 
-        return new Snapshot(sortedNames, sortedOffsets, sortedParentIds, sortedRowIds, sortedIsFolders, parentPaths.ToArray(), count);
+        return new Snapshot(sortedNames, sortedOffsets, sortedParentIds, sortedRowIds, sortedIsFolders, raw.ParentPaths, count);
     }
 
     /// <summary>索引を捨ててメモリを返す（機能を無効にしたとき・購読が切れたとき）。</summary>

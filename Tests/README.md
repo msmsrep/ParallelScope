@@ -44,6 +44,7 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | `Utilities/FileListCsvExporterTests` | `FileListCsvExporter` | 選択列どおりの見出し・行、生バイト出力時の `Size (bytes)` 見出し、RFC 4180のエスケープ（必要な場合だけ引用符で囲む）、UTF-8 BOM、キャンセル |
 | `ViewModels/FileItemViewModelTests` | `FileItemViewModel` | 表示用文字列（`SizeText` / `ModifiedTime` / `CreatedTime` / `FullPath`）の生成規則と、生値変更時の `PropertyChanged` 通知 |
 | `Data/FileCacheRepositoryTests` | `FileCacheRepository` | 一覧の並び順（フォルダ先・名前昇順）、全列のラウンドトリップ、差分書き込みの戻り値、配下ファイルの再帰列挙、検索のLIKEエスケープ、子フォルダ合計サイズ、`DeleteStaleEntries` の各分岐 |
+| `Data/FileNameIndexTests` | `FileNameIndex` | 索引での検索がキャッシュDBへの検索と同じ内容・同じ並びになること（部分一致・正規表現・範囲の絞り込み）、組み立て後に変わったフォルダの引き直し、上限超過での破棄、見積もりより長い名前（サロゲートペア）でも取りこぼさないこと |
 | `Data/AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON・旧形式（プロパティ欠落）でのフォールバック、遅延書き出し（保存直後でも別インスタンスから読めること、`Flush` でファイルへ書き切ること、保存が無ければファイルを作らないこと） |
 | `Services/StoreLicenseServiceTests` | `StoreLicenseService` | ライセンス未取得の間は未購読扱いであること、誤った開発者キーで解放されないこと、`RefreshLicenseAsync` が例外を出さないこと |
 | `ViewModels/LanguageSettingTests` | 表示言語の設定 | 既定がOS追従であること、`ApplyLanguage` の即時適用・保存、仮想ノードの表示名の追従、起動時の `ApplySavedLanguage` での復元 |
