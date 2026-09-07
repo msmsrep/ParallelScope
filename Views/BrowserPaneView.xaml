@@ -61,7 +61,6 @@
         <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -71,19 +70,63 @@
             <ColumnDefinition Width="*" MinWidth="240"/>
         </Grid.ColumnDefinitions>
 
-        <!-- タブ列（Plus機能。未購読の間はコードビハインドが非表示にする） -->
-        <Border Grid.Row="0" Grid.ColumnSpan="3" Name="TabStripBorder" Margin="0,0,0,8" Padding="4,3"
-                Visibility="Collapsed" AllowDrop="True"
-                DragOver="TabStrip_DragOver" Drop="TabStrip_Drop"
-                Style="{StaticResource CardBorderStyle}">
-            <Grid>
+        <!-- 上段: ツリー開閉・戻る/進む/上へ・アドレス欄・タブ列を1行にまとめる
+             （別々の行に置くと縦を1行ぶん余分に使い、一覧の表示件数が減るため） -->
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
+            <Grid VerticalAlignment="Center">
+                <!-- 左側（ボタン＋アドレス欄）で横幅の約1/3、残りをタブ列に回す -->
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="240"/>
+                    <ColumnDefinition x:Name="TabStripColumn" Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- タブが増えて溢れたら横スクロールで辿れるようにする -->
-                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <Grid Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                    <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
+                    <ToggleButton Name="TreeToggleButton" Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                                  Visibility="Collapsed"
+                                  ToolTip="{loc:Loc Nav.ToggleTree}"
+                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
+                        <TextBlock Text="&#xE700;" FontSize="14"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   Style="{StaticResource ToggleButtonContentTextStyle}"/>
+                    </ToggleButton>
+                    <!-- 文言ではなく矢印にして幅を詰める（言語によらず同じ幅で済み、空いた横幅をアドレス欄とタブ列に回せる）。
+                         文字色はボタンから継承させる（明示すると無効時に淡くならない） -->
+                    <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            ToolTip="{loc:Loc Nav.Back}" Click="BackButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoBack}"/>
+                    <Button Content="&#xE72A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            ToolTip="{loc:Loc Nav.Forward}" Click="ForwardButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoForward}"/>
+                    <Button Content="&#xE74A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0"
+                            ToolTip="{loc:Loc Nav.Up}" Click="UpButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoUp}"/>
+                </StackPanel>
+
+                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
+                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
+                </Grid>
+
+                <!-- タブ列（Plus機能。未購読の間はコードビハインドが列ごと畳む） -->
+                <Grid Grid.Column="1" Name="TabStripPanel" Margin="8,0,0,0"
+                      Background="Transparent" Visibility="Collapsed" AllowDrop="True"
+                      DragOver="TabStrip_DragOver" Drop="TabStrip_Drop">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- タブが増えて溢れたら横スクロールで辿れるようにする -->
+                    <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <ItemsControl Name="TabItemsControl" ItemsSource="{Binding Tabs}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -192,49 +235,18 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                        ToolTip="{loc:Loc Tab.New}"
-                        IsEnabled="{Binding CanAddTab}"
-                        Click="NewTabButton_Click"/>
-            </Grid>
-        </Border>
-
-        <!-- ナビゲーション: 戻る/進む/上へ とアドレス欄（ペインごとに1組持つ） -->
-        <Border Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
-            <Grid VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
-                    <ToggleButton Name="TreeToggleButton" Width="36" Padding="0" Margin="0,0,6,0"
-                                  Visibility="Collapsed"
-                                  ToolTip="{loc:Loc Nav.ToggleTree}"
-                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
-                        <TextBlock Text="&#xE700;" FontSize="14"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                   Style="{StaticResource ToggleButtonContentTextStyle}"/>
-                    </ToggleButton>
-                    <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
-                    <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoBack}"/>
-                    <Button Content="{loc:Loc Nav.Forward}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="ForwardButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoForward}"/>
-                    <Button Content="{loc:Loc Nav.Up}" MinWidth="80" Padding="8,0" Click="UpButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoUp}"/>
-                </StackPanel>
-
-                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
-                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
+                    <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            ToolTip="{loc:Loc Tab.New}"
+                            IsEnabled="{Binding CanAddTab}"
+                            Click="NewTabButton_Click"/>
+                </Grid>
             </Grid>
         </Border>
 
         <!-- 左側: フォルダツリー -->
-        <Border Grid.Row="2" Grid.Column="0" Name="TreeBorder" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+        <Border Grid.Row="1" Grid.Column="0" Name="TreeBorder" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
             <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
@@ -307,11 +319,11 @@
         </Border>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Row="2" Grid.Column="1" Name="TreeSplitter" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+        <GridSplitter Grid.Row="1" Grid.Column="1" Name="TreeSplitter" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                       Background="Transparent" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->
-        <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
             <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>

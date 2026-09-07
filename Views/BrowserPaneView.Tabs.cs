@@ -23,7 +23,11 @@ public partial class BrowserPaneView
     internal void SetTabsEnabled(bool isEnabled)
     {
         _areTabsEnabled = isEnabled;
-        TabStripBorder.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
+        TabStripPanel.Visibility = isEnabled ? Visibility.Visible : Visibility.Collapsed;
+        // タブ列はアドレス欄と同じ行を分け合うため、非表示のときは列ごと畳む
+        // （星の列のままだと中身が無くても横幅を取り続ける）。
+        // 2* にして、ボタン＋アドレス欄側（1*）が横幅の約1/3に収まるようにする
+        TabStripColumn.Width = isEnabled ? new GridLength(2, GridUnitType.Star) : GridLength.Auto;
     }
 
     /// <summary>タブ機能が現在使えるか（ウィンドウ側のショートカット処理から参照する）。</summary>
