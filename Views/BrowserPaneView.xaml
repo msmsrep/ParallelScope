@@ -113,7 +113,21 @@
                 </StackPanel>
 
                 <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
-                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
+                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"
+                         ToolTipService.ShowDuration="30000">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                            <!-- 幅が狭く長いパスは末尾が切れるため、ホバーで全体を読めるようにする -->
+                            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                            <Style.Triggers>
+                                <!-- 空のときは中身の無い枠だけが出てしまうので、ツールチップ自体を出さない -->
+                                <Trigger Property="Text" Value="">
+                                    <Setter Property="ToolTip" Value="{x:Null}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
                 </Grid>
 
                 <!-- タブ列（Plus機能。未購読の間はコードビハインドが列ごと畳む） -->
