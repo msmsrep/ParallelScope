@@ -246,6 +246,9 @@ public partial class BrowserPaneViewModel : ObservableObject
 
     /// <summary>
     /// 保存済みのタブ構成を復元する。1つ目のタブは既にあるものを使い回す。
+    /// 一覧を読み込むのは表示するタブだけで、残りは移動先を控えるだけにして初回表示まで遅らせる
+    /// （全タブぶんのキャッシュ読み・ファイルシステム列挙・キャッシュ書き込みが起動時に一斉に走ると、
+    /// SQLiteの書き込み待ちとスレッドプールの飽和でアプリ全体が固まるため）。
     /// 移動できなかった（フォルダが無くなった）タブは、最初のルートへ寄せるか取り除く。
     /// </summary>
     internal void RestoreTabs(IReadOnlyList<TabStateSettings> states, int activeTabIndex, string? fallbackPath)
@@ -261,11 +264,7 @@ public partial class BrowserPaneViewModel : ObservableObject
 
             // セッターだと保存や再取得が走るため、初期値として直接入れる
             tab.InitializeFlatFileViewEnabled(state.IsFlatFileViewEnabled);
-
-            if (!tab.NavigateTo(state.Path, false) && fallbackPath is not null)
-            {
-                tab.NavigateTo(fallbackPath, false);
-            }
+            tab.PrepareDeferredRestore(state.Path, fallbackPath);
         }
 
         // 移動先が1つも見つからなかったタブは残さない（空のタブが並ぶのを防ぐ）。最後の1つは残す
@@ -279,7 +278,12 @@ public partial class BrowserPaneViewModel : ObservableObject
             Tabs.Remove(emptyTab);
         }
 
-        ActivateTab(Tabs[Math.Clamp(activeTabIndex, 0, Tabs.Count - 1)]);
+        var tabToShow = Tabs[Math.Clamp(activeTabIndex, 0, Tabs.Count - 1)];
+        ActivateTab(tabToShow);
+
+        // 1つ目のタブが表示対象の場合、既にActiveTabなのでActivateTabが早期returnする。
+        // 遅らせた読み込みは表示するタブだけここで必ず走らせる（2回目以降は何もしない）
+        tabToShow.OnActivated();
     }
 
     /// <summary>settings.json へ保存するための、このペインのタブ構成を組み立てる。</summary>

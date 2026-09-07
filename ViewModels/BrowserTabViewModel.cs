@@ -36,6 +36,12 @@ public partial class BrowserTabViewModel : ObservableObject
     private bool _isSuspended;
     private bool _isStale;
 
+    // 復元したがまだ一度も表示していないタブの移動先（null なら遅延中ではない）。
+    // 起動時に全タブぶんの読み込みを走らせないよう、移動先だけ控えて初回表示まで遅らせる
+    // （BrowserTabViewModel.Navigation.cs の PrepareDeferredRestore を参照）
+    private string? _pendingRestorePath;
+    private string? _pendingRestoreFallbackPath;
+
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
     private readonly SingleFlightCoalescer<(string RootPath, NameSearchPattern Pattern, int SearchVersion, bool FilesOnly)> _searchCoalescer;
@@ -262,6 +268,12 @@ public partial class BrowserTabViewModel : ObservableObject
     /// <summary>再び表示する際に、手放していた一覧・古くなった一覧をキャッシュから読み直す。</summary>
     internal void OnActivated()
     {
+        // 復元後の初回表示なら、遅らせていた移動をここで行う（一覧の読み込みもその中で走る）
+        if (TryConsumePendingRestore())
+        {
+            return;
+        }
+
         if (!_isSuspended && !_isStale)
         {
             return;
@@ -311,6 +323,10 @@ public partial class BrowserTabViewModel : ObservableObject
     /// <summary>表示できるルートが1つも無くなった場合に、現在地と一覧を空にする。</summary>
     internal void Clear()
     {
+        // 移動先を控えたままだと、次に表示したときに空にしたはずの場所へ戻ってしまう
+        _pendingRestorePath = null;
+        _pendingRestoreFallbackPath = null;
+
         CurrentPath = string.Empty;
         AddressInput = string.Empty;
         _currentDirectoryItems.Clear();

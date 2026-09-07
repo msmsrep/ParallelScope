@@ -19,7 +19,7 @@ public partial class BrowserTabViewModel
             // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く。
             // ViewModelの生成もここ（バックグラウンド）で済ませる —— 数万件のフォルダでは
             // 生成そのものがUIスレッドの停止時間になるため、UIスレッドには出来上がった一覧だけを渡す
-            (cachedEntries, cachedItems) = await Task.Run(() =>
+            (cachedEntries, cachedItems) = await _host.BackgroundGate.RunAsync(() =>
             {
                 var entries = _host.FileCacheRepository.GetEntriesByParentPath(folderPath)
                     .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))
@@ -66,7 +66,7 @@ public partial class BrowserTabViewModel
         List<FileItemViewModel> rootItems;
         try
         {
-            rootItems = await Task.Run(() =>
+            rootItems = await _host.BackgroundGate.RunAsync(() =>
             {
                 var cachedTotalSizes = _host.FileCacheRepository.GetCachedTotalSizesUnderPaths(rootPaths);
                 return rootPaths
@@ -122,7 +122,7 @@ public partial class BrowserTabViewModel
 
         try
         {
-            liveEntries = await Task.Run(() => _host.ReadEntriesFromFileSystem(folderPath));
+            liveEntries = await _host.BackgroundGate.RunAsync(() => _host.ReadEntriesFromFileSystem(folderPath));
         }
         catch
         {
@@ -134,7 +134,7 @@ public partial class BrowserTabViewModel
         bool cacheChanged;
         try
         {
-            cacheChanged = await Task.Run(() => _host.FileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
+            cacheChanged = await _host.BackgroundGate.RunAsync(() => _host.FileCacheRepository.ReplaceEntriesByParentPath(folderPath, liveEntries));
         }
         catch
         {
@@ -165,7 +165,7 @@ public partial class BrowserTabViewModel
         try
         {
             // ViewModelの生成はバックグラウンドで済ませる（UIスレッドの停止時間を減らすため）
-            liveItems = await Task.Run(() => ToViewModels(liveEntries).ToList());
+            liveItems = await _host.BackgroundGate.RunAsync(() => ToViewModels(liveEntries).ToList());
         }
         catch
         {
@@ -203,7 +203,7 @@ public partial class BrowserTabViewModel
         Dictionary<string, long> cachedFolderSizes;
         try
         {
-            cachedFolderSizes = await Task.Run(() => _host.FileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
+            cachedFolderSizes = await _host.BackgroundGate.RunAsync(() => _host.FileCacheRepository.GetCachedFolderTotalSizes(folderPath, folderPaths));
         }
         catch
         {

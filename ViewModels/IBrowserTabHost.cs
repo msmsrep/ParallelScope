@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -15,6 +16,9 @@ internal interface IBrowserTabHost
 
     /// <summary>ファイル一覧のキャッシュDB（アプリ全体で1インスタンス）。</summary>
     FileCacheRepository FileCacheRepository { get; }
+
+    /// <summary>タブの背景処理の同時実行数を絞るゲート（アプリ全体で1インスタンス）。</summary>
+    BackgroundWorkGate BackgroundGate { get; }
 
     /// <summary>検索に使えるファイル名索引（Plus機能。無効・未完成なら null で、キャッシュDBへの検索に切り替える）。</summary>
     FileNameIndex? NameIndex { get; }

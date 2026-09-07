@@ -21,6 +21,9 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly FileCacheRepository _fileCacheRepository;
     private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
+    // タブの背景処理の同時実行数を絞るゲート。タブごとのコアレサーはタブ内でしか統合しないため、
+    // タブ数ぶんの処理が一斉に走らないようアプリ全体で本数を抑える
+    private readonly BackgroundWorkGate _backgroundWorkGate = new(BackgroundWorkGate.DefaultMaxConcurrency);
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     // 除外判定用に、除外パスと「区切り文字付きの接頭辞」を作り置きした配列（SetExcludedPathsで更新）

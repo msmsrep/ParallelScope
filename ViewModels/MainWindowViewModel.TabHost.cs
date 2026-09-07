@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -13,6 +14,8 @@ public partial class MainWindowViewModel : IBrowserTabHost
     SynchronizationContext IBrowserTabHost.UiContext => _uiContext;
 
     FileCacheRepository IBrowserTabHost.FileCacheRepository => _fileCacheRepository;
+
+    BackgroundWorkGate IBrowserTabHost.BackgroundGate => _backgroundWorkGate;
 
     FileNameIndex? IBrowserTabHost.NameIndex => GetUsableNameIndex();
 
