@@ -94,6 +94,11 @@ public class FolderItemViewModel : ObservableObject
         set => SetProperty(ref _isExpanded, value);
     }
 
+    /// <summary>
+    /// 子フォルダ。読み込み時はコレクションのインスタンスごと差し替える（<see cref="SetSubFolders"/>）ため、
+    /// 差し替えを画面へ伝えられるよう変更通知を出す。
+    /// 仮想ノードだけは呼び出し側のコレクションを共有しており、差し替えは行わない。
+    /// </summary>
     public ObservableCollection<FolderItemViewModel> SubFolders
     {
         get
@@ -101,6 +106,18 @@ public class FolderItemViewModel : ObservableObject
             _subFolders ??= new ObservableCollection<FolderItemViewModel>();
             return _subFolders;
         }
+    }
+
+    /// <summary>
+    /// 子フォルダをまとめて入れ替える。
+    /// 1件ずつ Add すると件数分の CollectionChanged がUIスレッドで発生し、
+    /// 子が2万を超えるフォルダ（C:\Windows\WinSxS など）では展開だけで画面が固まるため、
+    /// ファイル一覧（<c>ReplaceVisibleFileItems</c>）と同じくインスタンスごと差し替えて通知を1回にする。
+    /// </summary>
+    private void SetSubFolders(IEnumerable<FolderItemViewModel> subFolders)
+    {
+        _subFolders = new ObservableCollection<FolderItemViewModel>(subFolders);
+        OnPropertyChanged(nameof(SubFolders));
     }
 
     public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null, bool isShortcut = false)
@@ -157,20 +174,11 @@ public class FolderItemViewModel : ObservableObject
         children.CollectionChanged += (_, _) => HasSubFolders = children.Count > 0;
     }
 
-    /// <summary>遅延読み込み（同期版）: パス遡査などで即座に実行が必要な場合に使用。</summary>
-    public void EnsureLoaded()
-    {
-        if (_isLoaded)
-        {
-            return;
-        }
-
-        _isLoaded = true;
-        var subDirs = GetSubFoldersList();
-        ApplySubFolders(subDirs);
-    }
-
-    /// <summary>遅延読み込み（非同期版）: UIスレッドブロックを避ける必要があるイベントで使用。</summary>
+    /// <summary>
+    /// 子フォルダを遅延読み込みする。列挙は必ずバックグラウンドで行う
+    /// —— 子が2万を超えるフォルダでは列挙だけでUIスレッドが数百msブロックされるため、
+    /// パス遡査のような「すぐ結果が要る」経路も含めて同期版は持たない。
+    /// </summary>
     public async Task EnsureLoadedAsync()
     {
         if (_isLoaded)
@@ -183,8 +191,15 @@ public class FolderItemViewModel : ObservableObject
         // バックグラウンドスレッドで子フォルダリストを構築
         var subDirs = await Task.Run(GetSubFoldersList);
 
-        // UIスレッドに戻ってコレクションを更新
-        await Application.Current.Dispatcher.InvokeAsync(() => ApplySubFolders(subDirs));
+        // UIスレッドに戻ってコレクションを更新（単体テストなど Application が無い場合はそのまま反映する）
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null)
+        {
+            ApplySubFolders(subDirs);
+            return;
+        }
+
+        await dispatcher.InvokeAsync(() => ApplySubFolders(subDirs));
     }
 
     /// <summary>
@@ -201,12 +216,10 @@ public class FolderItemViewModel : ObservableObject
         }
 
         _isLoaded = false;
-        _subFolders ??= new ObservableCollection<FolderItemViewModel>();
-        _subFolders.Clear();
 
         var dummy = new FolderItemViewModel(string.Empty, null);
         dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
-        _subFolders.Add(dummy);
+        SetSubFolders(new[] { dummy });
         HasSubFolders = true;
 
         if (IsExpanded)
@@ -235,16 +248,10 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    /// <summary>取得した子フォルダ一覧をコレクションへ反映する（ダミーアイテムのクリアを含む）。</summary>
+    /// <summary>取得した子フォルダ一覧をコレクションへ反映する（遅延読み込み中のダミーもここで消える）。</summary>
     private void ApplySubFolders(List<FolderItemViewModel> subDirs)
     {
-        _subFolders?.Clear();
-        _subFolders ??= new ObservableCollection<FolderItemViewModel>();
-
-        foreach (var subDir in subDirs)
-        {
-            _subFolders.Add(subDir);
-        }
+        SetSubFolders(subDirs);
 
         // サブフォルダがない場合、展開ボタンを表示しない
         HasSubFolders = subDirs.Count > 0;
