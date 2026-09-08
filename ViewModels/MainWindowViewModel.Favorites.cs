@@ -18,6 +18,14 @@ public partial class MainWindowViewModel
     /// <summary>「Recent」に並べるフォルダの最大件数（履歴なので「よく使う」より多めに出す）。</summary>
     private const int MaxRecentFolders = 20;
 
+    /// <summary>
+    /// アクセス実績を控えておくフォルダの上限。表示に使うのは「最近」20件と「よく使う」10件だけだが、
+    /// 回数を積み上げる余地を持たせるためもっと多めに残す。
+    /// 上限が無いと訪問したフォルダの数だけ settings.json が際限なく育ち、
+    /// 移動のたびの書き出し（=全件のJSON生成）が少しずつ重くなっていく。
+    /// </summary>
+    internal const int MaxFolderUsages = 200;
+
     // お気に入りの登録順（正規化済みパス）。ツリーの並び順もこの順になる
     private List<string> _favoritePaths = new();
 
@@ -187,6 +195,9 @@ public partial class MainWindowViewModel
                 Count = 1,
                 LastAccessedAt = DateTime.Now
             };
+
+            // 増えるのは新しいフォルダを開いたときだけなので、絞り込みもここでだけ試みる
+            TrimFolderUsages();
         }
 
         // 書き出しはリポジトリ側で遅延・集約され、失敗しても黙って諦めるため、
@@ -208,6 +219,31 @@ public partial class MainWindowViewModel
     public IReadOnlyList<string> GetFavoritePaths()
     {
         return _favoritePaths.ToList();
+    }
+
+    /// <summary>
+    /// アクセス実績を上限（<see cref="MaxFolderUsages"/>）まで絞る。最終アクセスが古いものから捨てるが、
+    /// 「よく使う」に並ぶ回数上位だけは最近触っていなくても残す
+    /// —— 捨てると回数が0から数え直しになり、よく使うフォルダが一覧から消えてしまうため。
+    /// </summary>
+    private void TrimFolderUsages()
+    {
+        if (_folderUsages.Count <= MaxFolderUsages)
+        {
+            return;
+        }
+
+        var frequentlyUsed = _folderUsages.Values
+            .OrderByDescending(usage => usage.Count)
+            .ThenByDescending(usage => usage.LastAccessedAt)
+            .Take(MaxFrequentFolders)
+            .ToHashSet();
+
+        _folderUsages = _folderUsages.Values
+            .OrderByDescending(frequentlyUsed.Contains)
+            .ThenByDescending(usage => usage.LastAccessedAt)
+            .Take(MaxFolderUsages)
+            .ToDictionary(usage => usage.Path, usage => usage, StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>アクセス回数の多いフォルダのパス一覧（回数の多い順、同数なら最終アクセスが新しい順）。</summary>
@@ -276,6 +312,9 @@ public partial class MainWindowViewModel
                 LastAccessedAt = usage.LastAccessedAt
             };
         }
+
+        // 上限を設ける前の settings.json には際限なく貯まっているため、読み込み時にも絞る
+        TrimFolderUsages();
 
         foreach (var pane in Panes)
         {
