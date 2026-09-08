@@ -364,7 +364,7 @@ public partial class BrowserPaneView
 
         // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
         // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
-        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_paneViewModel.AllRootsNode) is not TreeViewItem allRootsItem)
+        if (RealizeContainer(FolderTreeView, _paneViewModel.AllRootsNode) is not { } allRootsItem)
         {
             return;
         }
@@ -384,17 +384,70 @@ public partial class BrowserPaneView
         }
     }
 
+    /// <summary>
+    /// 指定アイテムのTreeViewItemを取り出す。ツリーは仮想化されているため、画面外のアイテムには
+    /// まだコンテナが無い。その場合は表示範囲へ入れてから生成されたコンテナを返す
+    /// （これをしないと、深いパスへ移動したときに選択が追従しない）。
+    /// </summary>
+    private static TreeViewItem? RealizeContainer(ItemsControl parentControl, object item)
+    {
+        if (parentControl.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem realized)
+        {
+            return realized;
+        }
+
+        var index = parentControl.Items.IndexOf(item);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        // パネル自体がまだ組み立てられていないことがあるため、先にレイアウトを流す
+        parentControl.UpdateLayout();
+
+        if (FindItemsHostPanel(parentControl) is { } panel)
+        {
+            panel.BringIndexIntoViewPublic(index);
+            parentControl.UpdateLayout();
+        }
+
+        return parentControl.ItemContainerGenerator.ContainerFromItem(item) as TreeViewItem;
+    }
+
+    /// <summary>
+    /// 子アイテムを並べているパネルを探す。子（TreeViewItem）の下は自分のパネルではないので潜らない。
+    /// </summary>
+    private static VirtualizingStackPanel? FindItemsHostPanel(DependencyObject root)
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is VirtualizingStackPanel { IsItemsHost: true } panel)
+            {
+                return panel;
+            }
+
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+
+            if (FindItemsHostPanel(child) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
     // パス構成要素を1つずつ辿りながらツリーを再帰的に展開し、目的のノードを選択する
     private async Task<bool> ExpandAndSelectByPathAsync(ItemsControl parentControl, FolderItemViewModel folderItem,
         List<string> pathComponents, int componentIndex, int version)
     {
-        // 初回呼び出しのみレイアウト更新を行う
-        if (componentIndex == 0)
-        {
-            parentControl.UpdateLayout();
-        }
-
-        if (parentControl.ItemContainerGenerator.ContainerFromItem(folderItem) is not TreeViewItem treeViewItem)
+        // レイアウトの流し直しは RealizeContainer 側が必要なときだけ行う
+        if (RealizeContainer(parentControl, folderItem) is not { } treeViewItem)
         {
             return false;
         }
