@@ -25,21 +25,12 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 
 ## Release
 
-- Unreleased
+- ver 1.4.7.0
   - Added regular expression search (Plus): the "Search" settings page switches the search box between substring and .NET regular expression matching
-  - Added an in-memory file name index (Plus): searching 1.5 million files drops from about 400 ms to about 20 ms, at the cost of about 160 MB
-  - Search results and the "All Files" list now appear in stages instead of waiting for the whole list
-  - Moved the navigation buttons onto the tab row and shortened them to arrows, leaving more height for the file list
-  - Added settings to show or hide hidden and system files/folders (both shown by default, free version included)
   - Added multiple tabs (Plus): each tab keeps its own folder, history, search text, view mode and sort order, and the layout is restored on the next start
   - Added a split view (Plus): two panes side by side or stacked, each with its own tree and file list
-  - Added a folder tree toggle to each pane (Plus): collapse the tree to give the file list the full width; the state is saved per pane, and a pane added by splitting starts collapsed
-  - Added a "Folder Tree" settings page to show/hide and reorder the top-level tree nodes (Plus)
   - Added a "🕘 Recent" node to the folder tree (Plus)
-  - Added an English / Japanese display language setting (defaults to your Windows display language)
   - Added "★ Favorites" and "🕒 Frequently Used" nodes to the folder tree (Plus)
-  - Added "Export CSV..." for the currently displayed list (Plus)
-  - Reworked "Display Columns" so column order and widths are saved as well (Plus)
 - Ver 1.4.5.0 Added a "User Guide" menu item
 - Ver1.4.0.0 Added Monthly Subscription feature
 - Ver 1.3.0.0 Feature change
