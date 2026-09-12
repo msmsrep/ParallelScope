@@ -77,7 +77,7 @@
   </figure>
   <ol class="legend">
     <li><span><strong>Menu</strong> — sits in the title bar, to the left of the app name. It opens the settings window, exports the current list to CSV, and links to this user guide.</span></li>
-    <li><span><strong>← Back / Forward → / ↑ Up</strong> — move through your navigation history, or go to the parent folder.</span></li>
+    <li><span><strong>Navigation buttons</strong> — the arrow buttons move back and forward through your navigation history and go up to the parent folder. Hover over one to see what it does. With a Plus subscription the tab strip shares this row, to the right of the address bar.</span></li>
     <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
     <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
     <li><span><strong>All Files toggle</strong> — lists every file under the current folder as one flat list.</span></li>
@@ -121,9 +121,9 @@
   <ul>
     <li><strong>Select in the tree</strong> — click a folder on the left and its immediate contents appear on the right. Click <code>&gt;</code> to expand a node; children are loaded at that point.</li>
     <li><strong>Double-click</strong> — double-clicking a folder in the list moves into it; double-clicking a file opens it in the default application.</li>
-    <li><strong>Back / Forward / Up</strong> — navigation history works the way it does in a browser.</li>
-    <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there.</li>
-    <li><strong>Folder tree toggle</strong> — the "☰" button left of "Back" collapses the folder tree so the file list gets the full width, and brings it back. This is a ParallelScope Plus feature; see <a href="#tabs">Tabs and split view</a>.</li>
+    <li><strong>Back / Forward / Up</strong> — the three arrow buttons work the way a browser's do. Hover over one for a tooltip saying which is which.</li>
+    <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there. When the path is too long for the box, hover over it to read the whole thing.</li>
+    <li><strong>Folder tree toggle</strong> — the "☰" button left of the arrows collapses the folder tree so the file list gets the full width, and brings it back. This is a ParallelScope Plus feature; see <a href="#tabs">Tabs and split view</a>.</li>
     <li><strong>Sorting</strong> — click a column header such as "Name", "Size", or "Modified". Sizes and timestamps are compared as raw values rather than as displayed text, so <code>9 KB</code> and <code>12 MB</code> sort correctly.</li>
     <li><strong>Scrolling sideways</strong> — when the columns are wider than the list, a horizontal scroll bar appears at the bottom. <kbd>Shift</kbd> + the mouse wheel scrolls sideways too.</li>
   </ul>
@@ -193,6 +193,31 @@
     <li>Search runs <strong>against the cache</strong>, never by walking the live file system, so it stays fast even on a NAS. The flip side: files added since the last scan are not found until the next one.</li>
     <li>Clear the search box to return to the normal folder listing.</li>
     <li>Excluded folders never appear in results.</li>
+    <li><strong>Results appear in stages.</strong> On a large folder the first couple of thousand rows are shown right away and the rest fill in behind them, so you do not wait for the whole list before you can start reading it.</li>
+    <li>While a search is running the list you are looking at stays on screen, so it does not flash empty on every keystroke.</li>
+  </ul>
+
+  <h3>Regular expression search (a ParallelScope Plus feature)</h3>
+  <p>
+    Turn on <strong>"Treat the search box text as a regular expression"</strong> on the "Settings &gt; Search" page to search with
+    .NET regular expression syntax instead of a plain substring. The switch applies and is saved immediately — it does not go
+    through the "Save" button.
+  </p>
+  <ul>
+    <li>The pattern is matched against the <strong>file or folder name</strong>, not the full path.</li>
+    <li>Uppercase and lowercase are not distinguished, the same as the normal search.</li>
+    <li>While a pattern is still half-typed and not yet valid, no search runs: the list stays as it was and the search box turns red.</li>
+  </ul>
+
+  <h3>Keeping file names in memory (a ParallelScope Plus feature)</h3>
+  <p>
+    Also on the "Settings &gt; Search" page, <strong>"Speed up search by keeping file names in memory"</strong> builds an in-memory
+    index of every cached name. It too applies and is saved immediately.
+  </p>
+  <ul>
+    <li><strong>Searching gets faster</strong> — roughly 400 ms down to roughly 20 ms on a cache of 1.5 million files.</li>
+    <li><strong>Memory use goes up</strong> — roughly 160 MB for those 1.5 million files. Turning the setting off releases it.</li>
+    <li>The index is built in the background and rebuilt after each scan. <strong>Results do not change</strong> — only how quickly they arrive.</li>
   </ul>
 </section>
 
@@ -210,6 +235,7 @@
     <li>This view is also built from the cache, so it reflects the most recent scan.</li>
     <li>Selecting another folder while it is on switches the flat list to that folder.</li>
     <li>Searching while it is on returns files only.</li>
+    <li>The list appears in stages: the first couple of thousand files show up straight away, and the rest follow, so a folder with a very large subtree does not leave you staring at the previous list.</li>
     <li>The on/off state is saved per tab and restored the next time you start the app.</li>
   </ul>
 </section>
@@ -427,6 +453,8 @@
         <li><a href="#favorites">"★ Favorites", "🕘 Recent" and "🕒 Frequently Used"</a> in the folder tree</li>
         <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
         <li><a href="#customize">Customizing the file list columns</a> — which columns, their order, and their widths</li>
+        <li><a href="#search">Regular expression search</a></li>
+        <li><a href="#search">Keeping the file name index in memory</a> to speed up search</li>
         <li><a href="#csv">Exporting the file list to CSV</a></li>
         <li><a href="#tabs">Multiple tabs</a></li>
         <li><a href="#tabs">Split view (two panes)</a></li>
