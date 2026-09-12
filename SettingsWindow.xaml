@@ -25,6 +25,7 @@
                          SelectionChanged="SettingsMenuListBox_SelectionChanged">
                     <ListBoxItem Name="RootFoldersMenuItem" Content="{loc:Loc Settings.Menu.RootFolders}" IsSelected="True" Padding="8,6"/>
                     <ListBoxItem Name="TreeNodesMenuItem" Content="{loc:Loc Settings.Menu.TreeNodes}" Padding="8,6"/>
+                    <ListBoxItem Name="SearchMenuItem" Content="{loc:Loc Settings.Menu.Search}" Padding="8,6"/>
                     <ListBoxItem Name="ColumnsMenuItem" Content="{loc:Loc Settings.Menu.Columns}" Padding="8,6"/>
                     <ListBoxItem Name="ThemeMenuItem" Content="{loc:Loc Settings.Menu.Theme}" Padding="8,6"/>
                     <ListBoxItem Name="LanguageMenuItem" Content="{loc:Loc Settings.Menu.Language}" Padding="8,6"/>
@@ -132,7 +133,7 @@
                     <StackPanel Name="TreeNodeCheckBoxesPanel">
                         <TextBlock Text="{loc:Loc Settings.TreeNodes.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
                         <TextBlock Text="{loc:Loc Settings.TreeNodes.Note}"
-                                   TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                                   TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -160,8 +161,7 @@
                         <Button Name="ResetTreeNodesButton" Content="{loc:Loc Settings.TreeNodes.Reset}" HorizontalAlignment="Left"
                                 Margin="0,12,0,0" Padding="8,6" Click="ResetTreeNodesButton_Click"/>
                         <TextBlock Name="ResetTreeNodesHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
-                                   Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                   Text="{loc:Loc Settings.TreeNodes.ResetHint}"/>
+                                   Margin="0,6,0,0" Text="{loc:Loc Settings.TreeNodes.ResetHint}"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -197,7 +197,7 @@
                         <StackPanel Name="ColumnCheckBoxesPanel">
                             <TextBlock Text="{loc:Loc Settings.Columns.Description}" TextWrapping="Wrap" Margin="0,0,0,4"/>
                             <TextBlock Text="{loc:Loc Settings.Columns.Note}"
-                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12"/>
+                                       TextWrapping="Wrap" Margin="0,0,0,12"/>
 
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -226,8 +226,7 @@
                             <Button Name="ResetColumnsButton" Content="{loc:Loc Settings.Columns.Reset}" HorizontalAlignment="Left"
                                     Margin="0,12,0,0" Padding="8,6" Click="ResetColumnsButton_Click"/>
                             <TextBlock Name="ResetColumnsHintTextBlock" Visibility="Collapsed" TextWrapping="Wrap"
-                                       Margin="0,6,0,0" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
-                                       Text="{loc:Loc Settings.Columns.ResetHint}"/>
+                                       Margin="0,6,0,0" Text="{loc:Loc Settings.Columns.ResetHint}"/>
                         </StackPanel>
                     </Border>
 
@@ -236,7 +235,7 @@
                         <StackPanel Name="HiddenItemsPanel">
                             <TextBlock Text="{loc:Loc Settings.HiddenItems.Header}" FontWeight="SemiBold" Margin="0,0,0,4"/>
                             <TextBlock Text="{loc:Loc Settings.HiddenItems.Description}"
-                                       TextWrapping="Wrap" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,10"/>
+                                       TextWrapping="Wrap" Margin="0,0,0,10"/>
                             <CheckBox Name="ShowHiddenItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowHidden}"/>
                             <CheckBox Name="ShowSystemItemsCheckBox" Content="{loc:Loc Settings.HiddenItems.ShowSystem}" Margin="0,8,0,0"/>
                         </StackPanel>
@@ -244,6 +243,63 @@
 
                 </StackPanel>
                 </ScrollViewer>
+            </Grid>
+
+            <!-- 右側: 検索のページ。ファイル名索引の切り替えはその場で適用・保存されるためSave/Cancelボタンは経由しない -->
+            <Grid Grid.Column="1" Name="SearchPanel" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="{loc:Loc Settings.Search.Header}" Style="{StaticResource PaneHeaderTextStyle}"/>
+
+                <!-- Plus未購読時のみ表示するアンロック案内。購入操作はSubscriptionページに集約し、ここからは遷移のみ -->
+                <Border Grid.Row="1" Name="SearchPlusUpsellCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10"
+                        Visibility="Collapsed">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                   Text="{loc:Loc Settings.Search.PlusUpsell}"/>
+                        <Button Name="GoToSubscriptionFromSearchButton" Content="{loc:Loc Settings.GoToSubscription}" HorizontalAlignment="Left"
+                                Padding="8,6" Click="GoToSubscriptionButton_Click"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- 未購読時はIsEnabled=falseで薄字表示・操作不可にする（WPFの無効化スタイルに任せる） -->
+                <StackPanel Grid.Row="2" Name="SearchOptionsPanel" VerticalAlignment="Top">
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,0,0,10">
+                        <StackPanel>
+                            <TextBlock Text="{loc:Loc Settings.Search.Regex.Header}" FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                            <CheckBox Name="RegexSearchCheckBox" Content="{loc:Loc Settings.Search.Regex.Enable}"
+                                      Checked="RegexSearchCheckBox_Changed" Unchecked="RegexSearchCheckBox_Changed"/>
+
+                            <StackPanel Margin="0,12,0,0">
+                                <TextBlock Text="{loc:Loc Settings.Search.Regex.Syntax}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBlock Text="{loc:Loc Settings.Search.Regex.IgnoreCase}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <TextBlock Text="{loc:Loc Settings.Search.Regex.Invalid}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Style="{StaticResource CardBorderStyle}" Padding="12">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Header}" FontWeight="SemiBold" Margin="0,0,0,10"/>
+
+                        <CheckBox Name="NameIndexCheckBox" Content="{loc:Loc Settings.Search.NameIndex.Enable}"
+                                  Checked="NameIndexCheckBox_Changed" Unchecked="NameIndexCheckBox_Changed"/>
+
+                        <!-- 有効にすると何が変わるか。速さと引き換えにメモリが増えることを明示する -->
+                        <StackPanel Margin="0,12,0,0">
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Faster}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Memory}" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                            <TextBlock Text="{loc:Loc Settings.Search.NameIndex.Note}" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </StackPanel>
+                    </Border>
+                </StackPanel>
             </Grid>
 
             <!-- 右側: 配色テーマのページ。切り替えは即座に適用・保存されるためSave/Cancelボタンは出さない -->
@@ -267,8 +323,7 @@
                         <RadioButton Name="DarkThemeRadioButton" GroupName="Theme" Tag="Dark"
                                      Content="{loc:Loc Settings.Theme.Dark}" Margin="0,8,0,0" Checked="ThemeRadioButton_Checked"/>
 
-                        <TextBlock Text="{loc:Loc Settings.Theme.Note}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,12,0,0"/>
+                        <TextBlock Text="{loc:Loc Settings.Theme.Note}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -295,8 +350,7 @@
                         <RadioButton Name="JapaneseLanguageRadioButton" GroupName="Language" Tag="Japanese"
                                      Content="{loc:Loc Settings.Language.Japanese}" Margin="0,8,0,0" Checked="LanguageRadioButton_Checked"/>
 
-                        <TextBlock Text="{loc:Loc Settings.Language.Note}" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,12,0,0"/>
+                        <TextBlock Text="{loc:Loc Settings.Language.Note}" TextWrapping="Wrap" Margin="0,12,0,0"/>
                     </StackPanel>
                 </Border>
             </Grid>
@@ -322,7 +376,7 @@
                             <!-- 価格を取得できたら、コードビハインドが金額入りの文言へ差し替える -->
                             <Button Name="SubscribePlusButton" Content="{loc:Loc Settings.Subscription.Subscribe}" HorizontalAlignment="Left"
                                     Padding="8,6" Click="SubscribePlusButton_Click"/>
-                            <TextBlock Name="PlusStatusTextBlock" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" Margin="0,8,0,0"
+                            <TextBlock Name="PlusStatusTextBlock" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
@@ -350,8 +404,7 @@
                 <Border Grid.Row="1" Style="{StaticResource CardBorderStyle}" Padding="12" VerticalAlignment="Top">
                     <StackPanel>
                         <TextBlock TextWrapping="Wrap" Text="{loc:Loc Settings.Support.Body}"/>
-                        <TextBlock TextWrapping="Wrap" Margin="0,12,0,12" Text="{loc:Loc Settings.Support.Note}"
-                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"/>
+                        <TextBlock TextWrapping="Wrap" Margin="0,12,0,12" Text="{loc:Loc Settings.Support.Note}"/>
                         <Button Name="KofiButton" Content="{loc:Loc Settings.Support.Kofi}" HorizontalAlignment="Left"
                                 Padding="8,6" Click="KofiButton_Click"/>
                         <Button Name="GitHubSponsorsButton" Content="{loc:Loc Settings.Support.GitHubSponsors}" HorizontalAlignment="Left"

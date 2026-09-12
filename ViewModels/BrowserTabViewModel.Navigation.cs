@@ -89,6 +89,13 @@ public partial class BrowserTabViewModel
             return false;
         }
 
+        // まだ一度も表示していない復元中のタブは、控えてある移動先を差し替えるだけにする
+        // （読み込みは初回表示のときにまとめて行う）
+        if (_pendingRestorePath is not null)
+        {
+            return TryRedirectPendingRestore(folderPath);
+        }
+
         var normalizedTargetPath = PathNormalizer.Normalize(folderPath);
         if (string.IsNullOrEmpty(normalizedTargetPath))
         {
@@ -194,6 +201,15 @@ public partial class BrowserTabViewModel
     /// </summary>
     public void RefreshCurrentFolder()
     {
+        // まだ表示していない復元中のタブは、初回表示のときに最新の内容で読み込まれる
+        if (_pendingRestorePath is not null)
+        {
+            return;
+        }
+
+        // 読み直す＝キャッシュが変わった可能性があるので、控えてある検索結果は使わない
+        ForgetCompletedSearch();
+
         var folderPath = CurrentPath;
         if (string.IsNullOrWhiteSpace(folderPath))
         {
@@ -224,6 +240,107 @@ public partial class BrowserTabViewModel
         {
             RequestFlatFileView();
         }
+    }
+
+    /// <summary>
+    /// 復元したタブの移動先を控えるだけにして、実際の読み込みは初めて表示するときまで遅らせる。
+    /// 起動時に全タブぶんのキャッシュ読み・ファイルシステム列挙・キャッシュ書き込みが一斉に走ると、
+    /// SQLiteの書き込み待ちとスレッドプールの飽和でアプリ全体が固まるため。
+    /// 移動先の存在確認もここでは行わない（切断中のNASでは1タブあたり最大2秒UIスレッドが止まる）。
+    /// </summary>
+    internal void PrepareDeferredRestore(string path, string? fallbackPath)
+    {
+        var resolvedFallbackPath = ResolveRestorePath(fallbackPath);
+        var resolvedPath = ResolveRestorePath(path) ?? resolvedFallbackPath;
+        if (resolvedPath is null)
+        {
+            // 移動先が1つも決まらないタブは、CurrentPathが空のまま残す（呼び出し側が取り除く）
+            return;
+        }
+
+        _pendingRestorePath = resolvedPath;
+        _pendingRestoreFallbackPath = resolvedFallbackPath;
+
+        // 復元前にこのタブへ移動が入っていた場合（2画面の復元では EnableSplitView が先に移動させる）、
+        // 走り出している取得の結果が後から届いても捨てられるよう番号を進めておく
+        Interlocked.Increment(ref _navigationVersion);
+
+        // タブ見出しと settings.json への保存は移動先が分かれば足りるため、一覧を読まずに現在地だけ入れる
+        CurrentPath = resolvedPath;
+        AddressInput = resolvedPath;
+    }
+
+    /// <summary>
+    /// 遅らせていた移動をここで実行する。移動できなければ代わりのルートへ寄せ、それも無理なら空にする。
+    /// 遅延中でなければ false を返す。
+    /// </summary>
+    private bool TryConsumePendingRestore()
+    {
+        if (_pendingRestorePath is not { } path)
+        {
+            return false;
+        }
+
+        var fallbackPath = _pendingRestoreFallbackPath;
+        _pendingRestorePath = null;
+        _pendingRestoreFallbackPath = null;
+
+        // これから読み込むので、遅延中に付いた「表示時に読み直す」印は消す
+        _isSuspended = false;
+        _isStale = false;
+
+        // NavigateTo は同一パスへの移動を早期returnで無視するため、控えてあった現在地はここで外す
+        CurrentPath = string.Empty;
+
+        if (NavigateTo(path, false))
+        {
+            return true;
+        }
+
+        if (fallbackPath is not null && NavigateTo(fallbackPath, false))
+        {
+            return true;
+        }
+
+        // 移動先が無くなっている（ルートが外された等）。空のタブとして残す
+        Clear();
+        return true;
+    }
+
+    /// <summary>遅延中のタブの移動先を差し替える（読み込みは行わない）。</summary>
+    private bool TryRedirectPendingRestore(string folderPath)
+    {
+        if (ResolveRestorePath(folderPath) is not { } resolvedPath)
+        {
+            return false;
+        }
+
+        _pendingRestorePath = resolvedPath;
+        CurrentPath = resolvedPath;
+        AddressInput = resolvedPath;
+        return true;
+    }
+
+    /// <summary>遅延復元用にパスを正規化する（仮想ノードは正規表記へ。除外パスは移動先にしない）。</summary>
+    private string? ResolveRestorePath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return null;
+        }
+
+        if (VirtualFolders.GetKind(path) != VirtualFolderKind.None)
+        {
+            return VirtualFolders.GetCanonicalPath(path);
+        }
+
+        var normalizedPath = PathNormalizer.Normalize(path);
+        if (string.IsNullOrEmpty(normalizedPath) || _host.IsExcludedPath(normalizedPath))
+        {
+            return null;
+        }
+
+        return normalizedPath;
     }
 
     private static string? GetParentPath(string path)

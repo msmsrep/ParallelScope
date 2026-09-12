@@ -27,14 +27,24 @@ public partial class BrowserTabViewModel : ObservableObject
     private int _navigationVersion;
     private int _searchVersion;
     private int _flatViewVersion;
+
+    // キャッシュ由来の一覧を表示し終えたナビゲーション番号。ライブ更新がキャッシュと同内容だった場合に
+    // 一覧の作り直しを省けるかどうかの判定に使う（BrowserTabViewModel.Cache.cs）
+    private int _cacheAppliedNavigationVersion = -1;
     private List<FileItemViewModel> _currentDirectoryItems = new();
     private bool _isActive;
     private bool _isSuspended;
     private bool _isStale;
 
+    // 復元したがまだ一度も表示していないタブの移動先（null なら遅延中ではない）。
+    // 起動時に全タブぶんの読み込みを走らせないよう、移動先だけ控えて初回表示まで遅らせる
+    // （BrowserTabViewModel.Navigation.cs の PrepareDeferredRestore を参照）
+    private string? _pendingRestorePath;
+    private string? _pendingRestoreFallbackPath;
+
     // バックグラウンド更新・検索・フォルダサイズ適用・フラット表示について、連続リクエストを1本化するキュー
     private readonly SingleFlightCoalescer<(string FolderPath, int NavigationVersion)> _refreshCoalescer;
-    private readonly SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)> _searchCoalescer;
+    private readonly SingleFlightCoalescer<(string RootPath, NameSearchPattern Pattern, int SearchVersion, bool FilesOnly)> _searchCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)> _folderSizeCoalescer;
     private readonly SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)> _flatViewCoalescer;
 
@@ -44,8 +54,8 @@ public partial class BrowserTabViewModel : ObservableObject
 
         _refreshCoalescer = new SingleFlightCoalescer<(string FolderPath, int NavigationVersion)>(
             request => RefreshFromFileSystemInBackground(request.FolderPath, request.NavigationVersion));
-        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, string Query, int SearchVersion, bool FilesOnly)>(
-            request => SearchInBackground(request.RootPath, request.Query, request.SearchVersion, request.FilesOnly));
+        _searchCoalescer = new SingleFlightCoalescer<(string RootPath, NameSearchPattern Pattern, int SearchVersion, bool FilesOnly)>(
+            request => SearchInBackground(request.RootPath, request.Pattern, request.SearchVersion, request.FilesOnly));
         _folderSizeCoalescer = new SingleFlightCoalescer<(string FolderPath, IReadOnlyCollection<CachedFileSystemEntry> Entries, int NavigationVersion)>(
             request => ApplyCachedFolderSizesInBackground(request.FolderPath, request.Entries, request.NavigationVersion));
         _flatViewCoalescer = new SingleFlightCoalescer<(string FolderPath, int FlatViewVersion)>(
@@ -168,6 +178,18 @@ public partial class BrowserTabViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 検索語が正規表現として成立していないか（正規表現モードのときだけ真になりうる）。
+    /// 打ちかけの正規表現でも一覧は据え置くため、書きかけであることは入力欄の色で示す。
+    /// </summary>
+    public bool IsSearchQueryInvalid
+    {
+        get => _isSearchQueryInvalid;
+        private set => SetProperty(ref _isSearchQueryInvalid, value);
+    }
+
+    private bool _isSearchQueryInvalid;
+
     /// <summary>trueの場合、現在フォルダ直下ではなく配下の全ファイルを再帰的に表示する。</summary>
     public bool IsFlatFileViewEnabled
     {
@@ -221,12 +243,14 @@ public partial class BrowserTabViewModel : ObservableObject
     /// </summary>
     internal void SuspendIfHeavy()
     {
-        if (FileItems.Count < SuspendItemCountThreshold && _currentDirectoryItems.Count < SuspendItemCountThreshold)
+        var threshold = GetSuspendItemCountThreshold();
+        if (FileItems.Count < threshold && _currentDirectoryItems.Count < threshold)
         {
             return;
         }
 
         _isSuspended = true;
+        ForgetCompletedSearch();
         _currentDirectoryItems = new List<FileItemViewModel>();
         FileItems = new ObservableCollection<FileItemViewModel>();
     }
@@ -238,11 +262,19 @@ public partial class BrowserTabViewModel : ObservableObject
     internal void MarkStale()
     {
         _isStale = true;
+        // キャッシュが変わった以上、控えてある検索結果からは絞り込めない
+        ForgetCompletedSearch();
     }
 
     /// <summary>再び表示する際に、手放していた一覧・古くなった一覧をキャッシュから読み直す。</summary>
     internal void OnActivated()
     {
+        // 復元後の初回表示なら、遅らせていた移動をここで行う（一覧の読み込みもその中で走る）
+        if (TryConsumePendingRestore())
+        {
+            return;
+        }
+
         if (!_isSuspended && !_isStale)
         {
             return;
@@ -253,8 +285,26 @@ public partial class BrowserTabViewModel : ObservableObject
         RefreshCurrentFolder();
     }
 
-    /// <summary>この件数以上の一覧を持つタブは、非表示になった時点で一覧を手放す。</summary>
-    private const int SuspendItemCountThreshold = 5_000;
+    /// <summary>全タブ合わせて抱えたままにしてよい一覧の件数の目安（これをタブ数で割る）。</summary>
+    private const int RetainedItemBudget = 20_000;
+
+    /// <summary>1タブあたりの上限の下限・上限。</summary>
+    private const int MinSuspendItemCountThreshold = 1_000;
+    private const int MaxSuspendItemCountThreshold = 5_000;
+
+    /// <summary>
+    /// この件数以上の一覧を持つタブは、非表示になった時点で一覧を手放す。
+    /// タブが増えるほど1タブあたりの取り分を絞る —— 上限を一律にすると、開いているタブ数ぶんだけ
+    /// 一覧がそのまま積み上がるため。タブが数本のうちは従来どおり手放さない
+    /// （切り替えのたびに空表示を挟まないほうが体感がよく、その本数ぶんなら抱えても知れている）。
+    /// </summary>
+    internal int GetSuspendItemCountThreshold()
+    {
+        return Math.Clamp(
+            RetainedItemBudget / Math.Max(1, _host.TotalTabCount),
+            MinSuspendItemCountThreshold,
+            MaxSuspendItemCountThreshold);
+    }
 
     /// <summary>閉じたタブを開き直すために、復元に必要な状態を控える。</summary>
     internal ClosedTabState CreateClosedState(int index)
@@ -292,6 +342,10 @@ public partial class BrowserTabViewModel : ObservableObject
     /// <summary>表示できるルートが1つも無くなった場合に、現在地と一覧を空にする。</summary>
     internal void Clear()
     {
+        // 移動先を控えたままだと、次に表示したときに空にしたはずの場所へ戻ってしまう
+        _pendingRestorePath = null;
+        _pendingRestoreFallbackPath = null;
+
         CurrentPath = string.Empty;
         AddressInput = string.Empty;
         _currentDirectoryItems.Clear();

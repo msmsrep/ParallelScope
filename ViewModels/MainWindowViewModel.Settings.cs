@@ -12,7 +12,7 @@ public partial class MainWindowViewModel
     {
         var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
-        _excludedPaths = NormalizeExcludedPaths(settings.ExcludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SetExcludedPaths(settings.ExcludedPaths);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む
         ActiveTab.InitializeFlatFileViewEnabled(settings.IsFlatFileViewEnabled);
         _visibleColumns = NormalizeVisibleColumns(settings.VisibleColumns);
@@ -21,6 +21,9 @@ public partial class MainWindowViewModel
         _csvExportSizeInBytes = settings.CsvExportSizeInBytes;
         _showHiddenItems = settings.ShowHiddenItems;
         _showSystemItems = settings.ShowSystemItems;
+        // 索引の組み立ては購読状態が確定してから（SetPlusFeaturesEnabled）なので、ここでは値を読むだけ
+        _isNameIndexEnabled = settings.IsNameIndexEnabled;
+        _isRegexSearchEnabled = settings.IsRegexSearchEnabled;
         ApplyHiddenItemVisibilityToTree();
         _developerUnlockKey = settings.DeveloperUnlockKey;
         _theme = AppTheme.Parse(settings.Theme);
@@ -219,7 +222,7 @@ public partial class MainWindowViewModel
         _showHiddenItems = showHiddenItems;
         _showSystemItems = showSystemItems;
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(fullScanIntervalHours);
-        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        SetExcludedPaths(excludedPaths);
         _visibleColumns = NormalizeVisibleColumns(visibleColumns?.ToList());
         _columnOrder = NormalizeColumnOrder(columnOrder?.ToList());
         _visibleTreeNodes = NormalizeVisibleTreeNodes(visibleTreeNodes?.ToList());
@@ -312,6 +315,12 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>現在の設定一式（ルートパス・除外パス・フルスキャン間隔・フラット表示モード・配色テーマ・お気に入り・アクセス実績）をsettings.jsonへ保存する。</summary>
+    /// <summary>
+    /// 遅延させている設定の書き出しを、待たずにファイルへ反映する（アプリの終了時に呼ぶ）。
+    /// 通常の読み出しはリポジトリ側が読む前に反映するため、ここを呼ぶ必要はない。
+    /// </summary>
+    public void FlushPendingSettings() => _appSettingsRepository.Flush();
+
     private void SaveSettings()
     {
         _appSettingsRepository.Save(new AppSettings
@@ -327,6 +336,8 @@ public partial class MainWindowViewModel
             CsvExportSizeInBytes = _csvExportSizeInBytes,
             ShowHiddenItems = _showHiddenItems,
             ShowSystemItems = _showSystemItems,
+            IsNameIndexEnabled = _isNameIndexEnabled,
+            IsRegexSearchEnabled = _isRegexSearchEnabled,
             Theme = _theme.ToString(),
             Language = _language.ToString(),
             IsSplitViewEnabled = GetPersistedIsSplitViewEnabled(),
@@ -545,18 +556,24 @@ public partial class MainWindowViewModel
         return IsExcludedNormalizedPath(normalizedPath);
     }
 
+    /// <summary>除外パスを正規化して保持し、配下判定に使う接頭辞（区切り文字付き）を作り置きする。</summary>
+    private void SetExcludedPaths(IEnumerable<string>? excludedPaths)
+    {
+        _excludedPaths = NormalizeExcludedPaths(excludedPaths ?? Enumerable.Empty<string>()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        _excludedPathMatchers = _excludedPaths
+            .Select(x => (Path: x, Prefix: PathNormalizer.WithTrailingSeparator(x)))
+            .ToArray();
+    }
+
     /// <summary>正規化済みパス用の除外判定。DBキャッシュ由来のパスは保存時に正規化済みのため、大量の結果行に対して再正規化のコストをかけずに使える。</summary>
     private bool IsExcludedNormalizedPath(string normalizedPath)
     {
-        foreach (var excludedPath in _excludedPaths)
+        // 除外パスと、その配下判定に使う「区切り文字付きの接頭辞」の組。接頭辞を毎行組み立てないため
+        // 除外設定の更新時に作り置きしている（All Files表示では数十万行に対して呼ばれる）
+        foreach (var (excludedPath, prefix) in _excludedPathMatchers)
         {
-            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
-
-            var prefix = PathNormalizer.WithTrailingSeparator(excludedPath);
-            if (normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(normalizedPath, excludedPath, StringComparison.OrdinalIgnoreCase)
+                || normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

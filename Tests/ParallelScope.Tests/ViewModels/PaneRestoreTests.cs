@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.ViewModels;
@@ -106,6 +106,48 @@ public class PaneRestoreTests : IDisposable
         var restarted = Start();
 
         Assert.Equal(2, restarted.ActivePane.Tabs.Count);
+        Assert.Equal(_rootA.Path, restarted.ActivePane.Tabs[1].CurrentPath);
+    }
+
+    /// <summary>
+    /// 表示しないタブは復元時に読み込まない（移動先を控えるだけ）ことの確認。
+    /// 移動できるかどうかの判定も初回表示まで行わないため、消えたフォルダを開いていたタブは
+    /// 表示するまで保存時のパスのままになり、表示した時点でルートへ寄る。
+    /// </summary>
+    [Fact]
+    public void HiddenTab_IsNotLoadedUntilItIsShown()
+    {
+        var first = Start();
+        var removed = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Removed")).FullName;
+        first.ActivePane.OpenTab(removed);
+        // 消えたフォルダのタブを表示しない状態で保存する
+        first.ActivePane.ActivateTabAt(0);
+        Directory.Delete(removed);
+
+        var restarted = Start();
+        var hiddenTab = restarted.ActivePane.Tabs[1];
+
+        Assert.Equal(removed, hiddenTab.CurrentPath);
+        Assert.Empty(hiddenTab.FileItems);
+
+        restarted.ActivePane.ActivateTabAt(1);
+
+        Assert.Equal(_rootA.Path, hiddenTab.CurrentPath);
+    }
+
+    /// <summary>表示を遅らせたタブも、閉じて開き直すまでの間に構成が変わればその内容で開く。</summary>
+    [Fact]
+    public void HiddenTab_FollowsRootChangesMadeBeforeItIsShown()
+    {
+        var first = Start();
+        first.ActivePane.OpenTab(_rootB.Path);
+        first.ActivePane.ActivateTabAt(0);
+
+        var restarted = Start();
+        // _rootB を対象から外すと、まだ表示していないタブも次に開いた時点で残ったルートへ寄る
+        restarted.ApplyRootPaths(new[] { _rootA.Path });
+        restarted.ActivePane.ActivateTabAt(1);
+
         Assert.Equal(_rootA.Path, restarted.ActivePane.Tabs[1].CurrentPath);
     }
 

@@ -27,6 +27,18 @@ public partial class BrowserTabViewModel
             return;
         }
 
+        // 照合方法（部分一致 or 正規表現）はリクエスト時点の設定で固定する
+        // （結果が届くまでに設定が変わっても、出す結果と判定を食い違わせないため）
+        var pattern = NameSearchPattern.Create(normalizedQuery, _host.UseRegexSearch);
+
+        // 正規表現は打ちかけの段階では壊れていること（開き括弧だけ、等）が普通なので、
+        // 結果を空にせず表示は据え置き、入力欄の色で書きかけであることだけ示す
+        IsSearchQueryInvalid = !pattern.IsValid;
+        if (!pattern.IsValid)
+        {
+            return;
+        }
+
         var searchRootPath = CurrentPath;
         var searchVersion = Interlocked.Increment(ref _searchVersion);
 
@@ -35,13 +47,29 @@ public partial class BrowserTabViewModel
         var filesOnly = IsFlatFileViewEnabled;
 
         // 検索リクエストを統合するキューへ委譲
-        _searchCoalescer.Request((searchRootPath, normalizedQuery, searchVersion, filesOnly));
+        _searchCoalescer.Request((searchRootPath, pattern, searchVersion, filesOnly));
+    }
+
+    /// <summary>
+    /// 検索モード（部分一致 or 正規表現）が切り替わったので、控えた結果を捨てて検索し直す。
+    /// 設定変更・購読状態の確定でシェルから呼ばれる。
+    /// </summary>
+    internal void OnSearchModeChanged()
+    {
+        ForgetCompletedSearch();
+
+        if (!string.IsNullOrWhiteSpace(SearchQuery))
+        {
+            RequestSearch(SearchQuery);
+        }
     }
 
     /// <summary>検索状態を解除し、現在の表示モード（通常一覧 or フラット表示）に戻す。SearchQueryが空になった際に呼ばれる。</summary>
     private void ClearSearch()
     {
         Interlocked.Increment(ref _searchVersion);
+        ForgetCompletedSearch();
+        IsSearchQueryInvalid = false;
 
         if (IsFlatFileViewEnabled)
         {
@@ -52,58 +80,192 @@ public partial class BrowserTabViewModel
         ReplaceVisibleFileItems(_currentDirectoryItems);
     }
 
-    /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
-    private async Task SearchInBackground(string rootPath, string query, int searchVersion, bool filesOnly)
+    /// <summary>取得を続けてよいか（検索語の変更・フォルダ移動が起きていないか）を確認する間隔（件数）。</summary>
+    private const int SearchAbortCheckInterval = 1_000;
+
+    /// <summary>取得の途中経過を最初に画面へ出す件数（All Filesの段階表示と同じ考え方）。</summary>
+    private const int SearchFirstBatchSize = 2_000;
+
+    /// <summary>途中経過を出すたびに、次に出すまでの件数をこの倍率で広げる（件数が増えるほど間引く）。</summary>
+    private const int SearchBatchGrowthFactor = 8;
+
+    /// <summary>
+    /// 直前に完了した検索の、表示していた結果一式。検索語を足しただけならここから絞り込めるため、
+    /// キャッシュDBを引き直さずに済む（ドライブ直下では1回あたり数百msかかる）。
+    /// 参照ごと差し替えるだけなので、UIスレッドとバックグラウンドの間はVolatileの読み書きで足りる。
+    /// </summary>
+    private sealed record CompletedSearch(string RootPath, string Query, bool FilesOnly, List<FileItemViewModel> Results);
+
+    private CompletedSearch? _completedSearch;
+
+    /// <summary>検索結果の使い回しをやめる（キャッシュが更新された・検索を終えた・一覧を手放した）。</summary>
+    private void ForgetCompletedSearch()
     {
+        Volatile.Write(ref _completedSearch, null);
+    }
+
+    /// <summary>
+    /// 直前の検索結果から絞り込めるなら、その結果を返す（引き直しが必要なら null）。
+    /// `%repo%` に一致する名前は必ず `%rep%` にも一致するので、検索語が前回の検索語を含んでいれば
+    /// 新しい結果は必ず前回の結果の部分集合になる。
+    /// </summary>
+    private List<FileItemViewModel>? TryNarrowCompletedSearch(string rootPath, NameSearchPattern pattern, bool filesOnly)
+    {
+        // 正規表現は打ち足しても結果が前回の部分集合になるとは限らないため、必ず引き直す
+        if (pattern.IsRegex)
+        {
+            return null;
+        }
+
+        var completed = Volatile.Read(ref _completedSearch);
+
+        // 検索語の包含判定は大文字小文字をそのまま見る（Ordinal）。
+        // ここを寛容にすると、畳み方の違いでDBを引き直したときと結果が変わりうるため。
+        // 打ち足していく通常の操作では前回の検索語がそのまま前方に残るので、これで十分効く
+        if (completed is null
+            || completed.FilesOnly != filesOnly
+            || !pattern.Text.Contains(completed.Query, StringComparison.Ordinal)
+            || !PathNormalizer.AreSame(completed.RootPath, rootPath))
+        {
+            return null;
+        }
+
+        var narrowed = new List<FileItemViewModel>();
+        foreach (var item in completed.Results)
+        {
+            if (pattern.Matches(item.Name))
+            {
+                narrowed.Add(item);
+            }
+        }
+
+        return narrowed;
+    }
+
+    /// <summary>キャッシュDBに対して検索を実行し、結果を画面へ反映する。</summary>
+    private async Task SearchInBackground(string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly)
+    {
+        // 直前の結果から絞り込めるならDBは引かない。ここはキューが空のとき要求元（UIスレッド）から
+        // そのまま同期実行されるため、必ずバックグラウンドへ逃がす
+        // （1文字の検索語の結果は数十万件あり、その絞り込みをUIスレッドでやると入力が引っかかる）
+        if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, pattern, filesOnly)) is { } narrowedResults)
+        {
+            PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, narrowedResults, isComplete: true);
+            return;
+        }
+
         List<FileItemViewModel> cacheResults;
 
         try
         {
-            // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
             cacheResults = await Task.Run(() =>
-                ToViewModels(
-                    SearchCacheEntries(rootPath, query)
+            {
+                var results = new List<FileItemViewModel>();
+                var nextPublishCount = SearchFirstBatchSize;
+
+                // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
+                foreach (var item in ToViewModels(
+                    SearchCacheEntries(rootPath, pattern)
                         .Where(x => !(filesOnly && x.IsFolder))
-                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath)))
-                    .ToList());
+                        .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
+                {
+                    results.Add(item);
+
+                    var isPublishPoint = results.Count >= nextPublishCount;
+
+                    // 1文字の検索語では数十万件ヒットしうる一方、インクリメンタルサーチは
+                    // 1キー入力ごとに要求が来て、キューは直列実行される。打ち切らないと
+                    // 次の入力の検索が、用済みになった列挙の後ろで待たされてしまう
+                    if (!isPublishPoint && results.Count % SearchAbortCheckInterval != 0)
+                    {
+                        continue;
+                    }
+
+                    if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
+                    {
+                        // 打ち切った時点の状態は下の確認でも同じく不一致になるので、そのまま返して弾かせる
+                        // （検索バージョンは要求のたびに増えるだけで、一度ずれたら戻らない）
+                        return results;
+                    }
+
+                    if (!isPublishPoint)
+                    {
+                        continue;
+                    }
+
+                    // 全件そろうのを待たず、貯まった分を先に見せる（結果は並べ替え済みで返ってくるので、
+                    // 途中経過は最終結果の先頭部分そのものになる）。この後も追記が続くため渡すのは複製
+                    PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, results.ToList(), isComplete: false);
+                    nextPublishCount = results.Count * SearchBatchGrowthFactor;
+                }
+
+                return results;
+            });
         }
         catch
         {
             cacheResults = new List<FileItemViewModel>();
         }
 
-        if (searchVersion != Volatile.Read(ref _searchVersion)
-            || !PathNormalizer.AreSame(CurrentPath, rootPath)
-            || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+        PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, cacheResults, isComplete: true);
+    }
+
+    /// <summary>検索結果を画面へ反映する。全件そろった結果だけ、次の入力で絞り込めるよう控える。</summary>
+    private void PublishSearchResults(
+        string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete)
+    {
+        if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
         {
             return;
         }
 
         _host.UiContext.Post(_ =>
         {
-            if (searchVersion != Volatile.Read(ref _searchVersion)
-                || !PathNormalizer.AreSame(CurrentPath, rootPath)
-                || !string.Equals(SearchQuery.Trim(), query, StringComparison.Ordinal))
+            if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
             {
                 return;
             }
 
-            ReplaceVisibleFileItems(cacheResults);
+            ReplaceVisibleFileItems(results);
+
+            // 途中経過から絞り込むと結果が欠けるため、控えるのは全件そろったときだけ。
+            // 控えるのは実際に表示したインスタンス —— ReplaceVisibleFileItems は既存の行を
+            // 使い回すため、渡した results をそのまま控えると同じ行を二重に抱えることになる
+            if (isComplete)
+            {
+                Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, pattern.Text, filesOnly, FileItems.ToList()));
+            }
         }, null);
+    }
+
+    /// <summary>結果が届いた時点でもまだ表示すべき状態か（検索語の変更・フォルダ移動が起きていないか）を確認する。</summary>
+    private bool IsSearchResultStillValid(string rootPath, NameSearchPattern pattern, int searchVersion)
+    {
+        return searchVersion == Volatile.Read(ref _searchVersion)
+            && PathNormalizer.AreSame(CurrentPath, rootPath)
+            && string.Equals(SearchQuery.Trim(), pattern.Text, StringComparison.Ordinal);
     }
 
     /// <summary>検索起点が仮想ノードの場合は対象フォルダ群を横断検索し、それ以外は単一パス配下を検索する。</summary>
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
-    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, string query)
+    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, NameSearchPattern pattern)
     {
+        // ファイル名索引（Plus機能）が使えるならそちらで探す。無効・未完成なら null が返るのでDBへ問い合わせる
+        var nameIndex = _host.NameIndex;
+
+        IEnumerable<CachedFileSystemEntry> SearchUnder(string path)
+        {
+            return nameIndex?.SearchUnderPath(path, pattern)
+                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern);
+        }
+
         var traversalPaths = _host.GetTraversalPaths(rootPath);
         if (traversalPaths.Count == 1)
         {
-            return _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(traversalPaths[0], query);
+            return SearchUnder(traversalPaths[0]);
         }
 
-        var results = traversalPaths
-            .SelectMany(root => _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(root, query));
+        var results = traversalPaths.SelectMany(SearchUnder);
 
         // 対象同士が入れ子（例: D:\ と D:\Sub）の場合のみ同一エントリが重複するため、その場合だけ
         // FullPathで除去する（通常構成でヒット全件分の FullPath 文字列を判定セットに同時保持しないため）

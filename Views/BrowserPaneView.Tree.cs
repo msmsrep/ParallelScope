@@ -316,9 +316,23 @@ public partial class BrowserPaneView
         }
     }
 
-    // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）
+    // ツリー選択の同期は、子フォルダの読み込みを待つ間に別のフォルダへ移動されうる。
+    // 割り込まれた古い同期が選択を書き戻さないよう、要求ごとに番号を振って最新のものだけを通す
+    private int _treeSyncVersion;
+
+    private bool IsCurrentTreeSync(int version) => version == _treeSyncVersion;
+
+    // フォルダツリーの選択状態を現在のパスに同期する（必要に応じて祖先ノードを遅延展開）。
+    // 結果を待つ呼び出し元は無いため投げっぱなしにする
     internal void SyncTreeSelectionToCurrentPath()
     {
+        _ = SyncTreeSelectionToCurrentPathAsync();
+    }
+
+    private async Task SyncTreeSelectionToCurrentPathAsync()
+    {
+        var version = ++_treeSyncVersion;
+
         var path = PathNormalizer.Normalize(ActiveTab.CurrentPath);
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -350,31 +364,90 @@ public partial class BrowserPaneView
 
         // ルートは仮想「Folders」ノードの子になったため、そのTreeViewItemを展開してから配下を辿る
         // （Favorites/Frequently Usedが上に挿入されうるので、インデックスではなくノード実体から引く）
-        if (FolderTreeView.ItemContainerGenerator.ContainerFromItem(_paneViewModel.AllRootsNode) is not TreeViewItem allRootsItem)
+        if (RealizeContainer(FolderTreeView, _paneViewModel.AllRootsNode) is not { } allRootsItem)
         {
             return;
         }
 
         allRootsItem.IsExpanded = true;
 
-        ExpandAndSelectByPath(allRootsItem, rootFolder, pathComponents, 0);
+        await ExpandAndSelectByPathAsync(allRootsItem, rootFolder, pathComponents, 0, version);
+
+        if (!IsCurrentTreeSync(version))
+        {
+            return;
+        }
+
         if (_treeItemMap.TryGetValue(path, out tvi))
         {
             ExpandParents(tvi);
         }
     }
 
-    // パス構成要素を1つずつ辿りながらツリーを再帰的に展開し、目的のノードを選択する
-    private bool ExpandAndSelectByPath(ItemsControl parentControl, FolderItemViewModel folderItem,
-        List<string> pathComponents, int componentIndex)
+    /// <summary>
+    /// 指定アイテムのTreeViewItemを取り出す。ツリーは仮想化されているため、画面外のアイテムには
+    /// まだコンテナが無い。その場合は表示範囲へ入れてから生成されたコンテナを返す
+    /// （これをしないと、深いパスへ移動したときに選択が追従しない）。
+    /// </summary>
+    private static TreeViewItem? RealizeContainer(ItemsControl parentControl, object item)
     {
-        // 初回呼び出しのみレイアウト更新を行う
-        if (componentIndex == 0)
+        if (parentControl.ItemContainerGenerator.ContainerFromItem(item) is TreeViewItem realized)
         {
+            return realized;
+        }
+
+        var index = parentControl.Items.IndexOf(item);
+        if (index < 0)
+        {
+            return null;
+        }
+
+        // パネル自体がまだ組み立てられていないことがあるため、先にレイアウトを流す
+        parentControl.UpdateLayout();
+
+        if (FindItemsHostPanel(parentControl) is { } panel)
+        {
+            panel.BringIndexIntoViewPublic(index);
             parentControl.UpdateLayout();
         }
 
-        if (parentControl.ItemContainerGenerator.ContainerFromItem(folderItem) is not TreeViewItem treeViewItem)
+        return parentControl.ItemContainerGenerator.ContainerFromItem(item) as TreeViewItem;
+    }
+
+    /// <summary>
+    /// 子アイテムを並べているパネルを探す。子（TreeViewItem）の下は自分のパネルではないので潜らない。
+    /// </summary>
+    private static VirtualizingStackPanel? FindItemsHostPanel(DependencyObject root)
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is VirtualizingStackPanel { IsItemsHost: true } panel)
+            {
+                return panel;
+            }
+
+            if (child is TreeViewItem)
+            {
+                continue;
+            }
+
+            if (FindItemsHostPanel(child) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    // パス構成要素を1つずつ辿りながらツリーを再帰的に展開し、目的のノードを選択する
+    private async Task<bool> ExpandAndSelectByPathAsync(ItemsControl parentControl, FolderItemViewModel folderItem,
+        List<string> pathComponents, int componentIndex, int version)
+    {
+        // レイアウトの流し直しは RealizeContainer 側が必要なときだけ行う
+        if (RealizeContainer(parentControl, folderItem) is not { } treeViewItem)
         {
             return false;
         }
@@ -389,8 +462,16 @@ public partial class BrowserPaneView
             return true;
         }
 
-        // 遅延読み込みを実行（次のディレクトリを探すために）
-        folderItem.EnsureLoaded();
+        // 遅延読み込みを実行（次のディレクトリを探すために）。
+        // 列挙はバックグラウンドで行われるので、ここで待ってもUIスレッドは止まらない
+        await folderItem.EnsureLoadedAsync();
+
+        // 待っている間に別のフォルダへ移動していれば、そちらの同期に任せて降りる
+        if (!IsCurrentTreeSync(version))
+        {
+            return false;
+        }
+
         treeViewItem.IsExpanded = true;
         // 中間のUpdateLayout()は削除（最後の更新のみで十分）
 
@@ -401,7 +482,7 @@ public partial class BrowserPaneView
 
         if (matchingChild is not null)
         {
-            return ExpandAndSelectByPath(treeViewItem, matchingChild, pathComponents, componentIndex + 1);
+            return await ExpandAndSelectByPathAsync(treeViewItem, matchingChild, pathComponents, componentIndex + 1, version);
         }
 
         return false;

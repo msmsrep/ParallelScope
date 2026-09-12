@@ -1,6 +1,7 @@
 ﻿using System.Data.Common;
 using System.IO;
 using System.Text;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using ParallelScope.Utilities;
@@ -135,7 +136,16 @@ public class FileCacheRepository
     /// </summary>
     public void ReleasePooledConnections()
     {
-        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        try
+        {
+            Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        }
+        catch
+        {
+            // ClearAllPools はプロセス全体のプールを走査し、その時点で別スレッドが使っている接続に
+            // 出くわすと SQLite Error 5 を投げることがある。メモリを返せるときに返すだけの処理なので、
+            // 失敗しても次の機会に任せる（ここで投げると呼び出し側のGCや後処理まで飛んでしまう）
+        }
     }
 
     /// <summary>指定した親パス直下のキャッシュ済みエントリ一覧を取得する。</summary>
@@ -170,24 +180,19 @@ public class FileCacheRepository
     /// </remarks>
     public IEnumerable<CachedFileSystemEntry> EnumerateFilesUnderPath(string rootPath)
     {
-        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
-        var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
-
         using var db = CreateDbContext();
         db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
+
+        var prefixFilter = BuildPathPrefixFilter(conn, rootPath);
 
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
             FROM FileSystemEntries
             WHERE IsFolder = 0
-                            AND FullPath LIKE @rootPattern";
-
-        var rootPatternParam = cmd.CreateParameter();
-        rootPatternParam.ParameterName = "@rootPattern";
-        rootPatternParam.Value = rootWithSeparator + "%";
-        cmd.Parameters.Add(rootPatternParam);
+              AND " + prefixFilter.WhereClause;
+        prefixFilter.AddParametersTo(cmd);
 
         // 同じ親フォルダのファイル数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
         // 共有する（結果はAll Files表示のViewModelから保持され続けるので、保持メモリに直結する）
@@ -206,6 +211,54 @@ public class FileCacheRepository
                 reader.IsDBNull(6) ? null : reader.GetDateTime(6),
                 reader.IsDBNull(7) ? null : reader.GetInt32(7));
         }
+    }
+
+    /// <summary>
+    /// 「FullPath が指定フォルダ配下か」を表すWHERE句と、そこへ渡すパラメータ。
+    /// 使う側は WhereClause を条件へ埋め込み、AddParametersTo でパラメータを積む。
+    /// </summary>
+    private sealed record PathPrefixFilter(string WhereClause, IReadOnlyList<(string Name, string Value)> Parameters)
+    {
+        public void AddParametersTo(DbCommand cmd)
+        {
+            foreach (var (name, value) in Parameters)
+            {
+                AddParameter(cmd, name, value);
+            }
+        }
+    }
+
+    /// <summary>
+    /// FullPath のプレフィックス絞り込み条件を組み立てる。
+    /// LIKE は既定でASCIIの大文字小文字を区別しない照合になり、FullPath のインデックス（BINARY照合）を
+    /// 使えないため、配下の件数に関わらずファイル行全件（百万件規模）のスキャンになる。
+    /// 代わりに「区切り文字 〜 その次の文字」のレンジ検索にするとインデックスで直接引ける
+    /// （区切り文字だけがこの範囲に入るため、LIKE と同じ結果になる）。
+    /// ただしレンジ検索はBINARY照合＝大文字小文字を区別するので、アドレス欄への手入力等で
+    /// キャッシュ内の表記と大文字小文字が食い違うと1件も引けない。そこで、その表記で1件でも
+    /// 存在するかをインデックス検索（数マイクロ秒）で先に確かめ、無い場合だけ従来のLIKEに戻す。
+    /// </summary>
+    private static PathPrefixFilter BuildPathPrefixFilter(DbConnection conn, string rootPath)
+    {
+        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
+        var lowerBound = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
+        var upperBound = lowerBound[..^1] + (char)(Path.DirectorySeparatorChar + 1);
+
+        using var probe = conn.CreateCommand();
+        probe.CommandText = "SELECT 1 FROM FileSystemEntries WHERE FullPath >= @lowerBound AND FullPath < @upperBound LIMIT 1";
+        AddParameter(probe, "@lowerBound", lowerBound);
+        AddParameter(probe, "@upperBound", upperBound);
+
+        if (probe.ExecuteScalar() is not null)
+        {
+            return new PathPrefixFilter(
+                "FullPath >= @lowerBound AND FullPath < @upperBound",
+                new[] { ("@lowerBound", lowerBound), ("@upperBound", upperBound) });
+        }
+
+        return new PathPrefixFilter(
+            "FullPath LIKE @prefixPattern ESCAPE '~'",
+            new[] { ("@prefixPattern", EscapeLikePattern(lowerBound) + "%") });
     }
 
     /// <summary>同一内容の文字列を1インスタンスへ共有するためのプール引き当て。</summary>
@@ -237,17 +290,15 @@ public class FileCacheRepository
                 continue;
             }
 
+            var prefixFilter = BuildPathPrefixFilter(conn, normalizedRootPath);
+
             using var cmd = conn.CreateCommand();
             cmd.CommandText = @"
                 SELECT COALESCE(SUM(SizeBytes), 0)
                 FROM FileSystemEntries
                 WHERE IsFolder = 0
-                    AND FullPath LIKE @rootPattern";
-
-            var rootPatternParam = cmd.CreateParameter();
-            rootPatternParam.ParameterName = "@rootPattern";
-            rootPatternParam.Value = PathNormalizer.WithTrailingSeparator(normalizedRootPath) + "%";
-            cmd.Parameters.Add(rootPatternParam);
+                  AND " + prefixFilter.WhereClause;
+            prefixFilter.AddParametersTo(cmd);
 
             var total = Convert.ToInt64(cmd.ExecuteScalar());
             if (total > 0)
@@ -265,62 +316,286 @@ public class FileCacheRepository
     /// インクリメンタルサーチは1文字の検索語で数十万件ヒットしうるため、List へ全件マテリアライズせず
     /// 1件ずつ返して呼び出し側でViewModelへ直接変換させる（中間リストを持つとピークメモリがほぼ倍増する）。
     /// </remarks>
-    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, string nameQuery)
+    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, NameSearchPattern pattern)
     {
         using var db = CreateDbContext();
 
-        var normalizedRootPath = PathNormalizer.Normalize(rootPath);
-        var rootWithSeparator = PathNormalizer.WithTrailingSeparator(normalizedRootPath);
+        // 正規表現の照合はSQLite側から呼ばせるため、接続を開く前に関数を登録する
+        var conn = db.Database.GetDbConnection();
+        RegisterNameMatchFunction(conn, pattern);
+        db.Database.OpenConnection();
 
-        // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
-        // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
-        var namePattern = "%" + EscapeLikePattern(nameQuery) + "%";
+        var prefixFilter = BuildPathPrefixFilter(conn, rootPath);
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+            FROM FileSystemEntries
+            WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(pattern) + BuildNameMatchClause(pattern) + @"
+            -- 並びはファイル名索引（ASCIIの大文字へ寄せて格納）と揃える。
+            -- 揃えないと、索引の有効・無効で検索結果の並びが変わってしまう
+            ORDER BY IsFolder DESC, Name COLLATE NOCASE";
+        prefixFilter.AddParametersTo(cmd);
+        AddNameMatchParametersTo(cmd, pattern);
 
         // 同じ親フォルダ内のヒット件数分だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ
         // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        var rows = db.FileSystemEntries
-            .AsNoTracking()
-            .Where(x => x.FullPath.StartsWith(rootWithSeparator) && EF.Functions.Like(x.Name, namePattern, "~"))
-            .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name)
-            .Select(x => new
-            {
-                x.ParentPath,
-                x.FullPath,
-                x.Name,
-                x.IsFolder,
-                x.SizeBytes,
-                x.LastWriteTimeUtc,
-                x.CreationTimeUtc,
-                x.Attributes
-            })
-            .AsEnumerable();
-
-        foreach (var x in rows)
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
         {
             yield return new CachedFileSystemEntry(
-                GetPooledString(parentPathPool, x.ParentPath),
-                x.FullPath,
-                x.Name,
-                x.IsFolder,
-                x.SizeBytes,
-                x.LastWriteTimeUtc,
-                x.CreationTimeUtc,
-                x.Attributes);
+                GetPooledString(parentPathPool, reader.GetString(0)),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetBoolean(3),
+                reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                reader.GetDateTime(5),
+                reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+                reader.IsDBNull(7) ? null : reader.GetInt32(7));
         }
     }
 
-    /// <summary>単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。</summary>
-    public void ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
+    /// <summary>ファイル名索引を組み立てるための最小限の行（行ID・親パス・名前・フォルダかどうか）。</summary>
+    public readonly record struct NameIndexRow(int Id, string ParentPath, string Name, bool IsFolder);
+
+    /// <summary>
+    /// ファイル名索引の組み立て前に、必要な配列の大きさを見積もるための件数と名前の総文字数を返す。
+    /// これが無いと可変長リストの倍々確保になり、150万件では確保のたびに数十MBの旧配列がLOHへ残る。
+    /// 数えた後に行が増減しうるためあくまで見積もりで、足りなければ呼び出し側が広げる。
+    /// </summary>
+    public (int RowCount, int TotalNameLength) GetNameIndexSizeHint()
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*), COALESCE(SUM(length(Name)), 0) FROM FileSystemEntries";
+
+        using var reader = cmd.ExecuteReader();
+        if (!reader.Read())
+        {
+            return (0, 0);
+        }
+
+        // SQLiteのlength()はコードポイント単位なので、サロゲートペアを含む名前があると
+        // C#のstring.Length（UTF-16単位）より小さくなる。少なめに出る前提で扱う
+        var rowCount = (int)Math.Min(reader.GetInt64(0), int.MaxValue);
+        var totalNameLength = (int)Math.Min(reader.GetInt64(1), int.MaxValue);
+        return (rowCount, totalNameLength);
+    }
+
+    /// <summary>
+    /// ファイル名索引の材料を全件列挙する（<see cref="FileNameIndex"/> 用）。
+    /// 索引に要るのは行ID・親パス・名前だけなので、他の列は読まない。
+    /// 百万件規模になるため List 化せず1件ずつ返す。
+    /// </summary>
+    public IEnumerable<NameIndexRow> EnumerateNameIndexRows()
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT Id, ParentPath, Name, IsFolder FROM FileSystemEntries";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            yield return new NameIndexRow(reader.GetInt32(0), reader.GetString(1), reader.GetString(2), reader.GetBoolean(3));
+        }
+    }
+
+    /// <summary>行IDを指定してエントリ本体を取り出す（索引で絞り込んだ結果の肉付けに使う）。</summary>
+    /// <remarks>
+    /// 並び順は指定しない。呼び出し側が索引上の位置（＝表示順）へ並べ直せるよう、行IDを添えて返す。
+    /// </remarks>
+    public List<(int Id, CachedFileSystemEntry Entry)> GetEntriesByIds(IReadOnlyList<int> ids)
+    {
+        var result = new List<(int Id, CachedFileSystemEntry Entry)>(ids.Count);
+        if (ids.Count == 0)
+        {
+            return result;
+        }
+
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        // 同じ親フォルダの行数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ共有する
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // SQLiteのパラメータ数には上限があるうえ、IN句が長すぎると解析コスト自体が効いてくるため小分けにする
+        for (var start = 0; start < ids.Count; start += IdLookupChunkSize)
+        {
+            var chunkLength = Math.Min(IdLookupChunkSize, ids.Count - start);
+
+            using var cmd = conn.CreateCommand();
+            // 値は自前の索引が持つ行IDそのもの（外部入力ではない）だが、組み立ては数値化を通して行う
+            cmd.CommandText = @"
+                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes, Id
+                FROM FileSystemEntries
+                WHERE Id IN (" + string.Join(",", ids.Skip(start).Take(chunkLength).Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + ")";
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add((reader.GetInt32(8), ReadEntry(reader, parentPathPool)));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// 1回のIN句にまとめる行IDの数。
+    /// 小分けにしすぎると文の準備回数が効き（数千件のヒットで3倍遅い）、大きくしすぎると
+    /// IN句自体の解析が重くなる（20万件で3倍遅い）。実測でこの辺りが底。
+    /// </summary>
+    private const int IdLookupChunkSize = 5_000;
+
+    /// <summary>指定した親フォルダ直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
+    public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, NameSearchPattern pattern)
+    {
+        var normalizedParentPath = PathNormalizer.Normalize(parentPath);
+
+        using var db = CreateDbContext();
+
+        var conn = db.Database.GetDbConnection();
+        RegisterNameMatchFunction(conn, pattern);
+        db.Database.OpenConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+            FROM FileSystemEntries
+            WHERE ParentPath = @parentPath" + BuildNameMatchClause(pattern);
+        AddParameter(cmd, "@parentPath", normalizedParentPath);
+        AddNameMatchParametersTo(cmd, pattern);
+
+        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
+        var result = new List<CachedFileSystemEntry>();
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            result.Add(ReadEntry(reader, parentPathPool));
+        }
+
+        return result;
+    }
+
+    /// <summary>ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes の並びで1行読む。</summary>
+    private static CachedFileSystemEntry ReadEntry(DbDataReader reader, Dictionary<string, string> parentPathPool)
+    {
+        return new CachedFileSystemEntry(
+            GetPooledString(parentPathPool, reader.GetString(0)),
+            reader.GetString(1),
+            reader.GetString(2),
+            reader.GetBoolean(3),
+            reader.IsDBNull(4) ? null : reader.GetInt64(4),
+            reader.GetDateTime(5),
+            reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+            reader.IsDBNull(7) ? null : reader.GetInt32(7));
+    }
+
+    /// <summary>この文字数以上の検索語のときだけ、FullPath による粗い絞り込みを挟む。</summary>
+    private const int SearchPathPreFilterMinQueryLength = 3;
+
+    /// <summary>
+    /// 検索語による絞り込みの前段として、FullPath 側の LIKE を足す（不要なら空文字を返す）。
+    /// Name は必ず FullPath の末尾なので、`Name LIKE '%語%'` が成り立つ行は必ず
+    /// `FullPath LIKE '%語%'` も成り立つ（条件としては安全な、広めの絞り込みになる）。
+    /// FullPath はインデックスに載っているため、ここで外れた行はテーブル本体を読まずに捨てられる。
+    /// Name の判定だけだと「1件もヒットしない検索語でも配下の全行を読む」ことになり、
+    /// ドライブ直下（150万行）では読み出しだけで1.6秒かかっていた（3文字以上でおよそ半分になる）。
+    /// 1〜2文字ではほとんどの行が通過して二重判定になるだけなので、その場合は足さない。
+    /// </summary>
+    private static string BuildSearchPathPreFilter(NameSearchPattern pattern)
+    {
+        // 正規表現は名前の一部を含むとは限らないので、この粗い絞り込みは使えない
+        return !pattern.IsRegex && pattern.Text.Length >= SearchPathPreFilterMinQueryLength
+            ? @"
+              AND FullPath LIKE @namePattern ESCAPE '~'"
+            : string.Empty;
+    }
+
+    /// <summary>正規表現の照合をSQLから呼べるようにする（部分一致のときはLIKEで済むため何もしない）。</summary>
+    /// <remarks>
+    /// 絞り込みをC#側で行うと ORDER BY が配下の全行（ドライブ直下で150万行）へかかる。
+    /// SQLiteに関数として渡せば、並べ替えは一致した行だけで済む。
+    /// </remarks>
+    private static void RegisterNameMatchFunction(DbConnection connection, NameSearchPattern pattern)
+    {
+        if (!pattern.IsRegex || connection is not SqliteConnection sqliteConnection)
+        {
+            return;
+        }
+
+        sqliteConnection.CreateFunction(NameMatchFunctionName, (string? name) => name is not null && pattern.Matches(name));
+    }
+
+    /// <summary>名前の絞り込み条件（部分一致はLIKE、正規表現は登録した関数）。</summary>
+    private static string BuildNameMatchClause(NameSearchPattern pattern)
+    {
+        return pattern.IsRegex
+            ? @"
+              AND " + NameMatchFunctionName + "(Name)"
+            // SQLiteのLIKEはASCIIの大文字小文字を元々区別しない（lower()もASCIIのみ折り畳む）ため、
+            // 行ごとに lower(Name) の文字列を生成していた従来と同じ判定を、生成コストなしで行える
+            : @"
+              AND Name LIKE @namePattern ESCAPE '~'";
+    }
+
+    private static void AddNameMatchParametersTo(DbCommand command, NameSearchPattern pattern)
+    {
+        if (!pattern.IsRegex)
+        {
+            AddParameter(command, "@namePattern", "%" + EscapeLikePattern(pattern.Text) + "%");
+        }
+    }
+
+    /// <summary>正規表現の照合を行う、SQLiteへ登録する関数の名前。</summary>
+    private const string NameMatchFunctionName = "ps_name_matches";
+
+    /// <summary>
+    /// 単一の親パスについて、キャッシュ済みエントリを渡されたエントリ群で置き換える。
+    /// キャッシュと内容が同一なら書き換えをスキップし、実際に書き換えたかどうかを返す。
+    /// </summary>
+    /// <remarks>
+    /// フォルダを開くたびに呼ばれる一方、中身が変わっていることは稀。無変化の場合まで
+    /// DELETE+INSERT（数万ファイルのフォルダでは数万行）を走らせるとフォルダ移動のたびに
+    /// 書き込みとWALの肥大が発生するため、フルスキャンと同じ差分判定を通す。
+    /// </remarks>
+    public bool ReplaceEntriesByParentPath(string parentPath, IReadOnlyCollection<CachedFileSystemEntry> entries)
     {
         var normalizedParentPath = PathNormalizer.Normalize(parentPath);
         var lockObject = ParentPathLockStripes[GetLockStripeIndex(normalizedParentPath)];
 
         lock (lockObject)
         {
+            var entriesByParentPath = new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>(StringComparer.OrdinalIgnoreCase)
+            {
+                [normalizedParentPath] = entries
+            };
+
+            try
+            {
+                using var db = CreateDbContext();
+                if (SelectChangedParentPaths(db, entriesByParentPath).Count == 0)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                // 差分判定に失敗した場合は従来通り書き換える（書き漏らしの方が害が大きい）
+            }
+
             ReplaceEntriesByParentPathInternal(normalizedParentPath, entries);
+            return true;
         }
     }
 
@@ -692,18 +967,20 @@ public class FileCacheRepository
         db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
 
+        var prefixFilter = BuildPathPrefixFilter(conn, normalizedParentPath);
+
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             SELECT substr(FullPath, length(@prefix) + 1, instr(substr(FullPath, length(@prefix) + 1), @sep) - 1) AS FirstSegment,
                    SUM(COALESCE(SizeBytes, 0)) AS TotalSize
             FROM FileSystemEntries
             WHERE IsFolder = 0
-              AND FullPath LIKE @prefixPattern ESCAPE '~'
+              AND " + prefixFilter.WhereClause + @"
               AND instr(substr(FullPath, length(@prefix) + 1), @sep) > 0 -- 親直下のファイルは子フォルダ合計に含めない
             GROUP BY FirstSegment COLLATE NOCASE";
 
+        prefixFilter.AddParametersTo(cmd);
         AddParameter(cmd, "@prefix", parentWithSeparator);
-        AddParameter(cmd, "@prefixPattern", EscapeLikePattern(parentWithSeparator) + "%");
         AddParameter(cmd, "@sep", Path.DirectorySeparatorChar.ToString());
 
         using var reader = cmd.ExecuteReader();

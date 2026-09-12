@@ -16,23 +16,20 @@ WPF で UI を構築し、ローカル SQLite キャッシュを使って表示�
 - 現在フォルダ配下のインクリメンタルサーチ（入力の都度、キャッシュに対して検索）
 - 「All Files」モード（現在フォルダ配下の全ファイルをフラットに一覧表示）
 - 一覧のダブルクリックでフォルダ移動/ファイルを既定アプリで起動
+- 隠しファイル・システムファイル/フォルダの表示切り替え（既定はどちらも表示。無料版でも利用可）
 - 配色テーマ（System / Light / Dark）
 - 表示言語（System / English / 日本語。既定はWindowsの表示言語に追従。無料版でも利用可）
 - Plus機能: 複数タブ、2画面（分割表示）、ペインごとのフォルダツリーの開閉、ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」（表示するノードと並び順を選択可）、
-  ファイル一覧の列カスタマイズ（表示列・並び順・列幅）、表示中の一覧のCSV出力
+  ファイル一覧の列カスタマイズ（表示列・並び順・列幅）、正規表現での検索、ファイル名索引をメモリに持って検索を速くする機能、表示中の一覧のCSV出力
 
 ## リリース
 
-- 未リリース
+- ver 1.4.7.0
+  - 正規表現での検索を追加（Plus機能。設定画面の「検索」ページで、検索欄の入力を部分一致と .NET の正規表現とで切り替え）
   - 複数タブを追加（Plus機能。タブごとに現在フォルダ・履歴・検索語・表示モード・並び順を保持し、構成は次回起動時に復元）
   - 2画面（分割表示）を追加（Plus機能。左右／上下に分割し、ペインごとにツリーと一覧を持つ）
-  - フォルダツリーの開閉を追加（Plus機能。ツリーを畳んで一覧を全幅で使える。開閉状態はペインごとに保存し、分割で増やしたペインは畳んだ状態から始まる）
-  - 設定に「フォルダツリー」ページを追加し、ツリー最上位のノードの表示/非表示と並び順を変更できるように（Plus機能）
   - ツリーに「🕘 Recent」（最近開いたフォルダー）を追加（Plus機能）
-  - 英語/日本語の表示言語切り替えを追加（既定はWindowsの表示言語に追従）
   - ツリーに「★ Favorites」「🕒 Frequently Used」を追加（Plus機能）
-  - 表示中の一覧の「Export CSV...」を追加（Plus機能）
-  - 「Display Columns」を刷新し、列の並び順と列幅も保存するよう変更（Plus機能）
 - Ver 1.4.5.0 メニューに「User Guide」を追加
 - Ver1.4.0.0 Monthly Subscription機能を追加
 - Ver 1.3.0.0 機能変更
@@ -92,7 +89,8 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
 6. 「All Files」をONにすると、現在フォルダ配下の全ファイルを階層に関係なく一覧表示
 7. 「Menu > Export CSV...」で、表示中の一覧をCSVへ書き出し（Plus機能）
 8. タブ列の「＋」または Ctrl+T で新しいタブ、「Menu > 画面を分割する」で左右／上下の2画面表示（どちらもPlus機能）
-9. 「Back」の左にある「☰」ボタンでフォルダツリーを畳み、一覧を全幅で表示（Plus機能）
+9. 矢印ボタンの左にある「☰」ボタンでフォルダツリーを畳み、一覧を全幅で表示（Plus機能）
+10. 「Settings > 検索」ページで、検索欄を正規表現として扱う設定と、ファイル名の索引をメモリに持って検索を速くする設定を切り替え（どちらもPlus機能。切り替えは即時反映・即保存）
 
 詳しくは[使い方ガイド](https://msmsrep.github.io/ParallelScope/index.ja.html)を参照してください。
 
@@ -101,7 +99,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
 `%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState`以下のフォルダへ保存します。
 アプリのアンインストール時に保存されたデータも削除されます。
 
-- `settings.json`: ルート/除外フォルダ・スキャン間隔・テーマ・表示言語・ツリー最上位ノードのレイアウト・ファイル一覧の列レイアウト・お気に入り・フォルダごとのアクセス回数
+- `settings.json`: ルート/除外フォルダ・スキャン間隔・テーマ・表示言語・検索の設定（正規表現・ファイル名索引）・隠し/システム項目の表示・ツリー最上位ノードのレイアウト・ファイル一覧の列レイアウト・お気に入り・フォルダごとのアクセス回数
 - `ParallelScope.sqlite`: ファイル一覧キャッシュ
 
 ## 開発メモ
@@ -120,7 +118,7 @@ dotnet ef database update
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面（メニューとペインの置き場）
 - `Views/BrowserPaneView.xaml`: 閲覧ペイン（タブ列＋フォルダツリー＋ファイル一覧）。2画面表示では2つ並ぶ
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/フォルダツリー/表示列/テーマ/言語/購読/支援）
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: 設定ダイアログ（ルート/フォルダツリー/検索/表示列/テーマ/言語/購読/支援）
 - `ViewModels/`: 画面ロジック（シェル `MainWindowViewModel` / ペイン `BrowserPaneViewModel` / タブ `BrowserTabViewModel` の3層。いずれも責務ごとにpartialクラスへ分割）
 - `Data/`: 設定/キャッシュ/DbContext
 - `Utilities/`: 共通ユーティリティ（パス正規化・CSV出力・列定義・仮想フォルダなど）
@@ -139,6 +137,7 @@ dotnet ef database update
   - フォルダツリーの開閉（未購読の間は「☰」ボタンを表示せず、ツリーは常に開いたままです）
   - ツリーの「★ Favorites」「🕘 Recent」「🕒 Frequently Used」と、その表示/非表示・並び順を選ぶ設定画面の「フォルダツリー」ページ（未購読の間はツリーに表示されません）
   - 設定画面の「Display Columns」（ファイル一覧の表示列・並び順・列幅のカスタマイズ）
+  - 正規表現での検索と、ファイル名の索引をメモリに保持して検索を速くする機能（設定画面の「検索」ページ。未購読の間はどちらも薄字で操作できません）
   - 「Menu > Export CSV...」（表示中の一覧のCSV出力）
 - 未購読でも、その他のすべての機能は引き続き無料で利用できます。対象機能は設定画面に薄字で表示されて操作のみ制限されるか、実行時に購読ページへの案内が表示されます
 - 購読は、Microsoft Store 版アプリの「Settings > Subscription」ページにある「Subscribe to Plus」ボタンから行えます

@@ -93,6 +93,46 @@ public class AppSettingsRepositoryTests
         Assert.Equal(new[] { @"C:\New" }, repository.Load().RootPaths);
     }
 
+    /// <summary>
+    /// 書き出しは遅延させているが、読み出しは保留分を反映してから行うため、
+    /// 別インスタンスからでも「書いた直後に読める」ことの確認。
+    /// </summary>
+    [Fact]
+    public void Save_IsVisibleToTheNextLoadWithoutWaiting()
+    {
+        using var temp = new TempDirectory();
+
+        new AppSettingsRepository(temp.Path).Save(new AppSettings { RootPaths = { @"C:\Saved" } });
+
+        Assert.Equal(new[] { @"C:\Saved" }, new AppSettingsRepository(temp.Path).Load().RootPaths);
+    }
+
+    /// <summary>終了時のフラッシュで、遅延させていた内容がファイルへ書き切られることの確認。</summary>
+    [Fact]
+    public void Flush_WritesThePendingSettingsToTheFile()
+    {
+        using var temp = new TempDirectory();
+        var repository = new AppSettingsRepository(temp.Path);
+        var settingsPath = Path.Combine(temp.Path, "settings.json");
+
+        repository.Save(new AppSettings { RootPaths = { @"C:\Flushed" } });
+        repository.Flush();
+
+        // JSONではパス区切りの \ がエスケープされて \\ になる
+        Assert.Contains(@"C:\\Flushed", File.ReadAllText(settingsPath));
+    }
+
+    /// <summary>保存していない状態でのフラッシュは、設定ファイルを作らないことの確認。</summary>
+    [Fact]
+    public void Flush_WithoutPendingSettings_DoesNotCreateTheFile()
+    {
+        using var temp = new TempDirectory();
+
+        new AppSettingsRepository(temp.Path).Flush();
+
+        Assert.False(File.Exists(Path.Combine(temp.Path, "settings.json")));
+    }
+
     [Fact]
     public void Load_FallsBackToDefaultsWhenFileIsCorrupted()
     {

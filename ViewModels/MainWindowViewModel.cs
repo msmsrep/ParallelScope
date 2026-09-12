@@ -21,8 +21,13 @@ public partial class MainWindowViewModel : ObservableObject
     private readonly FileCacheRepository _fileCacheRepository;
     private readonly AppSettingsRepository _appSettingsRepository;
     private readonly SynchronizationContext _uiContext;
+    // タブの背景処理の同時実行数を絞るゲート。タブごとのコアレサーはタブ内でしか統合しないため、
+    // タブ数ぶんの処理が一斉に走らないようアプリ全体で本数を抑える
+    private readonly BackgroundWorkGate _backgroundWorkGate = new(BackgroundWorkGate.DefaultMaxConcurrency);
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
+    // 除外判定用に、除外パスと「区切り文字付きの接頭辞」を作り置きした配列（SetExcludedPathsで更新）
+    private (string Path, string Prefix)[] _excludedPathMatchers = Array.Empty<(string, string)>();
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
     private AppThemeSetting _theme = AppThemeSetting.System;
@@ -126,6 +131,7 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _fileCacheRepository = fileCacheRepository;
         _appSettingsRepository = appSettingsRepository;
+        _fileNameIndex = new FileNameIndex(fileCacheRepository);
         _uiContext = SynchronizationContext.Current ?? new SynchronizationContext();
 
         // 設定の読み込みはペインのツリーとタブへ反映されるため、ペインを先に用意する
@@ -163,6 +169,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// </param>
     public void RefreshAfterScan(string? scannedPath = null)
     {
+        // キャッシュが入れ替わったので、ファイル名索引も作り直す（引き直し対象の親フォルダもここで消える）
+        ApplyNameIndexState();
+
         foreach (var tab in Panes.Select(pane => pane.ActiveTab))
         {
             if (string.IsNullOrWhiteSpace(tab.CurrentPath))

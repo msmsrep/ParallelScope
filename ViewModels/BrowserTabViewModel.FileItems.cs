@@ -40,61 +40,77 @@ public partial class BrowserTabViewModel
     /// <summary>表示中のFileItemsを、差分（追加/削除/更新）だけを適用する形で置き換える（不要な再描画を防止）。</summary>
     private void ReplaceVisibleFileItems(IEnumerable<FileItemViewModel> items, bool forceBulkReplace = false)
     {
-        var newItems = items.ToList();
+        // 呼び出し元はいずれも List を渡し、渡した後に中身を書き換えないため複製しない
+        // （検索・All Filesでは数十万件のコピーがそのままUIスレッドの停止時間になる）
+        var newItems = items as List<FileItemViewModel> ?? items.ToList();
         var replacedItemCount = Math.Max(FileItems.Count, newItems.Count);
 
-        if (forceBulkReplace)
+        // 件数が閾値を超えて増減していれば、差分を数えるまでもなく一括差し替えに決まる
+        // （重なるのは多くても少ない方の件数ぶんなので、追加と削除の合計は必ず件数差以上になる）。
+        // この近道が無いと、結論が決まっているのに全件ぶんのパスのハッシュ計算が
+        // UIスレッドで走ってしまう —— 97万件ヒットする検索や、そこから数件へ絞り込む場面がこれに当たる。
+        // 既存インスタンスの使い回しはここで諦めるが、フォルダの合計サイズは
+        // _currentDirectoryItems 側で引き継がれ、直後のキャッシュ集計でも入れ直される
+        var isBulkReplaceCertain = Math.Abs(newItems.Count - FileItems.Count) > BulkReplaceThreshold;
+
+        if (forceBulkReplace || isBulkReplaceCertain)
         {
             // モード切り替え時の大量データでは差分計算自体が高コストになるため、
             // 一括差し替えでUIスレッドのブロック時間を短縮する。
             FileItems = new ObservableCollection<FileItemViewModel>(newItems);
-            ScheduleMemoryTrim(replacedItemCount);
+            _host.RequestMemoryTrim(replacedItemCount);
             return;
         }
 
-        var currentItems = FileItems.ToList();
+        // 既存アイテムをパスでマップし、新しい一覧と突き合わせが済んだものは取り除いていく。
+        // 最後まで残ったものがそのまま「削除するアイテム」になる。
+        // （新旧のキー集合を別々に作って突き合わせると、パス文字列のハッシュ計算が
+        //   件数×数回ぶんUIスレッドで走る。1パスに畳んで15万件で約1/3の時間にしている）
+        var remainingItems = new Dictionary<(string Location, string Name), FileItemViewModel>(
+            FileItems.Count, PathKeyComparer.Instance);
+        foreach (var item in FileItems)
+        {
+            // 大文字小文字だけ異なる同じパスがキャッシュに残っているとキーが衝突するため、
+            // Add ではなくインデクサーで入れる（衝突した側は突き合わせ対象から外れ、削除される）
+            remainingItems[PathKeyOf(item)] = item;
+        }
 
-        // 既存アイテムをパスでマップ
-        var currentItemMap = currentItems.ToDictionary(PathKeyOf, PathKeyComparer.Instance);
-
-        // 削除するアイテムを特定（パスで比較）
-        var newItemPaths = newItems.Select(PathKeyOf).ToHashSet(PathKeyComparer.Instance);
-        var itemsToRemove = currentItems
-            .Where(x => !newItemPaths.Contains(PathKeyOf(x)))
-            .ToList();
-
-        // 追加するアイテムと更新するアイテムを特定
+        // 並びは新しい一覧のとおり。既存アイテムはサイズ表示等を保持するためインスタンスを再利用する
+        var mergedItems = new List<FileItemViewModel>(newItems.Count);
         var itemsToAdd = new List<FileItemViewModel>();
-        var itemsToUpdate = new List<(FileItemViewModel existing, FileItemViewModel newItem)>();
+        var addedItemCount = 0;
 
         foreach (var newItem in newItems)
         {
-            if (currentItemMap.TryGetValue(PathKeyOf(newItem), out var existingItem))
+            if (remainingItems.Remove(PathKeyOf(newItem), out var existingItem))
             {
-                itemsToUpdate.Add((existingItem, newItem));
+                ApplyItemUpdate(existingItem, newItem);
+                mergedItems.Add(existingItem);
+                continue;
             }
-            else
+
+            mergedItems.Add(newItem);
+            addedItemCount++;
+
+            // 追加が閾値を超えた時点で一括差し替えが確定するため、それ以降は控えない
+            if (addedItemCount <= BulkReplaceThreshold)
             {
                 itemsToAdd.Add(newItem);
             }
         }
 
-        ApplyItemUpdates(itemsToUpdate);
-
-        if (itemsToRemove.Count + itemsToAdd.Count > BulkReplaceThreshold)
+        if (remainingItems.Count + addedItemCount > BulkReplaceThreshold)
         {
             // 1件ずつのAdd/RemoveはCollectionChanged通知が件数分発生し（Removeは1件ごとに線形探索も走る）、
             // 大量差分ではUIスレッドが数秒単位でブロックされる。コレクション差し替えなら再バインド1回で済み、
-            // DataGridの行仮想化により生成されるのは可視行のみ。既存アイテムはサイズ表示等を保持するため
-            // インスタンスを再利用する。
-            FileItems = new ObservableCollection<FileItemViewModel>(
-                newItems.Select(x => currentItemMap.TryGetValue(PathKeyOf(x), out var existing) ? existing : x));
-            ScheduleMemoryTrim(replacedItemCount);
+            // DataGridの行仮想化により生成されるのは可視行のみ。
+            FileItems = new ObservableCollection<FileItemViewModel>(mergedItems);
+            _host.RequestMemoryTrim(replacedItemCount);
             return;
         }
 
         // 削除
-        foreach (var item in itemsToRemove)
+        foreach (var item in remainingItems.Values)
         {
             FileItems.Remove(item);
         }
@@ -106,78 +122,65 @@ public partial class BrowserTabViewModel
         }
     }
 
-    /// <summary>この件数を超える一覧の入れ替えの後は、メモリ返却のためのGCを予約する。</summary>
-    private const int MemoryTrimItemCountThreshold = 50_000;
-    private int _memoryTrimVersion;
-
-    /// <summary>
-    /// All Filesモード等での大量アイテム入れ替え後、不要になった旧一覧のメモリをOSへ返す。
-    /// 数十万件規模の入れ替えではGen2/LOHに旧一覧が残り、自然なGCまで（さらにGC後も
-    /// コミット済みのまま）ワーキングセットが積み上がるため、明示的に回収・返却する。
-    /// 連続ナビゲーション中に毎回ブロッキングGCが走らないよう、一定時間の静止後に最新の1回だけ実行する。
-    /// </summary>
-    private void ScheduleMemoryTrim(int replacedItemCount)
+    /// <summary>既存アイテムのプロパティを新規アイテムの情報で更新する。</summary>
+    private static void ApplyItemUpdate(FileItemViewModel existing, FileItemViewModel newItem)
     {
-        if (replacedItemCount < MemoryTrimItemCountThreshold)
+        existing.TypeText = newItem.TypeText;
+        existing.ModifiedAt = newItem.ModifiedAt;
+        existing.AttributesText = newItem.AttributesText;
+
+        // 作成日時: 古いキャッシュ行には値が無い（null）ため、nullで既存の値を上書きしない
+        // （ライブ更新で一度表示された値がキャッシュ再読込で消えるのを防ぐ。作成日時は変化しない値なので保持で問題ない）
+        if (newItem.CreatedAt is { } createdAt)
         {
-            return;
+            existing.CreatedAt = createdAt;
         }
 
-        var version = Interlocked.Increment(ref _memoryTrimVersion);
-        _ = Task.Run(async () =>
+        // サイズ: 新規アイテムが未取得（null。フォルダのキャッシュ集計が無い場合等）なら、
+        // キャッシュ集計由来の既存値を保持する
+        if (newItem.SizeBytes is { } sizeBytes)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2));
-            if (version != Volatile.Read(ref _memoryTrimVersion))
-            {
-                return;
-            }
-
-            // プールされたSQLite接続が抱えるページキャッシュ（接続あたり最大16MB）のネイティブメモリも返却する
-            // （使用中の接続には影響せず、次回アクセス時の再接続はローカルファイルでは数ms程度）
-            _host.FileCacheRepository.ReleasePooledConnections();
-
-            // Aggressive はLOHを含む全ヒープを圧縮し、空き領域をOSへ返却する
-            GC.Collect(GC.MaxGeneration, GCCollectionMode.Aggressive);
-        });
+            existing.SizeBytes = sizeBytes;
+        }
     }
 
-    /// <summary>既存アイテムのプロパティを新規アイテムの情報で更新する。</summary>
-    private static void ApplyItemUpdates(List<(FileItemViewModel existing, FileItemViewModel newItem)> itemsToUpdate)
+    /// <summary>フォルダ行だけをパスで引けるようにマップ化する。</summary>
+    private static Dictionary<(string Location, string Name), FileItemViewModel> BuildFolderLookup(
+        IEnumerable<FileItemViewModel> items)
     {
-        foreach (var (existing, newItem) in itemsToUpdate)
+        var result = new Dictionary<(string Location, string Name), FileItemViewModel>(PathKeyComparer.Instance);
+
+        foreach (var item in items)
         {
-            existing.TypeText = newItem.TypeText;
-            existing.ModifiedAt = newItem.ModifiedAt;
-            existing.AttributesText = newItem.AttributesText;
-
-            // 作成日時: 古いキャッシュ行には値が無い（null）ため、nullで既存の値を上書きしない
-            // （ライブ更新で一度表示された値がキャッシュ再読込で消えるのを防ぐ。作成日時は変化しない値なので保持で問題ない）
-            if (newItem.CreatedAt is { } createdAt)
+            if (item.IsFolder)
             {
-                existing.CreatedAt = createdAt;
-            }
-
-            // サイズ: 新規アイテムが未取得（null。フォルダのキャッシュ集計が無い場合等）なら、
-            // キャッシュ集計由来の既存値を保持する
-            if (newItem.SizeBytes is { } sizeBytes)
-            {
-                existing.SizeBytes = sizeBytes;
+                result[PathKeyOf(item)] = item;
             }
         }
+
+        return result;
     }
 
     /// <summary>現在フォルダの全件（検索対象外の基準データ）を更新し、検索中でなければ表示にも反映する。</summary>
     private void UpdateCurrentDirectoryItems(IEnumerable<FileItemViewModel> items)
     {
-        var newItems = items.ToList();
+        // 呼び出し元はいずれもバックグラウンドで組み立てた List を渡し、渡した後に中身を書き換えないため複製しない
+        var newItems = items as List<FileItemViewModel> ?? items.ToList();
 
         // 既存のアイテムからフォルダ合計サイズを引き継ぐ（キャッシュ集計でしか得られない値のため、
-        // ライブデータの再取得時に失われるのを防止）。ファイルはライブ列挙の最新サイズをそのまま使う
-        var currentItemMap = _currentDirectoryItems.ToDictionary(PathKeyOf, PathKeyComparer.Instance);
+        // ライブデータの再取得時に失われるのを防止）。ファイルはライブ列挙の最新サイズをそのまま使う。
+        // 引き継ぎ対象になるのはサイズ未取得のフォルダ行だけなので、突き合わせ表もフォルダ行だけで作る
+        // （数万ファイルのフォルダでも、この表はフォルダ数ぶんで済む）
+        Dictionary<(string Location, string Name), FileItemViewModel>? currentFolderMap = null;
         foreach (var newItem in newItems)
         {
-            if (newItem.SizeBytes is null
-                && currentItemMap.TryGetValue(PathKeyOf(newItem), out var existingItem)
+            if (newItem.SizeBytes is not null || !newItem.IsFolder)
+            {
+                continue;
+            }
+
+            currentFolderMap ??= BuildFolderLookup(_currentDirectoryItems);
+            if (currentFolderMap.TryGetValue(PathKeyOf(newItem), out var existingItem)
                 && existingItem.SizeBytes is { } existingSize)
             {
                 newItem.SizeBytes = existingSize;

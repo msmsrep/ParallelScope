@@ -11,6 +11,15 @@
 
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
+        <!-- ツリーの子アイテムを並べるパネル。
+             階層ごとのインデントを19px（Fluent既定）から約半分に縮めるため、負のマージンで左へ寄せる
+             （インデント幅はFluentのTreeViewItemテンプレート内の MinWidth="19" 固定列で作られており
+             リソース化されていないため、テンプレートを複製する代わりにこの方法を採っている）。
+             TreeViewItemのスタイルからセッターとトリガーの2箇所で参照する（下のコメント参照） -->
+        <ItemsPanelTemplate x:Key="TreeItemsPanelTemplate">
+            <VirtualizingStackPanel Margin="-9,0,0,0"/>
+        </ItemsPanelTemplate>
+
         <Style x:Key="ScanningIndicatorStyle" TargetType="TextBlock">
             <Setter Property="Text" Value="⟳"/>
             <Setter Property="Margin" Value="0,0,6,0"/>
@@ -61,7 +70,6 @@
         <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -71,19 +79,77 @@
             <ColumnDefinition Width="*" MinWidth="240"/>
         </Grid.ColumnDefinitions>
 
-        <!-- タブ列（Plus機能。未購読の間はコードビハインドが非表示にする） -->
-        <Border Grid.Row="0" Grid.ColumnSpan="3" Name="TabStripBorder" Margin="0,0,0,8" Padding="4,3"
-                Visibility="Collapsed" AllowDrop="True"
-                DragOver="TabStrip_DragOver" Drop="TabStrip_Drop"
-                Style="{StaticResource CardBorderStyle}">
-            <Grid>
+        <!-- 上段: ツリー開閉・戻る/進む/上へ・アドレス欄・タブ列を1行にまとめる
+             （別々の行に置くと縦を1行ぶん余分に使い、一覧の表示件数が減るため） -->
+        <Border Grid.Row="0" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
+            <Grid VerticalAlignment="Center">
+                <!-- 左側（ボタン＋アドレス欄）で横幅の約1/3、残りをタブ列に回す -->
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*" MinWidth="240"/>
+                    <ColumnDefinition x:Name="TabStripColumn" Width="Auto"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- タブが増えて溢れたら横スクロールで辿れるようにする -->
-                <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <Grid Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
+                    <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
+                    <ToggleButton Name="TreeToggleButton" Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                                  Visibility="Collapsed"
+                                  ToolTip="{loc:Loc Nav.ToggleTree}"
+                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
+                        <TextBlock Text="&#xE700;" FontSize="14"
+                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                   Style="{StaticResource ToggleButtonContentTextStyle}"/>
+                    </ToggleButton>
+                    <!-- 文言ではなく矢印にして幅を詰める（言語によらず同じ幅で済み、空いた横幅をアドレス欄とタブ列に回せる）。
+                         文字色はボタンから継承させる（明示すると無効時に淡くならない） -->
+                    <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            ToolTip="{loc:Loc Nav.Back}" Click="BackButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoBack}"/>
+                    <Button Content="&#xE72A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            ToolTip="{loc:Loc Nav.Forward}" Click="ForwardButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoForward}"/>
+                    <Button Content="&#xE74A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                            Width="32" Height="28" Padding="0"
+                            ToolTip="{loc:Loc Nav.Up}" Click="UpButton_Click"
+                            IsEnabled="{Binding ActiveTab.CanGoUp}"/>
+                </StackPanel>
+
+                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
+                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"
+                         ToolTipService.ShowDuration="30000">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                            <!-- 幅が狭く長いパスは末尾が切れるため、ホバーで全体を読めるようにする -->
+                            <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                            <Style.Triggers>
+                                <!-- 空のときは中身の無い枠だけが出てしまうので、ツールチップ自体を出さない -->
+                                <Trigger Property="Text" Value="">
+                                    <Setter Property="ToolTip" Value="{x:Null}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+                </Grid>
+
+                <!-- タブ列（Plus機能。未購読の間はコードビハインドが列ごと畳む） -->
+                <Grid Grid.Column="1" Name="TabStripPanel" Margin="8,0,0,0"
+                      Background="Transparent" Visibility="Collapsed" AllowDrop="True"
+                      DragOver="TabStrip_DragOver" Drop="TabStrip_Drop">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- タブが増えて溢れたら横スクロールで辿れるようにする -->
+                    <ScrollViewer Grid.Column="0" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
                     <ItemsControl Name="TabItemsControl" ItemsSource="{Binding Tabs}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
@@ -192,52 +258,23 @@
                     </ItemsControl>
                 </ScrollViewer>
 
-                <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
-                        Background="Transparent" BorderThickness="0"
-                        Foreground="{DynamicResource TextFillColorPrimaryBrush}"
-                        ToolTip="{loc:Loc Tab.New}"
-                        IsEnabled="{Binding CanAddTab}"
-                        Click="NewTabButton_Click"/>
-            </Grid>
-        </Border>
-
-        <!-- ナビゲーション: 戻る/進む/上へ とアドレス欄（ペインごとに1組持つ） -->
-        <Border Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,8" Style="{StaticResource CardBorderStyle}">
-            <Grid VerticalAlignment="Center">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="0,0,8,0">
-                    <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
-                    <ToggleButton Name="TreeToggleButton" Width="36" Padding="0" Margin="0,0,6,0"
-                                  Visibility="Collapsed"
-                                  ToolTip="{loc:Loc Nav.ToggleTree}"
-                                  IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
-                        <TextBlock Text="&#xE700;" FontSize="14"
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                   Style="{StaticResource ToggleButtonContentTextStyle}"/>
-                    </ToggleButton>
-                    <!-- ボタン幅は言語によって必要な幅が変わるため、既定幅を下限にして文字に合わせて伸びるようにする -->
-                    <Button Content="{loc:Loc Nav.Back}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="BackButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoBack}"/>
-                    <Button Content="{loc:Loc Nav.Forward}" MinWidth="80" Padding="8,0" Margin="0,0,6,0" Click="ForwardButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoForward}"/>
-                    <Button Content="{loc:Loc Nav.Up}" MinWidth="80" Padding="8,0" Click="UpButton_Click"
-                            IsEnabled="{Binding ActiveTab.CanGoUp}"/>
-                </StackPanel>
-
-                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
-                         VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"/>
+                    <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
+                            Background="Transparent" BorderThickness="0"
+                            Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            ToolTip="{loc:Loc Tab.New}"
+                            IsEnabled="{Binding CanAddTab}"
+                            Click="NewTabButton_Click"/>
+                </Grid>
             </Grid>
         </Border>
 
         <!-- 左側: フォルダツリー -->
-        <Border Grid.Row="2" Grid.Column="0" Name="TreeBorder" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
+        <Border Grid.Row="1" Grid.Column="0" Name="TreeBorder" Style="{StaticResource CardBorderStyle}" Margin="0,0,0,0">
             <!-- 最上位は仮想「Folders」ノードのみで、各ルートはその子として表示される -->
             <TreeView Name="FolderTreeView"
                       ItemsSource="{Binding TreeRoots}"
+                      VirtualizingPanel.IsVirtualizing="True"
+                      VirtualizingPanel.VirtualizationMode="Standard"
                       PreviewMouseRightButtonDown="FolderTreeView_PreviewMouseRightButtonDown"
                       ContextMenuOpening="FolderTreeView_ContextMenuOpening"
                       SelectedItemChanged="FolderTreeView_SelectedItemChanged">
@@ -246,22 +283,20 @@
                          Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
-                        <!-- 階層ごとのインデントを19px（Fluent既定）から約半分に縮める。
-                             インデント幅はFluentのTreeViewItemテンプレート内の
-                             MinWidth="19" 固定列で作られておりリソース化されていないため、
-                             テンプレートを複製する代わりに子アイテムのパネルを負のマージンで左に寄せる。
-                             注: VirtualizingPanel.IsVirtualizing をONにするとFluent側のトリガーが
-                             ItemsPanel を差し替えるため、このマージンも一緒に指定し直す必要がある -->
-                        <Setter Property="ItemsPanel">
-                            <Setter.Value>
-                                <ItemsPanelTemplate>
-                                    <VirtualizingStackPanel Margin="-9,0,0,0"/>
-                                </ItemsPanelTemplate>
-                            </Setter.Value>
-                        </Setter>
+                        <Setter Property="ItemsPanel" Value="{StaticResource TreeItemsPanelTemplate}"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
                         <EventSetter Event="Expanded" Handler="FolderTreeItem_Expanded"/>
+                        <Style.Triggers>
+                            <!-- 仮想化が有効なときは、Fluent既定のスタイルが持つ同じトリガーが
+                                 ItemsPanel を素の VirtualizingStackPanel へ差し替えてしまい、
+                                 上のセッターが無視される（インデントが約13px→約24pxに広がる）。
+                                 スタイルのトリガーはセッターより優先されるため基底側が勝つので、
+                                 派生スタイルのトリガー（＝こちらが最後に評価される）で同じものを入れ直す -->
+                            <Trigger Property="VirtualizingPanel.IsVirtualizing" Value="True">
+                                <Setter Property="ItemsPanel" Value="{StaticResource TreeItemsPanelTemplate}"/>
+                            </Trigger>
+                        </Style.Triggers>
                     </Style>
                 </TreeView.ItemContainerStyle>
                 <TreeView.ItemTemplate>
@@ -307,11 +342,11 @@
         </Border>
 
         <!-- セパレーター -->
-        <GridSplitter Grid.Row="2" Grid.Column="1" Name="TreeSplitter" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
+        <GridSplitter Grid.Row="1" Grid.Column="1" Name="TreeSplitter" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
                       Background="Transparent" Cursor="SizeWE"/>
 
         <!-- 右側: ファイル一覧 -->
-        <Border Grid.Row="2" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
+        <Border Grid.Row="1" Grid.Column="2" Style="{StaticResource CardBorderStyle}">
             <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -328,7 +363,20 @@
                 <TextBox Grid.Column="0" Margin="0,0,8,0"
                          Text="{Binding ActiveTab.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
-                         VerticalContentAlignment="Center"/>
+                         VerticalContentAlignment="Center">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+                            <Style.Triggers>
+                                <!-- 正規表現が書きかけで成立しない間は一覧を据え置くため、
+                                     入力欄の枠だけで「まだ検索していない」ことを示す -->
+                                <DataTrigger Binding="{Binding ActiveTab.IsSearchQueryInvalid}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{StaticResource InvalidInputBorderBrush}"/>
+                                    <Setter Property="BorderThickness" Value="1"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
                 <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
                               IsChecked="{Binding ActiveTab.IsFlatFileViewEnabled}">

@@ -16,6 +16,10 @@
                  面の濃さと太字で示す（アクセント色の文字も青が強く出るため使わない）。
                  TextFillColorPrimary は明暗テーマで反転するので、
                  ライトではグレー、ダークでは白の薄敷きになり、どちらでも面が沈まない -->
+            <!-- 入力が成立していないことを示す枠線（書きかけの正規表現）。
+                 テーマ追従の色ではなく固定の赤にしてある。明暗どちらの背景でも読める明度を選んだ -->
+            <SolidColorBrush x:Key="InvalidInputBorderBrush" Color="#E05252"/>
+
             <SolidColorBrush x:Key="SelectionNeutralFillBrush"
                              Color="{DynamicResource TextFillColorPrimary}" Opacity="0.14"/>
             <SolidColorBrush x:Key="SelectionNeutralHoverFillBrush"

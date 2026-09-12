@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -13,6 +14,19 @@ public partial class MainWindowViewModel : IBrowserTabHost
     SynchronizationContext IBrowserTabHost.UiContext => _uiContext;
 
     FileCacheRepository IBrowserTabHost.FileCacheRepository => _fileCacheRepository;
+
+    BackgroundWorkGate IBrowserTabHost.BackgroundGate => _backgroundWorkGate;
+
+    int IBrowserTabHost.TotalTabCount => AllTabs.Count();
+
+    void IBrowserTabHost.RequestMemoryTrim(int replacedItemCount) => RequestMemoryTrim(replacedItemCount);
+
+    FileNameIndex? IBrowserTabHost.NameIndex => GetUsableNameIndex();
+
+    bool IBrowserTabHost.UseRegexSearch => IsRegexSearchActive;
+
+    // 索引はキャッシュDBの写しなので、書き換わった親フォルダは検索時にDBから引き直させる
+    void IBrowserTabHost.OnCachedFolderChanged(string folderPath) => _fileNameIndex.MarkParentChanged(folderPath);
 
     bool IBrowserTabHost.ShowHiddenItems => _showHiddenItems;
 

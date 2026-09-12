@@ -1,5 +1,6 @@
 ﻿using System.Threading;
 using ParallelScope.Data;
+using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
 
@@ -15,6 +16,24 @@ internal interface IBrowserTabHost
 
     /// <summary>ファイル一覧のキャッシュDB（アプリ全体で1インスタンス）。</summary>
     FileCacheRepository FileCacheRepository { get; }
+
+    /// <summary>タブの背景処理の同時実行数を絞るゲート（アプリ全体で1インスタンス）。</summary>
+    BackgroundWorkGate BackgroundGate { get; }
+
+    /// <summary>全ペイン合わせて開いているタブの本数（1タブが抱えてよい一覧の件数を決めるのに使う）。</summary>
+    int TotalTabCount { get; }
+
+    /// <summary>大量アイテムの入れ替えが起きたことを通知する（アプリ全体で1回にまとめてメモリを返すため）。</summary>
+    void RequestMemoryTrim(int replacedItemCount);
+
+    /// <summary>検索に使えるファイル名索引（Plus機能。無効・未完成なら null で、キャッシュDBへの検索に切り替える）。</summary>
+    FileNameIndex? NameIndex { get; }
+
+    /// <summary>検索語を正規表現として扱うか（Plus機能。未購読・無効なら false で従来の部分一致）。</summary>
+    bool UseRegexSearch { get; }
+
+    /// <summary>1フォルダ分のキャッシュが書き換わったことを通知する（ファイル名索引の引き直し対象になる）。</summary>
+    void OnCachedFolderChanged(string folderPath);
 
     /// <summary>隠し属性のファイル/フォルダを一覧に出すか。</summary>
     bool ShowHiddenItems { get; }
