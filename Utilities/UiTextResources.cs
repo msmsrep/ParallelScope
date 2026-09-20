@@ -107,12 +107,12 @@ internal static class UiTextResources
         ["Settings.Menu.Search"] = "Search",
         ["Settings.Menu.Theme"] = "Theme",
         ["Settings.Menu.Language"] = "Language",
-        ["Settings.Menu.Subscription"] = "Subscription",
+        ["Settings.Menu.Subscription"] = "Plus",
         ["Settings.Menu.Support"] = "Support",
 
         // 設定画面: 検索（ファイル名索引）
         ["Settings.Search.Header"] = "Search",
-        ["Settings.Search.PlusUpsell"] = "Regular expression search and keeping the file name index in memory are Plus features. Subscribe to unlock them.",
+        ["Settings.Search.PlusUpsell"] = "Regular expression search and keeping the file name index in memory are Plus features. Subscribe to Plus, or buy it once, to unlock them.",
         ["Settings.Search.NameIndex.Header"] = "Keep the file name index in memory",
         ["Settings.Search.NameIndex.Enable"] = "Speed up search by keeping file names in memory",
         ["Settings.Search.NameIndex.Faster"] = "Search gets faster: about 400 ms to about 20 ms for 1.5 million files.",
@@ -138,7 +138,7 @@ internal static class UiTextResources
 
         // 設定画面: 表示列
         ["Settings.Columns.Header"] = "Display Columns",
-        ["Settings.Columns.PlusUpsell"] = "Customizing display columns is a Plus feature. Subscribe to unlock it.",
+        ["Settings.Columns.PlusUpsell"] = "Customizing display columns is a Plus feature. Subscribe to Plus, or buy it once, to unlock it.",
         ["Settings.Columns.Description"] = "Select the columns to show in the file list, and put them in the order you want.",
         ["Settings.Columns.Note"] = "The Name column is always shown. Column widths and the order you set by dragging the column headers are saved when you close the app.",
         ["Settings.Columns.Reset"] = "Reset columns to defaults",
@@ -153,7 +153,7 @@ internal static class UiTextResources
 
         // 設定画面: ツリー最上位のノード
         ["Settings.TreeNodes.Header"] = "Folder Tree",
-        ["Settings.TreeNodes.PlusUpsell"] = "Customizing the top-level tree nodes is a Plus feature. Subscribe to unlock it.",
+        ["Settings.TreeNodes.PlusUpsell"] = "Customizing the top-level tree nodes is a Plus feature. Subscribe to Plus, or buy it once, to unlock it.",
         ["Settings.TreeNodes.Description"] = "Select the shortcut nodes to show at the top of the folder tree, and put them in the order you want.",
         ["Settings.TreeNodes.Note"] = "The Folders node is always shown, but you can move it. \"Recent\" and \"Frequently Used\" are both built from the folders you open; hiding one does not stop the other from filling up.",
         ["Settings.TreeNodes.Reset"] = "Reset the tree nodes to defaults",
@@ -177,14 +177,23 @@ internal static class UiTextResources
         ["Settings.Language.Note"] = "The language is applied and saved immediately.",
 
         // 設定画面: サブスクリプション
+        ["TitleBar.License.Free"] = "Free",
+        ["TitleBar.License.Subscription"] = "Plus (monthly)",
+        ["TitleBar.License.Lifetime"] = "Plus (one-time)",
+        ["TitleBar.License.Plus"] = "Plus",
         ["Plus.Name"] = "ParallelScope Plus",
-        ["Settings.GoToSubscription"] = "Go to Subscription page",
-        ["Settings.Subscription.Header"] = "Subscription",
+        ["Settings.GoToSubscription"] = "Go to Plus page",
+        ["Settings.Subscription.Header"] = "ParallelScope Plus",
         ["Settings.Subscription.Active"] = "✅ Your Plus subscription is active.",
-        ["Settings.Subscription.Description"] = "Subscribe to ParallelScope Plus to unlock premium features such as Favorites, Recent and Frequently Used folders in the tree, customizing display columns in the file list, and exporting the file list to CSV.",
+        ["Settings.Subscription.Description"] = "Unlock premium features such as Favorites, Recent and Frequently Used folders in the tree, customizing display columns in the file list, and exporting the file list to CSV. Choose a monthly subscription or a one-time purchase - both unlock exactly the same features.",
+        ["Settings.Subscription.PlanDescription"] = "Pay monthly and cancel any time.",
         ["Settings.Subscription.Subscribe"] = "🔓 Subscribe to Plus",
         ["Settings.Subscription.SubscribeWithPrice"] = "🔓 Subscribe to Plus ({0} / month)",
-        ["Settings.Subscription.StoreUnavailable"] = "The Microsoft Store is not available. Please install this app from the Microsoft Store to subscribe.",
+        ["Settings.Purchase.LifetimeDescription"] = "Pay once and keep Plus forever, with no recurring charge.",
+        ["Settings.Purchase.Lifetime"] = "🔓 Buy Plus (one-time purchase)",
+        ["Settings.Purchase.LifetimeWithPrice"] = "🔓 Buy Plus ({0} / one-time purchase)",
+        ["Settings.Purchase.LifetimeActive"] = "✅ You own the one-time purchase of Plus.",
+        ["Settings.Subscription.StoreUnavailable"] = "The Microsoft Store is not available. Please install this app from the Microsoft Store to purchase.",
         ["Settings.Subscription.PurchaseNotCompleted"] = "The purchase was not completed.",
         ["Settings.Subscription.ManageDescription"] = "Subscriptions are billed through the Microsoft Store. To cancel your subscription, open the subscriptions page of your Microsoft account.",
         ["Settings.Subscription.Manage"] = "🔗 Manage / Cancel subscription",
@@ -299,12 +308,12 @@ internal static class UiTextResources
         ["Settings.Menu.Search"] = "検索",
         ["Settings.Menu.Theme"] = "配色テーマ",
         ["Settings.Menu.Language"] = "言語",
-        ["Settings.Menu.Subscription"] = "サブスクリプション",
+        ["Settings.Menu.Subscription"] = "Plus",
         ["Settings.Menu.Support"] = "サポート",
 
         // 設定画面: 検索（ファイル名索引）
         ["Settings.Search.Header"] = "検索",
-        ["Settings.Search.PlusUpsell"] = "正規表現での検索と、ファイル名の索引をメモリに保持する機能は Plus の機能です。サブスクリプションに登録すると使えます。",
+        ["Settings.Search.PlusUpsell"] = "正規表現での検索と、ファイル名の索引をメモリに保持する機能は Plus の機能です。月額サブスクリプションまたは買い切りで使えるようになります。",
         ["Settings.Search.NameIndex.Header"] = "ファイル名の索引をメモリに保持する",
         ["Settings.Search.NameIndex.Enable"] = "ファイル名をメモリに保持して検索を速くする",
         ["Settings.Search.NameIndex.Faster"] = "検索が速くなります: 150万件で約400ミリ秒 → 約20ミリ秒。",
@@ -330,7 +339,7 @@ internal static class UiTextResources
 
         // 設定画面: 表示列
         ["Settings.Columns.Header"] = "表示する列",
-        ["Settings.Columns.PlusUpsell"] = "表示する列のカスタマイズは Plus の機能です。サブスクリプションに登録すると使えます。",
+        ["Settings.Columns.PlusUpsell"] = "表示する列のカスタマイズは Plus の機能です。月額サブスクリプションまたは買い切りで使えるようになります。",
         ["Settings.Columns.Description"] = "ファイル一覧に表示する列を選び、好きな順番に並べ替えられます。",
         ["Settings.Columns.Note"] = "「名前」列は常に表示されます。列の幅と、列見出しのドラッグで変えた並び順は、アプリを閉じるときに保存されます。",
         ["Settings.Columns.Reset"] = "列の設定を既定に戻す",
@@ -345,7 +354,7 @@ internal static class UiTextResources
 
         // 設定画面: ツリー最上位のノード
         ["Settings.TreeNodes.Header"] = "フォルダツリー",
-        ["Settings.TreeNodes.PlusUpsell"] = "ツリー最上位のノードのカスタマイズは Plus の機能です。サブスクリプションに登録すると使えます。",
+        ["Settings.TreeNodes.PlusUpsell"] = "ツリー最上位のノードのカスタマイズは Plus の機能です。月額サブスクリプションまたは買い切りで使えるようになります。",
         ["Settings.TreeNodes.Description"] = "フォルダツリーの最上位に表示するショートカットのノードを選び、好きな順番に並べ替えられます。",
         ["Settings.TreeNodes.Note"] = "「Folders」は常に表示されますが、位置は入れ替えられます。「Recent」と「Frequently Used」はどちらも開いたフォルダの記録から作られるので、片方を非表示にしてももう片方には並び続けます。",
         ["Settings.TreeNodes.Reset"] = "ツリーのノードを既定に戻す",
@@ -369,14 +378,23 @@ internal static class UiTextResources
         ["Settings.Language.Note"] = "表示言語はすぐに適用・保存されます。",
 
         // 設定画面: サブスクリプション
+        ["TitleBar.License.Free"] = "無料版",
+        ["TitleBar.License.Subscription"] = "Plus（月額）",
+        ["TitleBar.License.Lifetime"] = "Plus（買い切り）",
+        ["TitleBar.License.Plus"] = "Plus",
         ["Plus.Name"] = "ParallelScope Plus",
-        ["Settings.GoToSubscription"] = "サブスクリプションのページへ",
-        ["Settings.Subscription.Header"] = "サブスクリプション",
+        ["Settings.GoToSubscription"] = "Plus のページへ",
+        ["Settings.Subscription.Header"] = "ParallelScope Plus",
         ["Settings.Subscription.Active"] = "✅ Plus のサブスクリプションは有効です。",
-        ["Settings.Subscription.Description"] = "ParallelScope Plus に登録すると、ツリーの「お気に入り」「最近開いたフォルダー」「よく使うフォルダー」、ファイル一覧の表示列のカスタマイズ、ファイル一覧のCSV書き出しといった機能が使えます。",
+        ["Settings.Subscription.Description"] = "ツリーの「お気に入り」「最近開いたフォルダー」「よく使うフォルダー」、ファイル一覧の表示列のカスタマイズ、ファイル一覧のCSV書き出しといった機能が使えるようになります。月額サブスクリプションと買い切りのどちらでも、解放される機能は同じです。",
+        ["Settings.Subscription.PlanDescription"] = "毎月のお支払いで、いつでも解約できます。",
         ["Settings.Subscription.Subscribe"] = "🔓 Plus に登録する",
         ["Settings.Subscription.SubscribeWithPrice"] = "🔓 Plus に登録する（{0} / 月）",
-        ["Settings.Subscription.StoreUnavailable"] = "Microsoft Store を利用できません。登録するには、Microsoft Store からこのアプリをインストールしてください。",
+        ["Settings.Purchase.LifetimeDescription"] = "一度のお支払いで、以降の請求なく Plus を使い続けられます。",
+        ["Settings.Purchase.Lifetime"] = "🔓 Plus を購入する（買い切り）",
+        ["Settings.Purchase.LifetimeWithPrice"] = "🔓 Plus を購入する（{0} / 買い切り）",
+        ["Settings.Purchase.LifetimeActive"] = "✅ Plus の買い切り版を購入済みです。",
+        ["Settings.Subscription.StoreUnavailable"] = "Microsoft Store を利用できません。購入するには、Microsoft Store からこのアプリをインストールしてください。",
         ["Settings.Subscription.PurchaseNotCompleted"] = "購入は完了しませんでした。",
         ["Settings.Subscription.ManageDescription"] = "サブスクリプションは Microsoft Store 経由で請求されます。解約するには、Microsoft アカウントのサブスクリプションのページを開いてください。",
         ["Settings.Subscription.Manage"] = "🔗 サブスクリプションの管理・解約",

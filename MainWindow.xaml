@@ -180,12 +180,10 @@
                 </Button.ContextMenu>
             </Button>
 
-            <!-- アプリ名＋バージョン。非アクティブ時はWindows標準に倣って薄く表示する -->
-            <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="12,0,12,0"
-                       TextTrimming="CharacterEllipsis"
-                       Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}">
-                <TextBlock.Style>
-                    <Style TargetType="TextBlock">
+            <!-- アプリ名＋バージョンと、その右のPlusの課金状況。非アクティブ時はWindows標準に倣って薄く表示する -->
+            <Grid Grid.Column="2" Margin="12,0,12,0">
+                <Grid.Style>
+                    <Style TargetType="Grid">
                         <Setter Property="Opacity" Value="1"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding IsActive, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
@@ -193,8 +191,37 @@
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
-                </TextBlock.Style>
-            </TextBlock>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"/>
+
+                <!-- 課金状況。ライセンスの判定が終わるまでは表示しない（起動直後に「無料版」が一瞬出ないように）。
+                     文言はコードから差し替えず、状態ごとのTextBlockの表示を切り替える（言語切り替えにバインディングで追従させるため） -->
+                <Border Grid.Column="1" Name="LicenseBadgeBorder" Visibility="Collapsed"
+                        VerticalAlignment="Center" Margin="8,0,0,0" Padding="6,1"
+                        CornerRadius="9" BorderThickness="1"
+                        Background="{DynamicResource SubtleFillColorSecondaryBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}">
+                    <Grid>
+                        <TextBlock Name="FreeLicenseTextBlock" FontSize="11" Text="{loc:Loc TitleBar.License.Free}"
+                                   Visibility="Collapsed"/>
+                        <TextBlock Name="SubscriptionLicenseTextBlock" FontSize="11" Text="{loc:Loc TitleBar.License.Subscription}"
+                                   Visibility="Collapsed"/>
+                        <TextBlock Name="LifetimeLicenseTextBlock" FontSize="11" Text="{loc:Loc TitleBar.License.Lifetime}"
+                                   Visibility="Collapsed"/>
+                        <!-- 開発者キーによる解放など、月額・買い切りのどちらとも言えない場合 -->
+                        <TextBlock Name="PlusLicenseTextBlock" FontSize="11" Text="{loc:Loc TitleBar.License.Plus}"
+                                   Visibility="Collapsed"/>
+                    </Grid>
+                </Border>
+            </Grid>
 
             <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Top"
                         WindowChrome.IsHitTestVisibleInChrome="True">

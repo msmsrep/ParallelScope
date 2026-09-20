@@ -124,6 +124,24 @@ public partial class MainWindow : Window
             pane.ApplyFileListColumnVisibility();
             pane.ApplyFileListColumnLayout();
         }
+
+        ApplyLicenseBadge();
+    }
+
+    // タイトルバーのアプリ名の右へ課金状況を出す。
+    // ライセンスの判定は起動後に確定するため、確定するまで（＝この呼び出しまで）は何も表示しない
+    private void ApplyLicenseBadge()
+    {
+        var isLifetime = _storeLicenseService.IsLifetimeOwned;
+        var isSubscription = _storeLicenseService.IsSubscriptionActive && !isLifetime;
+        // 開発者キー等で解放されている場合は、月額・買い切りのどちらとも言えないため単に「Plus」と出す
+        var isUnspecifiedPlus = _storeLicenseService.IsPlusActive && !isLifetime && !isSubscription;
+
+        FreeLicenseTextBlock.Visibility = _storeLicenseService.IsPlusActive ? Visibility.Collapsed : Visibility.Visible;
+        SubscriptionLicenseTextBlock.Visibility = isSubscription ? Visibility.Visible : Visibility.Collapsed;
+        LifetimeLicenseTextBlock.Visibility = isLifetime ? Visibility.Visible : Visibility.Collapsed;
+        PlusLicenseTextBlock.Visibility = isUnspecifiedPlus ? Visibility.Visible : Visibility.Collapsed;
+        LicenseBadgeBorder.Visibility = Visibility.Visible;
     }
 
     // タブ・ペイン操作のキーボードショートカット（Plus機能のため、未購読の間はペイン側が受け付けない）
