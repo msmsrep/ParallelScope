@@ -177,6 +177,10 @@ internal static class UiTextResources
         ["Settings.Language.Note"] = "The language is applied and saved immediately.",
 
         // 設定画面: サブスクリプション
+        ["TitleBar.License.Free"] = "Free",
+        ["TitleBar.License.Subscription"] = "Plus (monthly)",
+        ["TitleBar.License.Lifetime"] = "Plus (one-time)",
+        ["TitleBar.License.Plus"] = "Plus",
         ["Plus.Name"] = "ParallelScope Plus",
         ["Settings.GoToSubscription"] = "Go to Plus page",
         ["Settings.Subscription.Header"] = "ParallelScope Plus",
@@ -374,6 +378,10 @@ internal static class UiTextResources
         ["Settings.Language.Note"] = "表示言語はすぐに適用・保存されます。",
 
         // 設定画面: サブスクリプション
+        ["TitleBar.License.Free"] = "無料版",
+        ["TitleBar.License.Subscription"] = "Plus（月額）",
+        ["TitleBar.License.Lifetime"] = "Plus（買い切り）",
+        ["TitleBar.License.Plus"] = "Plus",
         ["Plus.Name"] = "ParallelScope Plus",
         ["Settings.GoToSubscription"] = "Plus のページへ",
         ["Settings.Subscription.Header"] = "ParallelScope Plus",

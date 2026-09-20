@@ -25,8 +25,9 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 
 ## Release
 
-- ver 1.4.8.0
+- ver 1.5.0.0
   - Added a one-time purchase of Plus (unlocks the same features as the monthly subscription)
+  - The title bar now shows your current license (Free / Plus (monthly) / Plus (one-time)) next to the app name and version
 - ver 1.4.7.0
   - Added regular expression search (Plus): the "Search" settings page switches the search box between substring and .NET regular expression matching
   - Added multiple tabs (Plus): each tab keeps its own folder, history, search text, view mode and sort order, and the layout is restored on the next start
