@@ -3,9 +3,9 @@
 namespace ParallelScope.Tests.Services;
 
 /// <summary>
-/// Plusサブスクリプションの判定。
-/// Storeの購読状態そのもの（StoreContext経由の分岐）と、正しい開発者キーによる解放は
-/// テストから再現できないため、ここで確認するのは「購読が確認できない間は必ず未購読扱いになる」側です。
+/// Plusライセンス（月額サブスクリプション・買い切り）の判定。
+/// Storeの購入状態そのもの（StoreContext経由の分岐）と、正しい開発者キーによる解放は
+/// テストから再現できないため、ここで確認するのは「購入が確認できない間は必ず未購入扱いになる」側です。
 /// </summary>
 public class StoreLicenseServiceTests
 {
@@ -16,6 +16,8 @@ public class StoreLicenseServiceTests
 
         // 起動直後（ライセンス未取得）はPlus機能を出さない
         Assert.False(service.IsPlusActive);
+        Assert.False(service.IsSubscriptionActive);
+        Assert.False(service.IsLifetimeOwned);
         Assert.False(service.IsStoreAvailable);
     }
 

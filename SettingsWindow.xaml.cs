@@ -180,7 +180,7 @@ public partial class SettingsWindow : Window
             option.RefreshDisplayName();
         }
 
-        ApplySubscribeButtonText();
+        ApplyPurchaseButtonText();
     }
 
     // 指定された並び順・表示列から一覧の項目を組み立てる
@@ -315,8 +315,8 @@ public partial class SettingsWindow : Window
         ResetTreeNodesHintTextBlock.Visibility = Visibility.Visible;
     }
 
-    // Plusの購読状態をDisplay Columns/Subscriptionページへ反映する。
-    // 未購読時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
+    // Plusの購入状態をDisplay Columns/Subscriptionページへ反映する。
+    // 未購入時はチェックボックス群を無効化（WPF標準の無効化スタイルで薄字・操作不可になる）し、アンロック案内を表示する
     private void ApplyPlusLicenseState()
     {
         var isActive = _storeLicenseService.IsPlusActive;
@@ -327,36 +327,61 @@ public partial class SettingsWindow : Window
         SearchOptionsPanel.IsEnabled = isActive;
         SearchPlusUpsellCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
 
-        // Subscriptionページ: 購読済みなら状態表示のみ、未購読なら購入ボタンを表示する
+        // Subscriptionページ: 購入済みなら状態表示のみ、未購入なら月額・買い切りの両方を出す。
+        // 二重課金を避けるため、どちらかを持っている間はもう一方の購入導線を出さない
+        var isLifetime = _storeLicenseService.IsLifetimeOwned;
         PlusActiveTextBlock.Visibility = isActive ? Visibility.Visible : Visibility.Collapsed;
-        SubscribePlusButton.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        PlusDescriptionTextBlock.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        SubscribePlusCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        BuyPlusLifetimeCard.Visibility = isActive ? Visibility.Collapsed : Visibility.Visible;
+        // 買い切りには解約が無いため、その場合だけ管理ページへの導線を隠す
+        ManageSubscriptionCard.Visibility = isLifetime ? Visibility.Collapsed : Visibility.Visible;
+
+        ApplyPurchaseButtonText();
 
         if (!isActive)
         {
-            _ = LoadPlusPriceAsync();
+            _ = LoadPlusPricesAsync();
         }
     }
 
     // ストアから取得した表示価格（通貨ローカライズ済み）。取得できていなければnull
-    private string? _plusFormattedPrice;
+    private string? _plusSubscriptionFormattedPrice;
+    private string? _plusLifetimeFormattedPrice;
 
     // ストアから実際の表示価格を取得してボタンに反映する。取得できなければ金額なしの表記のまま
-    private async Task LoadPlusPriceAsync()
+    private async Task LoadPlusPricesAsync()
     {
-        _plusFormattedPrice = await _storeLicenseService.GetPlusFormattedPriceAsync();
-        ApplySubscribeButtonText();
+        var prices = await _storeLicenseService.GetPlusFormattedPricesAsync();
+        _plusSubscriptionFormattedPrice = prices.GetValueOrDefault(StoreLicenseService.PlusSubscriptionAddOnStoreId);
+        _plusLifetimeFormattedPrice = prices.GetValueOrDefault(StoreLicenseService.PlusLifetimeAddOnStoreId);
+        ApplyPurchaseButtonText();
     }
 
-    // 購入ボタンの文言を現在の言語・取得済みの価格で組み立てる
-    private void ApplySubscribeButtonText()
+    // 購入状態の表示・購入ボタンの文言を現在の言語・取得済みの価格で組み立てる。
+    // これらはバインディングではないため、言語切り替え時にも呼び直す
+    private void ApplyPurchaseButtonText()
     {
-        SubscribePlusButton.Content = string.IsNullOrEmpty(_plusFormattedPrice)
+        PlusActiveTextBlock.Text = _storeLicenseService.IsLifetimeOwned
+            ? UiText.Get("Settings.Purchase.LifetimeActive")
+            : UiText.Get("Settings.Subscription.Active");
+        SubscribePlusButton.Content = string.IsNullOrEmpty(_plusSubscriptionFormattedPrice)
             ? UiText.Get("Settings.Subscription.Subscribe")
-            : UiText.Format("Settings.Subscription.SubscribeWithPrice", _plusFormattedPrice);
+            : UiText.Format("Settings.Subscription.SubscribeWithPrice", _plusSubscriptionFormattedPrice);
+        BuyPlusLifetimeButton.Content = string.IsNullOrEmpty(_plusLifetimeFormattedPrice)
+            ? UiText.Get("Settings.Purchase.Lifetime")
+            : UiText.Format("Settings.Purchase.LifetimeWithPrice", _plusLifetimeFormattedPrice);
     }
 
     // 購入ダイアログを表示し、購読が成立したらチェックボックス群を有効化する
     private async void SubscribePlusButton_Click(object sender, RoutedEventArgs e)
+        => await PurchasePlusAsync(SubscribePlusButton, StoreLicenseService.PlusSubscriptionAddOnStoreId);
+
+    // 購入ダイアログを表示し、買い切りの購入が成立したらチェックボックス群を有効化する
+    private async void BuyPlusLifetimeButton_Click(object sender, RoutedEventArgs e)
+        => await PurchasePlusAsync(BuyPlusLifetimeButton, StoreLicenseService.PlusLifetimeAddOnStoreId);
+
+    private async Task PurchasePlusAsync(Button button, string addOnStoreId)
     {
         if (!_storeLicenseService.IsStoreAvailable)
         {
@@ -366,13 +391,14 @@ public partial class SettingsWindow : Window
         }
 
         // 購入ダイアログ表示中の多重クリックを防ぐ
-        SubscribePlusButton.IsEnabled = false;
+        button.IsEnabled = false;
         try
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            var purchased = await _storeLicenseService.PurchasePlusAsync(hwnd);
+            var purchased = await _storeLicenseService.PurchasePlusAsync(hwnd, addOnStoreId);
             if (purchased)
             {
+                PlusStatusTextBlock.Visibility = Visibility.Collapsed;
                 ApplyPlusLicenseState();
             }
             else
@@ -383,7 +409,7 @@ public partial class SettingsWindow : Window
         }
         finally
         {
-            SubscribePlusButton.IsEnabled = true;
+            button.IsEnabled = true;
         }
     }
 

@@ -368,20 +368,40 @@
                     <Border Style="{StaticResource CardBorderStyle}" Padding="12">
                         <StackPanel>
                             <TextBlock Text="{loc:Loc Plus.Name}" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                            <!-- 購読済みの場合のみ表示する状態表示 -->
+                            <!-- 購入済みの場合のみ表示する状態表示。月額・買い切りで文言はコードビハインドが差し替える -->
                             <TextBlock Name="PlusActiveTextBlock" Text="{loc:Loc Settings.Subscription.Active}"
-                                       TextWrapping="Wrap" Margin="0,0,0,8" Visibility="Collapsed"/>
-                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       TextWrapping="Wrap" Margin="0,0,0,4" Visibility="Collapsed"/>
+                            <TextBlock Name="PlusDescriptionTextBlock" TextWrapping="Wrap"
                                        Text="{loc:Loc Settings.Subscription.Description}"/>
-                            <!-- 価格を取得できたら、コードビハインドが金額入りの文言へ差し替える -->
-                            <Button Name="SubscribePlusButton" Content="{loc:Loc Settings.Subscription.Subscribe}" HorizontalAlignment="Left"
-                                    Padding="8,6" Click="SubscribePlusButton_Click"/>
                             <TextBlock Name="PlusStatusTextBlock" TextWrapping="Wrap" Margin="0,8,0,0"
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
 
-                    <Border Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0">
+                    <!-- 月額サブスクリプション。買い切り購入済みの場合は非表示 -->
+                    <Border Name="SubscribePlusCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       Text="{loc:Loc Settings.Subscription.PlanDescription}"/>
+                            <!-- 価格を取得できたら、コードビハインドが金額入りの文言へ差し替える -->
+                            <Button Name="SubscribePlusButton" Content="{loc:Loc Settings.Subscription.Subscribe}" HorizontalAlignment="Left"
+                                    Padding="8,6" Click="SubscribePlusButton_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 買い切り。購読中・買い切り購入済みの場合は非表示 -->
+                    <Border Name="BuyPlusLifetimeCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0">
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
+                                       Text="{loc:Loc Settings.Purchase.LifetimeDescription}"/>
+                            <!-- 価格を取得できたら、コードビハインドが金額入りの文言へ差し替える -->
+                            <Button Name="BuyPlusLifetimeButton" Content="{loc:Loc Settings.Purchase.Lifetime}" HorizontalAlignment="Left"
+                                    Padding="8,6" Click="BuyPlusLifetimeButton_Click"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 解約の導線。解約対象が無い（買い切り購入済み）場合は非表示 -->
+                    <Border Name="ManageSubscriptionCard" Style="{StaticResource CardBorderStyle}" Padding="12" Margin="0,10,0,0">
                         <StackPanel>
                             <TextBlock TextWrapping="Wrap" Margin="0,0,0,8"
                                        Text="{loc:Loc Settings.Subscription.ManageDescription}"/>

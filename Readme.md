@@ -25,6 +25,8 @@ It is built with WPF and uses a local SQLite cache to speed up listing and searc
 
 ## Release
 
+- ver 1.4.8.0
+  - Added a one-time purchase of Plus (unlocks the same features as the monthly subscription)
 - ver 1.4.7.0
   - Added regular expression search (Plus): the "Search" settings page switches the search box between substring and .NET regular expression matching
   - Added multiple tabs (Plus): each tab keeps its own folder, history, search text, view mode and sort order, and the layout is restored on the next start
@@ -119,7 +121,7 @@ dotnet ef database update
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: main window (menu and the host for the panes)
 - `Views/BrowserPaneView.xaml`: a browsing pane (tab strip + folder tree + file list); the split view shows two of them
-- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / folder tree / search / display columns / theme / language / subscription / support)
+- `SettingsWindow.xaml` / `SettingsWindow.xaml.cs`: settings dialog (root folders / folder tree / search / display columns / theme / language / Plus / support)
 - `ViewModels/`: UI logic (shell `MainWindowViewModel` / pane `BrowserPaneViewModel` / tab `BrowserTabViewModel`, each split into partial classes by responsibility)
 - `Data/`: settings/cache/DbContext
 - `Utilities/`: shared helpers (path normalization, CSV export, column definitions, virtual folders, etc.)
@@ -128,25 +130,25 @@ dotnet ef database update
 - `Tests/ParallelScope.Tests/`: unit tests
 - `docs/`: the published user guide
 
-## ParallelScope Plus (Monthly Subscription)
+## ParallelScope Plus (Monthly Subscription / One-Time Purchase)
 
-Some features are offered as "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
+Some features are offered as "ParallelScope Plus", an add-on on the Microsoft Store. It comes as a monthly subscription and as a one-time purchase; **both unlock exactly the same features**, so there is no need to buy both.
 
 - **Plus features**:
-  - Multiple tabs (the tab strip is hidden without a subscription; a saved tab layout is kept as is and comes back when you subscribe)
-  - Split view (two panes) ("Menu > Split View" stays greyed out without a subscription)
-  - Collapsing the folder tree of a pane (the "☰" button is hidden without a subscription, and the tree always stays open)
-  - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree, and "Folder Tree" in the settings window for choosing which of them to show and in what order (hidden entirely without a subscription)
+  - Multiple tabs (the tab strip is hidden without Plus; a saved tab layout is kept as is and comes back once you have it)
+  - Split view (two panes) ("Menu > Split View" stays greyed out without Plus)
+  - Collapsing the folder tree of a pane (the "☰" button is hidden without Plus, and the tree always stays open)
+  - "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" folders in the tree, and "Folder Tree" in the settings window for choosing which of them to show and in what order (hidden entirely without Plus)
   - "Display Columns" in the settings window (which columns the file list shows, their order, and their widths)
-  - Regular expression search, and keeping the file name index in memory to speed search up (the "Search" page of the settings window; both greyed out without a subscription)
+  - Regular expression search, and keeping the file name index in memory to speed search up (the "Search" page of the settings window; both greyed out without Plus)
   - "Menu > Export CSV..." (exporting the displayed list)
-- All other features remain free without a subscription. Locked features are either shown grayed out with only their controls disabled, or offer to open the Subscription page when used
-- You can subscribe from the "Subscribe to Plus" button on the "Settings > Subscription" page in the Microsoft Store version of the app
-- Payment, billing, and cancellation are all handled by the Microsoft Store. 
+- All other features remain free without Plus. Locked features are either shown grayed out with only their controls disabled, or offer to open the Plus page when used
+- You can buy Plus from the "Subscribe to Plus" or "Buy Plus (one-time purchase)" button on the "Settings > Plus" page in the Microsoft Store version of the app. Once you own either one, the other purchase button is hidden
+- Payment, billing, and cancellation are all handled by the Microsoft Store (a one-time purchase has nothing to cancel, so the cancellation link is hidden once you own it). 
 
 ### Open Source and Paid Features
 
-The full source code of this app is public, including the in-app purchase implementation. The subscription state is verified against the Microsoft Store license, so **the purchase flow (and the Plus feature lock) only takes effect in the version installed from the Microsoft Store**.
+The full source code of this app is public, including the in-app purchase implementation. The Plus license state is verified against the Microsoft Store license, so **the purchase flow (and the Plus feature lock) only takes effect in the version installed from the Microsoft Store**.
 
 ## Support
 
@@ -183,9 +185,9 @@ User data is not sold, shared, or provided to third parties.
 
 ### In-App Purchases (ParallelScope Plus)
 
-Purchases, billing, and license management for the Plus subscription are handled by the Microsoft Store.
-The app communicates with the Microsoft Store through the OS to check the subscription state, but it never obtains or stores payment information (such as credit card numbers).
-You can review your purchase history and manage the subscription from your Microsoft account.
+Purchases, billing, and license management for Plus (both the monthly subscription and the one-time purchase) are handled by the Microsoft Store.
+The app communicates with the Microsoft Store through the OS to check the license state, but it never obtains or stores payment information (such as credit card numbers).
+You can review your purchase history and manage any subscription from your Microsoft account.
 
 ### Cookies and Tracking Technologies
 
