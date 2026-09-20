@@ -1,4 +1,4 @@
-# Microsoft Store の掲載文
+﻿# Microsoft Store の掲載文
 
 Partner Center の「ストアの登録情報」へ貼る文面。**日本語と英語の2言語ぶん**ある。
 機能を追加・変更したら、`Readme.md` / `Readme.ja.md` のリリース欄と合わせてここも直す。
@@ -63,7 +63,10 @@ Parallel Scopeは、NASやPC内の大量のフォルダを“一瞬で検索・�
 ・隠しファイル・システムファイルの表示切り替え
 既定では表示します。チェックを外すと、ファイル一覧とフォルダツリーのどちらからも隠せます。
 
-ParallelScope Plus（月額サブスクリプション）でできること
+・現在のライセンスがひと目でわかる
+タイトルバーのアプリ名・バージョンの右に、「無料版」「Plus（月額）」「Plus（買い切り）」のいずれかを表示します。
+
+ParallelScope Plus（月額サブスクリプション／買い切り）でできること
 
 ・複数タブ
 フォルダを複数のタブで開いたまま行き来できます。タブごとに現在のフォルダ・戻る/進むの履歴・検索語・All Filesモード・並び順を持ち、
@@ -84,9 +87,21 @@ ParallelScope Plus（月額サブスクリプション）でできること
 検索結果やAll Filesモードの表示も、見えているとおりの並び・列でCSVへ書き出せます。
 サイズは表示どおりの文字列と、集計しやすい生のバイト数のどちらかを選べます。
 
-上記以外の機能は、サブスクリプションなしでお使いいただけます。
+・正規表現での検索
+検索欄の入力を部分一致と正規表現とで切り替えられます。拡張子や連番など、条件を決め打ちで絞り込めます。
 
-・一部の機能は、Microsoft Storeのアドオン「ParallelScope Plus」（月額サブスクリプション）として提供しています。
+・ファイル名の索引で検索をさらに高速化
+全ファイル名をメモリ上の索引に持つことで、100万件規模でも検索の待ち時間がほとんどなくなります。
+
+・フォルダツリーの開閉
+「☰」ボタンでツリーを畳み、ファイル一覧を画面の全幅で表示できます。
+
+上記以外の機能は、購入なしでお使いいただけます。
+
+・一部の機能は、Microsoft Storeのアドオン「ParallelScope Plus」として提供しています。
+購入方法は「月額サブスクリプション」と「買い切り」の2通りで、解放される機能はどちらも同じです。
+ご自身に合うほうを1つ選んでいただければよく、両方を購入する必要はありません。
+買い切りは一度のお支払いのみで、以降の請求はありません。
 
 本アプリ（ParallelScope）は個人で開発・運営しています。
 アドオンとは別に、継続的なアップデートや機能改善のため、任意の開発支援を受け付けています。
@@ -102,14 +117,18 @@ ParallelScope Plus（月額サブスクリプション）でできること
 - ネットワークが切れてもキャッシュ済みの内容はそのまま閲覧・検索できる設計
 - 戻る／進む／上へのナビゲーションとアドレスバーへのパス直接入力
 - 右クリックからファイル・ファイル名・フルパスをコピー、親フォルダを開く
-- 配色テーマ（システム／ライト／ダーク）
-- 表示言語（システム／英語／日本語）
+- 配色テーマ（システム／ライト／ダーク）と表示言語（システム／英語／日本語）の切り替え
 - 隠しファイル・システムファイルの表示切り替え
+- タイトルバーに現在のライセンス（無料版／Plus（月額）／Plus（買い切り））を表示
 - ParallelScope Plus: 複数タブ（タブごとに表示状態を保持し、次回起動時に復元）
 - ParallelScope Plus: 2画面（左右／上下の分割表示）で2つのフォルダを並べて比較
 - ParallelScope Plus: お気に入り／最近開いたフォルダ／よく使うフォルダのツリー表示
 - ParallelScope Plus: 表示列の選択・並び順・列幅の保存
+- ParallelScope Plus: 正規表現での検索（部分一致との切り替え）
+- ParallelScope Plus: ファイル名の索引をメモリに持ち、大量ファイルでも検索を高速化
+- ParallelScope Plus: フォルダツリーを畳んでファイル一覧を全幅表示
 - ParallelScope Plus: 表示中の一覧のCSV書き出し
+- ParallelScope Plus は月額サブスクリプションと買い切りの2通りで、解放される機能はどちらも同じ
 
 ### 検索用語
 
@@ -167,7 +186,10 @@ Both apply the moment you pick them, and both follow your Windows settings by de
 - Show or hide hidden and system items
 They are shown by default; clear a checkbox to leave them out of both the file list and the folder tree.
 
-What ParallelScope Plus (a monthly subscription) adds
+- Your license at a glance
+The title bar shows "Free", "Plus (monthly)" or "Plus (one-time)" next to the app name and version.
+
+What ParallelScope Plus (monthly subscription or one-time purchase) adds
 
 - Multiple tabs
 Keep several folders open and move between them. Each tab has its own folder, back/forward history, search text, All Files mode and sort order,
@@ -188,9 +210,21 @@ Pick from Location, Type, Size, Modified, Created and Attributes, then keep your
 Search results and All Files mode included, with the same rows, order and columns you see on screen.
 Sizes can be written as displayed, or as raw byte counts for totalling in a spreadsheet.
 
-Everything else is yours without a subscription.
+- Regular expression search
+Switch the search box between substring matching and regular expressions to pin down extensions, numbering and anything else exactly.
 
-- Some features are offered through "ParallelScope Plus", a monthly subscription add-on on the Microsoft Store.
+- A file name index that makes search faster still
+Keeping every file name in an in-memory index takes the wait out of searching, even across a million files.
+
+- Collapse the folder tree
+The "☰" button folds the tree away so the file list fills the full width of the window.
+
+Everything else is yours without buying anything.
+
+- Some features are offered through "ParallelScope Plus", an add-on on the Microsoft Store.
+It comes as a monthly subscription and as a one-time purchase, and both unlock exactly the same features.
+Pick whichever suits you - there is no need to buy both.
+The one-time purchase is paid once, with no recurring charge.
 
 ParallelScope is developed and run by one person.
 Separately from the add-on, optional support toward continued updates and improvements is welcome.
@@ -206,14 +240,18 @@ If you would like to help, there is a link inside the app — it is a real encou
 - Cached content stays browsable and searchable when the network is unavailable
 - Back / Forward / Up navigation and direct path entry in the address bar
 - Right-click to copy a file, its name or its full path, or to open its parent folder
-- Color theme (System / Light / Dark)
-- Display language (System / English / Japanese)
+- Color theme (System / Light / Dark) and display language (System / English / Japanese)
 - Show or hide hidden and system items
+- The title bar shows your current license (Free / Plus (monthly) / Plus (one-time))
 - ParallelScope Plus: multiple tabs, each keeping its own view and restored on the next start
 - ParallelScope Plus: split view (side by side or stacked) for comparing two folders
 - ParallelScope Plus: Favorites, Recent and Frequently Used folders in the tree
 - ParallelScope Plus: choose the file list columns, their order and their widths
+- ParallelScope Plus: regular expression search, switchable with substring matching
+- ParallelScope Plus: an in-memory file name index that keeps search fast across huge trees
+- ParallelScope Plus: collapse the folder tree to give the file list the full width
 - ParallelScope Plus: export the list you are looking at to CSV
+- ParallelScope Plus comes as a monthly subscription or a one-time purchase, both unlocking the same features
 
 ### Search terms
 
