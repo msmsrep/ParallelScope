@@ -513,4 +513,39 @@ eadme.txt"));
             [@"C:\Root\Sub\Deep"] = new[] { File(@"C:\Root\Sub\Deep", "deep.txt") }
         });
     }
+
+    /// <summary>進捗ハンドラーが呼ばれる程度（SQLiteの命令数で数十万）の行数を1フォルダに入れる。</summary>
+    private void SeedManyFiles(int count)
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Big", Enumerable.Range(0, count)
+            .Select(i => File(@"C:\Big", $"file{i:D5}.txt"))
+            .ToList());
+    }
+
+    // 用済みになった検索は、ヒットを待たずにSQLite側で打ち切る（ORDER BY の並べ替え中でも止まる）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_StopsWhenAborted()
+    {
+        SeedManyFiles(20_000);
+        var abortChecks = 0;
+
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file"), () =>
+        {
+            abortChecks++;
+            return true;
+        }).ToList();
+
+        Assert.True(abortChecks > 0);
+        Assert.Empty(hits);
+    }
+
+    // 打ち切り用のハンドラーは外してから接続をプールへ返す（残ると後の検索まで打ち切られる）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_DoesNotLeaveTheAbortHandlerOnPooledConnections()
+    {
+        SeedManyFiles(20_000);
+        _ = _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file"), () => true).ToList();
+
+        Assert.Equal(20_000, _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file")).Count());
+    }
 }

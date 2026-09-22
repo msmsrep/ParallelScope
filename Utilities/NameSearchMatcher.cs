@@ -49,6 +49,33 @@ public static class NameSearchMatcher
         return value is >= 'a' and <= 'z' ? (char)(value - ('a' - 'A')) : value;
     }
 
+    /// <summary>
+    /// <see cref="FoldAscii(char)"/> で畳んだ名前どうしを序数で比べる（検索結果の並び順）。
+    /// ファイル名索引・キャッシュDB（<c>ORDER BY upper(Name)</c>）と同じ並びにするための比較。
+    /// </summary>
+    /// <remarks>
+    /// <see cref="StringComparer.OrdinalIgnoreCase"/> はASCII以外の文字も畳むため、並びが索引とずれる。
+    /// なお、ここと索引はUTF-16の符号単位順、SQLiteはUTF-8のバイト順（＝コードポイント順）で比べるため、
+    /// サロゲートペアの文字と U+E000 以降の文字の前後だけは食い違いうる（実用上まず出ない）。
+    /// </remarks>
+    public static int CompareFolded(string left, string right)
+    {
+        var length = Math.Min(left.Length, right.Length);
+        for (var i = 0; i < length; i++)
+        {
+            var difference = FoldAscii(left[i]) - FoldAscii(right[i]);
+            if (difference != 0)
+            {
+                return difference;
+            }
+        }
+
+        return left.Length - right.Length;
+    }
+
+    /// <summary><see cref="CompareFolded"/> を使う比較子。</summary>
+    public static readonly IComparer<string> FoldedComparer = Comparer<string>.Create(CompareFolded);
+
     /// <summary>文字列全体を <see cref="FoldAscii(char)"/> の規則で畳む。</summary>
     public static string FoldAscii(string value)
     {

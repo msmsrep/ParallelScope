@@ -348,13 +348,21 @@ public sealed class FileNameIndex
     /// 結果は表示順のまま少しずつ返す（全件そろうのを待たない）。呼び出し側の段階表示が
     /// 最初のひとまとまりをすぐ画面へ出せるようにするため。
     /// </remarks>
-    public IEnumerable<CachedFileSystemEntry>? SearchUnderPath(string rootPath, NameSearchPattern pattern)
+    /// <param name="shouldAbort">
+    /// 途中で打ち切るかを返す（次の入力が来た等）。真になったら、その時点までの結果で列挙を終える。
+    /// ヒットが少ない検索語では全件を走査し終えるまで1件も返らないため、走査の途中でも確かめる。
+    /// </param>
+    public IEnumerable<CachedFileSystemEntry>? SearchUnderPath(string rootPath, NameSearchPattern pattern, Func<bool>? shouldAbort = null)
     {
         var snapshot = Volatile.Read(ref _snapshot);
-        return snapshot is null ? null : EnumerateMatches(snapshot, rootPath, pattern);
+        return snapshot is null ? null : EnumerateMatches(snapshot, rootPath, pattern, shouldAbort);
     }
 
-    private IEnumerable<CachedFileSystemEntry> EnumerateMatches(Snapshot snapshot, string rootPath, NameSearchPattern pattern)
+    /// <summary>走査中に打ち切りを確かめる間隔（件数）。部分一致なら数百μs、正規表現でも数ms程度ぶん。</summary>
+    private const int AbortCheckInterval = 16_384;
+
+    private IEnumerable<CachedFileSystemEntry> EnumerateMatches(
+        Snapshot snapshot, string rootPath, NameSearchPattern pattern, Func<bool>? shouldAbort)
     {
         var normalizedRoot = PathNormalizer.Normalize(rootPath);
         var rootPrefix = PathNormalizer.WithTrailingSeparator(normalizedRoot);
@@ -386,6 +394,11 @@ public sealed class FileNameIndex
 
         for (var i = 0; i < snapshot.EntryCount; i++)
         {
+            if (shouldAbort is not null && i % AbortCheckInterval == 0 && shouldAbort())
+            {
+                yield break;
+            }
+
             if (!searchable[snapshot.ParentIds[i]])
             {
                 continue;

@@ -211,4 +211,20 @@ public class AppSettingsRepositoryTests
         // 原因を追えるよう、読めなかったファイルは退避しておく
         Assert.True(File.Exists(Path.Combine(temp.Path, "settings.broken.json")));
     }
+
+    // 書き込みは一時ファイル経由で置き換える（途中で落ちても settings.json が途中で切れない）
+    [Fact]
+    public void Flush_ReplacesTheFileWithoutLeavingTheTemporaryFile()
+    {
+        using var temp = new TempDirectory();
+        var repository = new AppSettingsRepository(temp.Path);
+
+        repository.Save(new AppSettings { RootPaths = { @"C:\First" } });
+        repository.Flush();
+        repository.Save(new AppSettings { RootPaths = { @"C:\Second" } });
+        repository.Flush();
+
+        Assert.False(System.IO.File.Exists(temp.Combine("settings.json.tmp")));
+        Assert.Equal(new[] { @"C:\Second" }, new AppSettingsRepository(temp.Path).Load().RootPaths);
+    }
 }

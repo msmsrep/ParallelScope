@@ -255,4 +255,34 @@ public class FileNameIndexTests : IDisposable
 
         AssertMatchesDatabaseSearch(@"C:\Root", "txt");
     }
+
+    // 索引の有効・無効で並び順が変わらないこと（NOCASE だと英字と _ [ ] ^ の前後が索引と逆になっていた）
+    [Fact]
+    public void SearchUnderPath_OrdersLikeTheDatabaseForSymbolsAndMixedCase()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Sym", new[]
+        {
+            File(@"C:\Sym", "_under.txt"),
+            File(@"C:\Sym", "b.txt"),
+            File(@"C:\Sym", "A.txt"),
+            File(@"C:\Sym", "[bracket].txt"),
+            File(@"C:\Sym", "^caret.txt"),
+            File(@"C:\Sym", "z.txt")
+        });
+        _index.Build();
+
+        AssertMatchesDatabaseSearch(@"C:\Sym", "txt");
+        Assert.Equal(
+            new[] { "A.txt", "b.txt", "z.txt", "[bracket].txt", "^caret.txt", "_under.txt" },
+            _repository.EnumerateSearchEntriesUnderPath(@"C:\Sym", Substring("txt")).Select(x => x.Name));
+    }
+
+    [Fact]
+    public void SearchUnderPath_StopsWhenAborted()
+    {
+        SeedTree();
+        _index.Build();
+
+        Assert.Empty(_index.SearchUnderPath(@"C:\Root", Substring("txt"), () => true)!);
+    }
 }
