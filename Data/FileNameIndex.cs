@@ -32,12 +32,41 @@ public sealed class FileNameIndex
         int[] RowIds,
         bool[] IsFolders,
         string[] ParentPaths,
-        int EntryCount);
+        int EntryCount,
+        ChangeLog Changes);
+
+    /// <summary>
+    /// 索引の材料を読んだあとに内容が変わった親フォルダ（検索時にここだけDBから引き直す）。
+    /// 索引1つにつき1つ持つ —— 作り直しの最中も古い索引は検索に使われ続けるため、
+    /// 古い索引の控えと、作りかけの索引の控えを別々に積む必要がある。
+    /// </summary>
+    private sealed class ChangeLog
+    {
+        public readonly HashSet<string> ParentPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>控えが <see cref="MaxChangedParentPaths"/> を超えたか（超えた索引は使わない）。</summary>
+        public bool Overflowed;
+
+        /// <summary>控えを1件足し、上限を超えたら true を返す。</summary>
+        public bool Add(string parentPath)
+        {
+            ParentPaths.Add(parentPath);
+            if (ParentPaths.Count > MaxChangedParentPaths)
+            {
+                Overflowed = true;
+            }
+
+            return Overflowed;
+        }
+    }
 
     private Snapshot? _snapshot;
 
-    /// <summary>索引を作ってから内容が変わった親フォルダ（検索時にここだけDBから引き直す）。</summary>
-    private readonly HashSet<string> _changedParentPaths = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>作りかけの索引の控え（組み立て中でなければ null）。<see cref="_changeGate"/> の内側で読み書きする。</summary>
+    private ChangeLog? _buildChanges;
+
+    /// <summary>索引の差し替えと、変更の控えの読み書きをまとめて守るロック。</summary>
+    private readonly object _changeGate = new();
 
     /// <summary>
     /// 変わった親フォルダがこの数を超えたら索引を捨てる。
@@ -57,19 +86,62 @@ public sealed class FileNameIndex
     /// <summary>索引に載っているエントリ数（組み上がっていなければ0）。</summary>
     public int EntryCount => Volatile.Read(ref _snapshot)?.EntryCount ?? 0;
 
-    /// <summary>索引を作り直す（バックグラウンドから呼ぶこと。150万件で2秒強かかる）。</summary>
-    public void Build()
+    /// <summary>
+    /// 索引を作り直す（バックグラウンドから呼ぶこと。150万件で2秒強かかる）。
+    /// 出来上がった索引を差し替えたら true、途中で <see cref="Clear"/> された・別の組み立てに
+    /// 追い越された・組み立て中に変更が多すぎた場合は差し替えずに false を返す。
+    /// </summary>
+    /// <remarks>
+    /// 変更の控えは読み出しの前から取り始める。読み終えてから控え直すと、読み出し中（150万件で約1秒）に
+    /// 書き換わった親フォルダを取りこぼし、次の作り直しまで検索結果が古いままになるため。
+    /// 読む前に控え始めた分は、実際には読み出しに間に合っていても引き直すだけなので害はない。
+    /// </remarks>
+    public bool Build()
     {
-        var raw = ReadAllEntries();
-        var displayOrder = BuildDisplayOrder(raw);
-        var snapshot = Reorder(raw, displayOrder);
-
-        lock (_changedParentPaths)
+        var changes = new ChangeLog();
+        lock (_changeGate)
         {
-            _changedParentPaths.Clear();
+            _buildChanges = changes;
         }
 
-        Volatile.Write(ref _snapshot, snapshot);
+        Snapshot snapshot;
+        try
+        {
+            var raw = ReadAllEntries();
+            var displayOrder = BuildDisplayOrder(raw);
+            snapshot = Reorder(raw, displayOrder, changes);
+        }
+        catch
+        {
+            lock (_changeGate)
+            {
+                if (ReferenceEquals(_buildChanges, changes))
+                {
+                    _buildChanges = null;
+                }
+            }
+
+            throw;
+        }
+
+        lock (_changeGate)
+        {
+            // 組み立て中に Clear()（機能の無効化など）や別の組み立てが入った場合は、出来上がりを捨てる。
+            // ここで差し替えると、無効にしたはずの索引が百数十MBを抱えたまま居座る
+            if (!ReferenceEquals(_buildChanges, changes))
+            {
+                return false;
+            }
+
+            _buildChanges = null;
+            if (changes.Overflowed)
+            {
+                return false;
+            }
+
+            Volatile.Write(ref _snapshot, snapshot);
+            return true;
+        }
     }
 
     /// <summary>
@@ -199,7 +271,7 @@ public sealed class FileNameIndex
     }
 
     /// <summary>求めた順番どおりに詰め直す（走査が連続アクセスになり、そのまま表示順に流せる）。</summary>
-    private static Snapshot Reorder(RawEntries raw, int[] displayOrder)
+    private static Snapshot Reorder(RawEntries raw, int[] displayOrder, ChangeLog changes)
     {
         var count = displayOrder.Length;
         var sourceNames = raw.PackedNames;
@@ -228,17 +300,17 @@ public sealed class FileNameIndex
             sortedIsFolders[i] = raw.IsFolders[source];
         }
 
-        return new Snapshot(sortedNames, sortedOffsets, sortedParentIds, sortedRowIds, sortedIsFolders, raw.ParentPaths, count);
+        return new Snapshot(sortedNames, sortedOffsets, sortedParentIds, sortedRowIds, sortedIsFolders, raw.ParentPaths, count, changes);
     }
 
     /// <summary>索引を捨ててメモリを返す（機能を無効にしたとき・購読が切れたとき）。</summary>
+    /// <remarks>組み立て中の索引も、出来上がっても差し替えないようにする。</remarks>
     public void Clear()
     {
-        Volatile.Write(ref _snapshot, null);
-
-        lock (_changedParentPaths)
+        lock (_changeGate)
         {
-            _changedParentPaths.Clear();
+            Volatile.Write(ref _snapshot, null);
+            _buildChanges = null;
         }
     }
 
@@ -248,25 +320,24 @@ public sealed class FileNameIndex
     /// </summary>
     public void MarkParentChanged(string parentPath)
     {
-        if (Volatile.Read(ref _snapshot) is null || string.IsNullOrWhiteSpace(parentPath))
+        if (string.IsNullOrWhiteSpace(parentPath))
         {
             return;
         }
 
         var normalized = PathNormalizer.Normalize(parentPath);
 
-        lock (_changedParentPaths)
+        lock (_changeGate)
         {
-            _changedParentPaths.Add(normalized);
-
-            if (_changedParentPaths.Count <= MaxChangedParentPaths)
+            // 引き直す本数が多くなりすぎたら索引をやめる（次のフルスキャン完了時に作り直される）。
+            // 作りかけの索引は組み立ての最後に Overflowed を見て捨てるので、ここでは控えるだけでよい
+            if (_snapshot is { } snapshot && snapshot.Changes.Add(normalized))
             {
-                return;
+                Volatile.Write(ref _snapshot, null);
             }
-        }
 
-        // 引き直す本数が多くなりすぎたら索引をやめる（次のフルスキャン完了時に作り直される）
-        Clear();
+            _buildChanges?.Add(normalized);
+        }
     }
 
     /// <summary>
@@ -289,9 +360,9 @@ public sealed class FileNameIndex
         var rootPrefix = PathNormalizer.WithTrailingSeparator(normalizedRoot);
 
         string[] changedParentPaths;
-        lock (_changedParentPaths)
+        lock (_changeGate)
         {
-            changedParentPaths = _changedParentPaths.ToArray();
+            changedParentPaths = snapshot.Changes.ParentPaths.ToArray();
         }
 
         var changedLookup = changedParentPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);

@@ -172,6 +172,22 @@ public class FileCacheRepository
             .ToList();
     }
 
+    /// <summary>
+    /// 指定した表記のままのフォルダがキャッシュに載っているか（大文字小文字も区別する）。
+    /// 移動先の表記が正しいかを、ファイルシステムへ問い合わせずに確かめるために使う。
+    /// </summary>
+    public bool ContainsFolderPath(string fullPath)
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT 1 FROM FileSystemEntries WHERE FullPath = @fullPath AND IsFolder = 1 LIMIT 1";
+        AddParameter(cmd, "@fullPath", fullPath);
+        return cmd.ExecuteScalar() is not null;
+    }
+
     /// <summary>指定パス配下の全ファイル（フォルダを除く）をキャッシュから再帰的に列挙する。</summary>
     /// <remarks>
     /// All Files表示は数十万件規模になるため、List へ全件マテリアライズせず reader から1件ずつ返し、
@@ -601,14 +617,15 @@ public class FileCacheRepository
 
     /// <summary>
     /// 複数の親パスについて、まとめてキャッシュを置き換える（フルスキャン時に使用）。
-    /// キャッシュと内容が同一の親パスは書き換えをスキップし、実際に書き換えた親パス数を返す
+    /// キャッシュと内容が同一の親パスは書き換えをスキップし、実際に書き換えた親パス（正規化済み）を返す
     /// （フルスキャンの大部分は無変化なので、これで書き込み量を大幅に減らせる）。
+    /// 書き換えた親パスは行IDが変わるため、呼び出し側はファイル名索引へ知らせること。
     /// </summary>
-    public int BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
+    public IReadOnlyList<string> BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
     {
         if (entriesByParentPath.Count == 0)
         {
-            return 0;
+            return Array.Empty<string>();
         }
 
         var lockObjects = AcquireOrderedParentPathLocks(entriesByParentPath.Keys);
@@ -635,7 +652,7 @@ public class FileCacheRepository
 
             if (changedParentPaths.Count == 0)
             {
-                return 0;
+                return Array.Empty<string>();
             }
 
             using var transaction = db.Database.BeginTransaction();
@@ -651,7 +668,7 @@ public class FileCacheRepository
                 throw;
             }
 
-            return changedParentPaths.Count;
+            return changedParentPaths;
         }
         finally
         {
@@ -763,14 +780,19 @@ public class FileCacheRepository
     /// </summary>
     /// <param name="scannedRootPaths">今回実際にスキャンしたルートパス。</param>
     /// <param name="configuredRootPaths">設定済みの全ルート（オフライン等でスキャンできなかったものも含む）。nullならルート外の削除は行わない（フォルダ単位スキャン用）。</param>
-    /// <param name="visitedParentPaths">スキャンで実際に訪問した正規化済みフォルダパスの集合。</param>
+    /// <param name="visitedParentPaths">
+    /// スキャンで実際に訪問した正規化済みフォルダパスの集合。表記は大文字小文字まで区別して照合する
+    /// （表記違いで書き込まれた親パスの行は、同じフォルダの中身の重複なので残骸として消す）。
+    /// </param>
     public int DeleteStaleEntries(
         IReadOnlyCollection<string> scannedRootPaths,
         IReadOnlyCollection<string>? configuredRootPaths,
         IReadOnlyCollection<string> visitedParentPaths)
     {
-        var visitedSet = visitedParentPaths as ISet<string>
-            ?? new HashSet<string>(visitedParentPaths, StringComparer.OrdinalIgnoreCase);
+        // 呼び出し側の訪問済みセットは重複訪問の防止用に大文字小文字を区別しないため、流用せず作り直す。
+        // 流用すると、アドレス欄への手入力等で表記違いのまま書き込まれた親パスが「訪問済み」とみなされ、
+        // 同じフォルダの中身がキャッシュに二重に残り続ける
+        var visitedSet = new HashSet<string>(visitedParentPaths, StringComparer.Ordinal);
 
         var normalizedScannedRoots = scannedRootPaths
             .Select(PathNormalizer.Normalize)

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
+using ParallelScope.Utilities;
 using ParallelScope.ViewModels;
 
 namespace ParallelScope.Tests.ViewModels;
@@ -120,5 +121,41 @@ public class NameIndexSettingTests : IDisposable
 
         Assert.False(viewModel.IsNameIndexReady);
         Assert.False(_settingsRepository.Load().IsNameIndexEnabled);
+    }
+
+    // スキャンで書き換えた行は行IDが変わる。索引へ控えないと、作り直すまで検索結果から消え、増えたファイルも出ない
+    [Fact]
+    public async Task ScanChangesAreVisibleThroughTheIndexWithoutRebuilding()
+    {
+        File.WriteAllText(Path.Combine(_root.Path, "alpha.txt"), "a");
+        var viewModel = CreateViewModel();
+        await viewModel.ScanFolderSubtreeAsync(_root.Path);
+        viewModel.SetPlusFeaturesEnabled(true);
+        viewModel.SetNameIndexEnabled(true);
+        WaitForIndexReady(viewModel, true);
+
+        File.WriteAllText(Path.Combine(_root.Path, "beta.txt"), "b");
+        await viewModel.ScanFolderSubtreeAsync(_root.Path);
+
+        var index = ((IBrowserTabHost)viewModel).NameIndex;
+        Assert.NotNull(index);
+        var names = index!.SearchUnderPath(_root.Path, NameSearchPattern.Create(".txt", useRegex: false))!
+            .Select(x => x.Name)
+            .ToList();
+        Assert.Equal(new[] { "alpha.txt", "beta.txt" }, names);
+    }
+
+    // 組み立て中に無効へ切り替えたら、出来上がった索引を差し替えずに捨てる（無効なのにメモリを抱え続けない）
+    [Fact]
+    public void IndexTurnedOffWhileBuildingIsNotKept()
+    {
+        var viewModel = CreateViewModel();
+        viewModel.SetPlusFeaturesEnabled(true);
+
+        viewModel.SetNameIndexEnabled(true);
+        viewModel.SetNameIndexEnabled(false);
+        Thread.Sleep(500);
+
+        Assert.False(viewModel.IsNameIndexReady);
     }
 }

@@ -130,6 +130,19 @@ public partial class MainWindowViewModel
     }
 
     /// <summary>
+    /// スキャンの1バッチをキャッシュへ書き込み、実際に書き換えたフォルダ数を返す。
+    /// 書き換えたフォルダはファイル名索引へ控える —— 索引は行IDで本体を引くため、控えないと
+    /// 書き換えで行IDが変わったエントリが検索結果から消え、増えたエントリも出てこない
+    /// （完走時の作り直しまで、キャンセルされた場合は次に完走するまでその状態が続く）。
+    /// </summary>
+    private int WriteScanBatch(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> batchEntries)
+    {
+        var changedParentPaths = _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+        MarkScannedParentsChanged(changedParentPaths);
+        return changedParentPaths.Count;
+    }
+
+    /// <summary>
     /// 1ルート配下を走査し、100フォルダごとにバッチでキャッシュへ保存する。
     /// ディレクトリの列挙はウェーブ（複数ディレクトリの束）単位で並列化する。NASでは1ディレクトリの列挙が
     /// ラウンドトリップ数回分のレイテンシになるため、直列だとフォルダ数分の往復時間が積み上がる。
@@ -250,7 +263,7 @@ public partial class MainWindowViewModel
                 {
                     try
                     {
-                        updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                        updatedFolderCount += WriteScanBatch(batchEntries);
                     }
                     catch
                     {
@@ -277,7 +290,7 @@ public partial class MainWindowViewModel
         {
             try
             {
-                updatedFolderCount += _fileCacheRepository.BatchReplaceEntriesByParentPaths(batchEntries);
+                updatedFolderCount += WriteScanBatch(batchEntries);
             }
             catch
             {

@@ -184,6 +184,8 @@ public partial class MainWindowViewModel
 
         if (_folderUsages.TryGetValue(normalized, out var usage))
         {
+            // 以前に別表記（大文字小文字違い）で記録されていた場合は、今の表記へ寄せ直す
+            usage.Path = normalized;
             usage.Count++;
             usage.LastAccessedAt = DateTime.Now;
         }
