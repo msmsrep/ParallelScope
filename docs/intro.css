@@ -1,0 +1,164 @@
+/* 紹介ページ専用。色・文字・図版の基本は style.css（ガイドと共通）を使う。 */
+
+.topbar {
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.topbar .wrap {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  color: var(--text);
+  margin-right: auto;
+}
+
+.brand:hover { text-decoration: none; }
+.brand img { width: 28px; height: 28px; }
+
+.topbar nav { display: flex; gap: 16px; font-size: 14px; flex-wrap: wrap; }
+.topbar .langbar { margin: 0; }
+
+/* ---- hero ---- */
+
+.intro-hero { padding: 56px 0 8px; text-align: center; }
+
+.intro-hero h1 { font-size: 44px; margin-bottom: 14px; }
+
+.intro-hero .lead {
+  font-size: 19px;
+  color: var(--text-dim);
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.cta {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 28px 0 12px;
+}
+
+.btn {
+  display: inline-block;
+  padding: 10px 22px;
+  border-radius: 8px;
+  font-weight: 600;
+  border: 1px solid var(--accent);
+}
+
+.btn:hover { text-decoration: none; }
+.btn.primary { background: var(--accent); color: #fff; }
+.btn.secondary { background: var(--surface); color: var(--accent); }
+
+@media (prefers-color-scheme: dark) {
+  .btn.primary { color: #0d1522; }
+}
+
+.cta-note { font-size: 14px; color: var(--text-dim); margin: 0 0 36px; }
+
+.intro-hero figure { margin: 0; }
+
+@media (max-width: 560px) {
+  .intro-hero h1 { font-size: 32px; }
+  .intro-hero .lead { font-size: 17px; }
+}
+
+/* ---- highlights ---- */
+
+.highlights {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin: 48px 0 64px;
+}
+
+@media (max-width: 760px) { .highlights { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.card h3 { margin: 0 0 4px; font-size: 17px; }
+.card p { margin: 0; color: var(--text-dim); font-size: 15px; }
+
+/* ---- feature rows ---- */
+
+.feature {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 32px;
+  align-items: center;
+  margin-bottom: 64px;
+}
+
+.feature.reverse { grid-template-columns: 7fr 5fr; }
+.feature.reverse .feature-text { order: 2; }
+
+@media (max-width: 760px) {
+  .feature, .feature.reverse { grid-template-columns: 1fr; gap: 8px; }
+  .feature.reverse .feature-text { order: 0; }
+}
+
+.feature h2 { border-bottom: 0; padding-bottom: 0; }
+.feature figure { margin: 0; }
+
+.plus-tag {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* ---- free / plus ---- */
+
+.plans {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+@media (max-width: 700px) { .plans { grid-template-columns: 1fr; } }
+
+.plans .card ul { margin: 8px 0 0; color: var(--text); font-size: 15px; }
+.plans .card.plus { border-color: var(--accent); }
+
+.prices {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 16px;
+  margin: 10px 0 4px;
+  font-size: 15px;
+}
+
+.prices dt { color: var(--text-dim); }
+.prices dd { margin: 0; }
+.prices strong { font-size: 18px; }
+.price-note { display: block; font-size: 13px; color: var(--text-dim); }
+.plans .card .price-footnote { font-size: 13px; color: var(--text-dim); margin: 6px 0 0; }
+
+@media (max-width: 420px) {
+  .prices { grid-template-columns: 1fr; gap: 0; }
+  .prices dd { margin-bottom: 8px; }
+}

@@ -67,6 +67,7 @@ header.hero .wrap { padding-top: 40px; padding-bottom: 32px; }
 }
 
 .langbar .current { color: var(--text); font-weight: 600; }
+.langbar .intro-link { margin-right: auto; }
 
 h1 {
   font-size: 34px;
