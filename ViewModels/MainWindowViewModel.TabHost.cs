@@ -38,6 +38,23 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     IReadOnlyList<string> IBrowserTabHost.GetTraversalPaths(string path) => GetTraversalPaths(path);
 
+    // ルート一覧は参照ごと差し替えられるだけなので、バックグラウンドから読んでもよい
+    string IBrowserTabHost.ResolvePathCasing(string normalizedPath)
+        => PathCasingResolver.Resolve(normalizedPath, _rootPathsSnapshot, IsCachedFolderPath);
+
+    private bool IsCachedFolderPath(string fullPath)
+    {
+        try
+        {
+            return _fileCacheRepository.ContainsFolderPath(fullPath);
+        }
+        catch
+        {
+            // 確かめられなければファイルシステム側で表記をそろえる
+            return false;
+        }
+    }
+
     List<CachedFileSystemEntry> IBrowserTabHost.ReadEntriesFromFileSystem(string folderPath) => ReadEntriesFromFileSystem(folderPath);
 
     void IBrowserTabHost.RecordFolderUsage(string path) => RecordFolderUsage(path);

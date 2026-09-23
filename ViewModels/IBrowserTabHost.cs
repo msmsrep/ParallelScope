@@ -50,6 +50,12 @@ internal interface IBrowserTabHost
     /// <summary>横断列挙（All Files・横断検索）の起点となるパス群を返す。</summary>
     IReadOnlyList<string> GetTraversalPaths(string path);
 
+    /// <summary>
+    /// 実在するフォルダパスの大文字小文字を、キャッシュ・ファイルシステム上の表記へそろえる
+    /// （バックグラウンドから呼ばれる。例外は投げない）。
+    /// </summary>
+    string ResolvePathCasing(string normalizedPath);
+
     /// <summary>1フォルダ直下をファイルシステムから列挙する（除外設定を反映済み）。</summary>
     List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath);
 

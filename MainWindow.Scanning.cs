@@ -63,6 +63,7 @@ public partial class MainWindow : IBrowserPaneHost
         }
         catch (Exception ex)
         {
+            _viewModel.OnScanInterrupted();
             MessageBox.Show(UiText.Format("Scan.Folder.Failed", ex.Message), UiText.Get("Scan.Folder.ErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
         finally
@@ -136,6 +137,9 @@ public partial class MainWindow : IBrowserPaneHost
         }
         catch (OperationCanceledException)
         {
+            // 完走時の RefreshAfterScan が走らないので、捨てていたファイル名索引はここで作り直させる
+            _viewModel.OnScanInterrupted();
+
             if (showCompletionMessage)
             {
                 MessageBox.Show(UiText.Get("Scan.Full.Canceled"), UiText.Get("Scan.Full.CanceledCaption"), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -143,6 +147,8 @@ public partial class MainWindow : IBrowserPaneHost
         }
         catch (Exception ex)
         {
+            _viewModel.OnScanInterrupted();
+
             if (showCompletionMessage)
             {
                 MessageBox.Show(UiText.Format("Scan.Full.Failed", ex.Message), UiText.Get("Scan.Full.ErrorCaption"), MessageBoxButton.OK, MessageBoxImage.Error);

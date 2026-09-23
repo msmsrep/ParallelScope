@@ -31,7 +31,7 @@ public partial class BrowserTabViewModel
         var success = LoadFilesInternal(targetPath);
         if (success)
         {
-            _host.RecordFolderUsage(targetPath);
+            _host.RecordFolderUsage(CurrentPath);
         }
 
         NotifyNavigationStateChanged();
@@ -56,7 +56,7 @@ public partial class BrowserTabViewModel
         var success = LoadFilesInternal(targetPath);
         if (success)
         {
-            _host.RecordFolderUsage(targetPath);
+            _host.RecordFolderUsage(CurrentPath);
         }
 
         NotifyNavigationStateChanged();
@@ -121,7 +121,8 @@ public partial class BrowserTabViewModel
         {
             // 「よく使う」の集計対象はユーザー操作による移動のみ。
             // 起動時やルート設定変更時の自動移動は addToHistory=false で呼ばれるため数えない
-            _host.RecordFolderUsage(normalizedTargetPath);
+            // 記録するのは表記をそろえた後の現在地（入力の表記のまま残すと「最近」から別表記で開き直すことになる）
+            _host.RecordFolderUsage(CurrentPath);
 
             if (!string.IsNullOrEmpty(previousPath))
             {
@@ -162,11 +163,21 @@ public partial class BrowserTabViewModel
 
         // 切断中のNASでもUIを固めないよう、存在確認はタイムアウト付きで行う。
         // タイムアウト時は存在する扱いで進み、キャッシュからの表示（LoadFromCacheAsync）に任せる。
-        // 実際に読めない場合はバックグラウンド更新が何もせず終わるだけで、キャッシュ由来の一覧は閲覧できる
-        if (string.IsNullOrWhiteSpace(folderPath) || !DirectoryAvailabilityChecker.ExistsOrTimedOut(folderPath))
+        // 実際に読めない場合はバックグラウンド更新が何もせず終わるだけで、キャッシュ由来の一覧は閲覧できる。
+        // あわせて大文字小文字を実際の表記へそろえる —— 入力の表記のまま開くと、同じフォルダの中身が
+        // 別の親パスとしてキャッシュに二重に書き込まれる（PathCasingResolver 参照）
+        if (string.IsNullOrWhiteSpace(folderPath))
         {
             return false;
         }
+
+        var resolvedPath = DirectoryAvailabilityChecker.ResolveExistingOrTimedOut(folderPath, _host.ResolvePathCasing);
+        if (resolvedPath is null)
+        {
+            return false;
+        }
+
+        folderPath = resolvedPath;
 
         try
         {

@@ -164,8 +164,12 @@ public partial class BrowserTabViewModel
                 var nextPublishCount = SearchFirstBatchSize;
 
                 // 除外パス追加直後は、次のスキャンで掃除されるまで除外対象がキャッシュに残っているため、表示前に弾く
+                // 用済みになった検索は、ヒットを待たずに列挙の途中で打ち切らせる
+                // （ヒットが少ない検索語では、次のヒットまでに配下の全行を読み切ってしまう）
+                bool IsAborted() => !IsSearchResultStillValid(rootPath, pattern, searchVersion);
+
                 foreach (var item in ToViewModels(
-                    SearchCacheEntries(rootPath, pattern)
+                    SearchCacheEntries(rootPath, pattern, IsAborted)
                         .Where(x => !(filesOnly && x.IsFolder))
                         .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
                 {
@@ -248,15 +252,15 @@ public partial class BrowserTabViewModel
 
     /// <summary>検索起点が仮想ノードの場合は対象フォルダ群を横断検索し、それ以外は単一パス配下を検索する。</summary>
     /// <remarks>数十万件ヒットしうるため List 化せず逐次列挙で返し、呼び出し側でViewModelへ直接変換させる（ピークメモリ削減）。</remarks>
-    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, NameSearchPattern pattern)
+    private IEnumerable<CachedFileSystemEntry> SearchCacheEntries(string rootPath, NameSearchPattern pattern, Func<bool> shouldAbort)
     {
         // ファイル名索引（Plus機能）が使えるならそちらで探す。無効・未完成なら null が返るのでDBへ問い合わせる
         var nameIndex = _host.NameIndex;
 
         IEnumerable<CachedFileSystemEntry> SearchUnder(string path)
         {
-            return nameIndex?.SearchUnderPath(path, pattern)
-                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern);
+            return nameIndex?.SearchUnderPath(path, pattern, shouldAbort)
+                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern, shouldAbort);
         }
 
         var traversalPaths = _host.GetTraversalPaths(rootPath);
@@ -276,6 +280,7 @@ public partial class BrowserTabViewModel
 
         return results
             .OrderByDescending(x => x.IsFolder)
-            .ThenBy(x => x.Name, StringComparer.OrdinalIgnoreCase);
+            // 1か所だけを検索したとき（索引・キャッシュDBの並び）と同じ順にする
+            .ThenBy(x => x.Name, NameSearchMatcher.FoldedComparer);
     }
 }

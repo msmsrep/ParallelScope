@@ -208,6 +208,18 @@ public class AppSettingsRepository
             WriteIndented = true
         });
 
-        File.WriteAllText(_settingsPath, json);
+        // 直接上書きすると、書いている途中の強制終了・電源断で中身が途中で切れ、次の起動で
+        // 読めずにルートフォルダ等の設定がすべて既定値へ戻ってしまう。一時ファイルへ書き切って
+        // ディスクまで落としてから置き換える（同じフォルダ内の置き換えは途中の状態を残さない）
+        var temporaryPath = _settingsPath + ".tmp";
+        using (var stream = new FileStream(temporaryPath, FileMode.Create, FileAccess.Write, FileShare.None))
+        using (var writer = new StreamWriter(stream))
+        {
+            writer.Write(json);
+            writer.Flush();
+            stream.Flush(flushToDisk: true);
+        }
+
+        File.Move(temporaryPath, _settingsPath, overwrite: true);
     }
 }

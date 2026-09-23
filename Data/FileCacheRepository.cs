@@ -172,6 +172,22 @@ public class FileCacheRepository
             .ToList();
     }
 
+    /// <summary>
+    /// 指定した表記のままのフォルダがキャッシュに載っているか（大文字小文字も区別する）。
+    /// 移動先の表記が正しいかを、ファイルシステムへ問い合わせずに確かめるために使う。
+    /// </summary>
+    public bool ContainsFolderPath(string fullPath)
+    {
+        using var db = CreateDbContext();
+        db.Database.OpenConnection();
+        var conn = db.Database.GetDbConnection();
+
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT 1 FROM FileSystemEntries WHERE FullPath = @fullPath AND IsFolder = 1 LIMIT 1";
+        AddParameter(cmd, "@fullPath", fullPath);
+        return cmd.ExecuteScalar() is not null;
+    }
+
     /// <summary>指定パス配下の全ファイル（フォルダを除く）をキャッシュから再帰的に列挙する。</summary>
     /// <remarks>
     /// All Files表示は数十万件規模になるため、List へ全件マテリアライズせず reader から1件ずつ返し、
@@ -316,7 +332,13 @@ public class FileCacheRepository
     /// インクリメンタルサーチは1文字の検索語で数十万件ヒットしうるため、List へ全件マテリアライズせず
     /// 1件ずつ返して呼び出し側でViewModelへ直接変換させる（中間リストを持つとピークメモリがほぼ倍増する）。
     /// </remarks>
-    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(string rootPath, NameSearchPattern pattern)
+    /// <param name="shouldAbort">
+    /// 途中で打ち切るかを返す（次の入力が来た等）。真になったら、その時点までの結果で列挙を終える。
+    /// ヒットが少ない検索語ではSQLiteが配下の全行を読み終えるまで1件も返らないため、
+    /// 行を受け取った側で確かめるだけでは打ち切れない。SQLiteの進捗ハンドラーから確かめて中断させる。
+    /// </param>
+    public IEnumerable<CachedFileSystemEntry> EnumerateSearchEntriesUnderPath(
+        string rootPath, NameSearchPattern pattern, Func<bool>? shouldAbort = null)
     {
         using var db = CreateDbContext();
 
@@ -333,8 +355,10 @@ public class FileCacheRepository
             FROM FileSystemEntries
             WHERE " + prefixFilter.WhereClause + BuildSearchPathPreFilter(pattern) + BuildNameMatchClause(pattern) + @"
             -- 並びはファイル名索引（ASCIIの大文字へ寄せて格納）と揃える。
-            -- 揃えないと、索引の有効・無効で検索結果の並びが変わってしまう
-            ORDER BY IsFolder DESC, Name COLLATE NOCASE";
+            -- 揃えないと、索引の有効・無効で検索結果の並びが変わってしまう。
+            -- COLLATE NOCASE は小文字へ寄せて比べるため、英字と _ [ \ ] ^ ` の前後が索引と逆になる。
+            -- upper() はASCIIだけを大文字へ寄せる（ICU無しのビルド）ので、索引と同じ畳み方になる
+            ORDER BY IsFolder DESC, upper(Name)";
         prefixFilter.AddParametersTo(cmd);
         AddNameMatchParametersTo(cmd, pattern);
 
@@ -342,18 +366,82 @@ public class FileCacheRepository
         // 共有する（結果は検索結果表示のViewModelから保持され続けるので、保持メモリに直結する）
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
+        using var abortHandler = AbortHandler.Install(conn, shouldAbort);
+
+        if (TryExecuteReader(cmd) is not { } executedReader)
         {
-            yield return new CachedFileSystemEntry(
-                GetPooledString(parentPathPool, reader.GetString(0)),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetBoolean(3),
-                reader.IsDBNull(4) ? null : reader.GetInt64(4),
-                reader.GetDateTime(5),
-                reader.IsDBNull(6) ? null : reader.GetDateTime(6),
-                reader.IsDBNull(7) ? null : reader.GetInt32(7));
+            yield break;
+        }
+
+        using var reader = executedReader;
+        while (TryRead(reader))
+        {
+            yield return ReadEntry(reader, parentPathPool);
+        }
+    }
+
+    /// <summary>SQLiteの中断（進捗ハンドラーが打ち切りを返した）を表すエラーコード。</summary>
+    private const int SqliteInterruptErrorCode = 9;
+
+    /// <summary>
+    /// 進捗ハンドラーを確かめる間隔（SQLiteの仮想マシン命令数）。
+    /// 行を1件読むのに数十命令かかるので、数千行ごとに確かめる程度になる（1回の確認は数十ns）。
+    /// </summary>
+    private const int AbortCheckInstructionInterval = 100_000;
+
+    /// <summary>コマンドを実行して読み取りを始める（打ち切られたら null）。最初の行を読む時点で中断されうる。</summary>
+    private static DbDataReader? TryExecuteReader(DbCommand cmd)
+    {
+        try
+        {
+            return cmd.ExecuteReader();
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == SqliteInterruptErrorCode)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>次の行へ進む（打ち切られたら false）。</summary>
+    private static bool TryRead(DbDataReader reader)
+    {
+        try
+        {
+            return reader.Read();
+        }
+        catch (SqliteException ex) when (ex.SqliteErrorCode == SqliteInterruptErrorCode)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 接続に打ち切り用の進捗ハンドラーを付け、破棄時に外す。
+    /// 外さないまま接続がプールへ戻ると、後の無関係なクエリからも古い判定が呼ばれ続けてしまう。
+    /// </summary>
+    private sealed class AbortHandler : IDisposable
+    {
+        private readonly SQLitePCL.sqlite3 _handle;
+
+        private AbortHandler(SQLitePCL.sqlite3 handle)
+        {
+            _handle = handle;
+        }
+
+        public static AbortHandler? Install(DbConnection connection, Func<bool>? shouldAbort)
+        {
+            if (shouldAbort is null || connection is not SqliteConnection { Handle: { } handle })
+            {
+                return null;
+            }
+
+            SQLitePCL.raw.sqlite3_progress_handler(handle, AbortCheckInstructionInterval, _ => shouldAbort() ? 1 : 0, null);
+            return new AbortHandler(handle);
+        }
+
+        public void Dispose()
+        {
+            SQLitePCL.raw.sqlite3_progress_handler(_handle, 0, null, null);
         }
     }
 
@@ -601,14 +689,15 @@ public class FileCacheRepository
 
     /// <summary>
     /// 複数の親パスについて、まとめてキャッシュを置き換える（フルスキャン時に使用）。
-    /// キャッシュと内容が同一の親パスは書き換えをスキップし、実際に書き換えた親パス数を返す
+    /// キャッシュと内容が同一の親パスは書き換えをスキップし、実際に書き換えた親パス（正規化済み）を返す
     /// （フルスキャンの大部分は無変化なので、これで書き込み量を大幅に減らせる）。
+    /// 書き換えた親パスは行IDが変わるため、呼び出し側はファイル名索引へ知らせること。
     /// </summary>
-    public int BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
+    public IReadOnlyList<string> BatchReplaceEntriesByParentPaths(IReadOnlyDictionary<string, IReadOnlyCollection<CachedFileSystemEntry>> entriesByParentPath)
     {
         if (entriesByParentPath.Count == 0)
         {
-            return 0;
+            return Array.Empty<string>();
         }
 
         var lockObjects = AcquireOrderedParentPathLocks(entriesByParentPath.Keys);
@@ -635,7 +724,7 @@ public class FileCacheRepository
 
             if (changedParentPaths.Count == 0)
             {
-                return 0;
+                return Array.Empty<string>();
             }
 
             using var transaction = db.Database.BeginTransaction();
@@ -651,7 +740,7 @@ public class FileCacheRepository
                 throw;
             }
 
-            return changedParentPaths.Count;
+            return changedParentPaths;
         }
         finally
         {
@@ -763,14 +852,19 @@ public class FileCacheRepository
     /// </summary>
     /// <param name="scannedRootPaths">今回実際にスキャンしたルートパス。</param>
     /// <param name="configuredRootPaths">設定済みの全ルート（オフライン等でスキャンできなかったものも含む）。nullならルート外の削除は行わない（フォルダ単位スキャン用）。</param>
-    /// <param name="visitedParentPaths">スキャンで実際に訪問した正規化済みフォルダパスの集合。</param>
+    /// <param name="visitedParentPaths">
+    /// スキャンで実際に訪問した正規化済みフォルダパスの集合。表記は大文字小文字まで区別して照合する
+    /// （表記違いで書き込まれた親パスの行は、同じフォルダの中身の重複なので残骸として消す）。
+    /// </param>
     public int DeleteStaleEntries(
         IReadOnlyCollection<string> scannedRootPaths,
         IReadOnlyCollection<string>? configuredRootPaths,
         IReadOnlyCollection<string> visitedParentPaths)
     {
-        var visitedSet = visitedParentPaths as ISet<string>
-            ?? new HashSet<string>(visitedParentPaths, StringComparer.OrdinalIgnoreCase);
+        // 呼び出し側の訪問済みセットは重複訪問の防止用に大文字小文字を区別しないため、流用せず作り直す。
+        // 流用すると、アドレス欄への手入力等で表記違いのまま書き込まれた親パスが「訪問済み」とみなされ、
+        // 同じフォルダの中身がキャッシュに二重に残り続ける
+        var visitedSet = new HashSet<string>(visitedParentPaths, StringComparer.Ordinal);
 
         var normalizedScannedRoots = scannedRootPaths
             .Select(PathNormalizer.Normalize)
@@ -917,6 +1011,11 @@ public class FileCacheRepository
     {
         using var db = CreateDbContext();
 
+        // 削除と追加は1つのトランザクションにまとめる。別々だと、削除だけ確定した後に追加が
+        // 失敗（書き込み待ちのタイムアウト等）したときにフォルダのキャッシュが空のまま残り、
+        // 削除と追加の間に読んだ別のタブにも空の一覧が見えてしまう
+        using var transaction = db.Database.BeginTransaction();
+
         // 追跡済みエンティティ削除の競合を避けるため、対象親パスを一括削除する
         db.Database.ExecuteSqlInterpolated($"DELETE FROM FileSystemEntries WHERE ParentPath = {normalizedParentPath}");
 
@@ -938,6 +1037,7 @@ public class FileCacheRepository
         }
 
         db.SaveChanges();
+        transaction.Commit();
     }
 
     /// <summary>parentPath 直下の各フォルダについて、配下ファイルの合計サイズをキャッシュから集計する。</summary>

@@ -122,19 +122,19 @@ public class FileCacheRepositoryTests : IDisposable
             [@"C:\Root\Sub"] = new[] { File(@"C:\Root\Sub", "a.txt") }
         };
 
-        Assert.Equal(2, _repository.BatchReplaceEntriesByParentPaths(batch));
+        Assert.Equal(2, _repository.BatchReplaceEntriesByParentPaths(batch).Count);
 
         // 内容が同じ2回目は書き換えをスキップする（フルスキャンの大部分は無変化なので書き込み量を抑える）
-        Assert.Equal(0, _repository.BatchReplaceEntriesByParentPaths(batch));
+        Assert.Empty(_repository.BatchReplaceEntriesByParentPaths(batch));
 
         batch[@"C:\Root\Sub"] = new[] { File(@"C:\Root\Sub", "a.txt", sizeBytes: 999) };
-        Assert.Equal(1, _repository.BatchReplaceEntriesByParentPaths(batch));
+        Assert.Single(_repository.BatchReplaceEntriesByParentPaths(batch));
     }
 
     [Fact]
     public void BatchReplaceEntriesByParentPaths_ReturnsZeroForEmptyBatch()
     {
-        Assert.Equal(0, _repository.BatchReplaceEntriesByParentPaths(
+        Assert.Empty(_repository.BatchReplaceEntriesByParentPaths(
             new Dictionary<string, IReadOnlyCollection<CachedFileSystemEntry>>()));
     }
 
@@ -150,7 +150,7 @@ public class FileCacheRepositoryTests : IDisposable
         // 件数が同じでも中身が入れ替わっていれば書き換え対象になる
         batch[@"C:\Root"] = new[] { File(@"C:\Root", "a.txt"), File(@"C:\Root", "c.txt") };
 
-        Assert.Equal(1, _repository.BatchReplaceEntriesByParentPaths(batch));
+        Assert.Single(_repository.BatchReplaceEntriesByParentPaths(batch));
         Assert.Equal(new[] { "a.txt", "c.txt" }, _repository.GetEntriesByParentPath(@"C:\Root").Select(e => e.Name));
     }
 
@@ -389,6 +389,40 @@ public class FileCacheRepositoryTests : IDisposable
         Assert.Equal(0, deleted);
     }
 
+    // アドレス欄への手入力などで表記違いのまま書き込まれた親パスは、同じフォルダの中身の重複なので消す
+    [Fact]
+    public void DeleteStaleEntries_RemovesParentsWrittenWithDifferentCasing()
+    {
+        SeedTree();
+        _repository.ReplaceEntriesByParentPath(@"C:\root\sub", new[] { File(@"C:\root\sub", "b.txt") });
+
+        var deleted = _repository.DeleteStaleEntries(
+            scannedRootPaths: new[] { @"C:\Root" },
+            configuredRootPaths: null,
+            visitedParentPaths: new HashSet<string>(
+                new[] { @"C:\Root", @"C:\Root\Sub", @"C:\Root\Sub\Deep" }, StringComparer.OrdinalIgnoreCase));
+
+        Assert.Equal(1, deleted);
+        Assert.Empty(_repository.GetEntriesByParentPath(@"C:\root\sub"));
+        Assert.NotEmpty(_repository.GetEntriesByParentPath(@"C:\Root\Sub"));
+    }
+
+    [Fact]
+    public void ContainsFolderPath_MatchesOnlyTheExactSpellingOfCachedFolders()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            Folder(@"C:\Root", "Reports"),
+            File(@"C:\Root", "readme.txt")
+        });
+
+        Assert.True(_repository.ContainsFolderPath(@"C:\Root\Reports"));
+        Assert.False(_repository.ContainsFolderPath(@"C:\root
+eports"));
+        Assert.False(_repository.ContainsFolderPath(@"C:\Root
+eadme.txt"));
+    }
+
     [Fact]
     public void TruncateWal_DoesNotThrow()
     {
@@ -478,5 +512,40 @@ public class FileCacheRepositoryTests : IDisposable
             [@"C:\Root\Sub"] = new[] { Folder(@"C:\Root\Sub", "Deep"), File(@"C:\Root\Sub", "b.txt") },
             [@"C:\Root\Sub\Deep"] = new[] { File(@"C:\Root\Sub\Deep", "deep.txt") }
         });
+    }
+
+    /// <summary>進捗ハンドラーが呼ばれる程度（SQLiteの命令数で数十万）の行数を1フォルダに入れる。</summary>
+    private void SeedManyFiles(int count)
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Big", Enumerable.Range(0, count)
+            .Select(i => File(@"C:\Big", $"file{i:D5}.txt"))
+            .ToList());
+    }
+
+    // 用済みになった検索は、ヒットを待たずにSQLite側で打ち切る（ORDER BY の並べ替え中でも止まる）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_StopsWhenAborted()
+    {
+        SeedManyFiles(20_000);
+        var abortChecks = 0;
+
+        var hits = _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file"), () =>
+        {
+            abortChecks++;
+            return true;
+        }).ToList();
+
+        Assert.True(abortChecks > 0);
+        Assert.Empty(hits);
+    }
+
+    // 打ち切り用のハンドラーは外してから接続をプールへ返す（残ると後の検索まで打ち切られる）
+    [Fact]
+    public void EnumerateSearchEntriesUnderPath_DoesNotLeaveTheAbortHandlerOnPooledConnections()
+    {
+        SeedManyFiles(20_000);
+        _ = _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file"), () => true).ToList();
+
+        Assert.Equal(20_000, _repository.EnumerateSearchEntriesUnderPath(@"C:\Big", Substring("file")).Count());
     }
 }

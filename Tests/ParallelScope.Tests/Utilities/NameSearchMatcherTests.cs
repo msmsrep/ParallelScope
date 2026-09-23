@@ -47,4 +47,22 @@ public class NameSearchMatcherTests
     {
         Assert.Equal(expected, NameSearchMatcher.Contains(name, query));
     }
+
+    // 検索結果の並び。ASCIIの大文字へ寄せて比べるので、英字は _ や [ より前に来る（NOCASE とは逆）
+    [Theory]
+    [InlineData("b.txt", "_a.txt")]
+    [InlineData("a.txt", "B.txt")]
+    [InlineData("Z.txt", "[x].txt")]
+    [InlineData("abc", "abcd")]
+    public void CompareFolded_OrdersNamesByAsciiUppercase(string earlier, string later)
+    {
+        Assert.True(NameSearchMatcher.CompareFolded(earlier, later) < 0);
+        Assert.True(NameSearchMatcher.CompareFolded(later, earlier) > 0);
+    }
+
+    [Fact]
+    public void CompareFolded_TreatsAsciiCaseAsEqual()
+    {
+        Assert.Equal(0, NameSearchMatcher.CompareFolded("Report.TXT", "report.txt"));
+    }
 }
