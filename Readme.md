@@ -5,6 +5,7 @@ English | [日本語](./Readme.ja.md)
 ParallelScope is a Windows desktop application that lets you browse folders and files across multiple configured root paths.
 It is built with WPF and uses a local SQLite cache to speed up listing and search.
 
+🌐 **[Product page](https://msmsrep.github.io/ParallelScope/intro.html)** — what ParallelScope does, at a glance.  
 📖 **[User Guide](https://msmsrep.github.io/ParallelScope/)** — how to use the app, with screenshots.
 
 ## Key Features
