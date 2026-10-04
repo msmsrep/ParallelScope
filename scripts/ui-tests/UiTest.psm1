@@ -172,7 +172,7 @@ function Set-UiWindowHandle {
 
 function Invoke-WinappUi {
     param(
-        [Parameter(Mandatory)][string[]]$Arguments,
+        [Parameter(Mandatory)][AllowEmptyString()][string[]]$Arguments,
         [switch]$AllowFailure
     )
 
@@ -257,9 +257,10 @@ function Invoke-UiElement {
     param(
         [Parameter(Mandatory)][string]$Selector,
         [int]$Pane = -1,
+        [string]$Type,
         [string]$Action
     )
-    $slug = Resolve-UiElement $Selector -Pane $Pane
+    $slug = Resolve-UiElement $Selector -Pane $Pane -Type $Type
     $arguments = @('invoke', $slug)
     if ($Action) { $arguments += @('--action', $Action) }
     Invoke-WinappUi $arguments | Out-Null
