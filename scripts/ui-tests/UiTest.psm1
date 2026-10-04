@@ -128,11 +128,15 @@ function Close-UiApp {
 同じデータフォルダのまま起動し直す（設定の保存と復元の確認用）。
 #>
 function Restart-UiApp {
+    param(
+        # 購読状態を変えて起動し直す（省略時は今と同じ）
+        [Nullable[bool]]$Plus = $null
+    )
     $fixture = $script:App.Fixture
-    $plus = $script:App.Plus
+    $nextPlus = if ($null -ne $Plus) { $Plus } else { $script:App.Plus }
     Close-UiApp
     $script:App = $null
-    Start-UiApp -Fixture $fixture -Plus:$plus
+    Start-UiApp -Fixture $fixture -Plus:$nextPlus
 }
 
 function Get-UiWindows {
@@ -435,6 +439,22 @@ function Get-UiTabNames {
     $tabs = Find-UiNode $tree { param($n) $n.PSObject.Properties['automationId'] -and $n.automationId -eq 'TabItemsControl' }
     if (-not $tabs -or -not $tabs.PSObject.Properties['children']) { return @() }
     @($tabs.children | Where-Object { $_.type -eq 'DataItem' } | ForEach-Object { $_.name })
+}
+
+<#
+.SYNOPSIS
+タブを位置（0始まり）でクリックして表示する。タブ名は一覧の行名と重なりうるため、名前ではなく位置で選ぶ。
+#>
+function Select-UiTab {
+    param(
+        [Parameter(Mandatory)][int]$Index,
+        [int]$Pane = 0
+    )
+    $tree = Get-UiTree "Pane$Pane" -Depth 4
+    $tabs = Find-UiNode $tree { param($n) $n.PSObject.Properties['automationId'] -and $n.automationId -eq 'TabItemsControl' }
+    $items = if ($tabs -and $tabs.PSObject.Properties['children']) { @($tabs.children | Where-Object { $_.type -eq 'DataItem' }) } else { @() }
+    if ($Index -ge $items.Count) { throw [UiTestFailure]::new("Pane$Pane にタブ $Index がありません（$($items.Count) 個）。") }
+    Invoke-WinappUi @('click', $items[$Index].selector) | Out-Null
 }
 
 function Wait-UiTabCount {
