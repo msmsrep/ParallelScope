@@ -5,8 +5,8 @@
 ParallelScope は、指定した複数ルート配下のフォルダ/ファイルを横断して参照できる Windows 向けデスクトップアプリです。
 WPF で UI を構築し、ローカル SQLite キャッシュを使って表示と検索を高速化しています。
 
-🌐 **[紹介ページ](https://msmsrep.github.io/ParallelScope/intro.ja.html)** — ParallelScope でできることをひと目で。  
-📖 **[使い方ガイド](https://msmsrep.github.io/ParallelScope/index.ja.html)** — 画面写真つきの操作説明。
+🌐 **[紹介ページ](https://msmsrep.github.io/ParallelScope/index.ja.html)** — ParallelScope でできることをひと目で。  
+📖 **[使い方ガイド](https://msmsrep.github.io/ParallelScope/guide.ja.html)** — 画面写真つきの操作説明。
 
 ## 主な機能
 
@@ -96,7 +96,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
 9. 矢印ボタンの左にある「☰」ボタンでフォルダツリーを畳み、一覧を全幅で表示（Plus機能）
 10. 「Settings > 検索」ページで、検索欄を正規表現として扱う設定と、ファイル名の索引をメモリに持って検索を速くする設定を切り替え（どちらもPlus機能。切り替えは即時反映・即保存）
 
-詳しくは[使い方ガイド](https://msmsrep.github.io/ParallelScope/index.ja.html)を参照してください。
+詳しくは[使い方ガイド](https://msmsrep.github.io/ParallelScope/guide.ja.html)を参照してください。
 
 ## データ保存先
 
