@@ -99,6 +99,7 @@
                     <!-- フォルダツリーの開閉（Plus機能。未購読の間はコードビハインドが非表示にする） -->
                     <ToggleButton Name="TreeToggleButton" Width="32" Height="28" Padding="0" Margin="0,0,4,0"
                                   Visibility="Collapsed"
+                                  AutomationProperties.Name="{loc:Loc Nav.ToggleTree}"
                                   ToolTip="{loc:Loc Nav.ToggleTree}"
                                   IsChecked="{Binding IsTreeVisible, Mode=TwoWay}">
                         <TextBlock Text="&#xE700;" FontSize="14"
@@ -109,19 +110,22 @@
                          文字色はボタンから継承させる（明示すると無効時に淡くならない） -->
                     <Button Content="&#xE72B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
                             Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="BackButton" AutomationProperties.Name="{loc:Loc Nav.Back}"
                             ToolTip="{loc:Loc Nav.Back}" Click="BackButton_Click"
                             IsEnabled="{Binding ActiveTab.CanGoBack}"/>
                     <Button Content="&#xE72A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
                             Width="32" Height="28" Padding="0" Margin="0,0,4,0"
+                            AutomationProperties.AutomationId="ForwardButton" AutomationProperties.Name="{loc:Loc Nav.Forward}"
                             ToolTip="{loc:Loc Nav.Forward}" Click="ForwardButton_Click"
                             IsEnabled="{Binding ActiveTab.CanGoForward}"/>
                     <Button Content="&#xE74A;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
                             Width="32" Height="28" Padding="0"
+                            AutomationProperties.AutomationId="UpButton" AutomationProperties.Name="{loc:Loc Nav.Up}"
                             ToolTip="{loc:Loc Nav.Up}" Click="UpButton_Click"
                             IsEnabled="{Binding ActiveTab.CanGoUp}"/>
                 </StackPanel>
 
-                <TextBox Grid.Column="1" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
+                <TextBox Grid.Column="1" AutomationProperties.AutomationId="AddressTextBox" Text="{Binding ActiveTab.AddressInput, UpdateSourceTrigger=PropertyChanged}" Height="28"
                          VerticalContentAlignment="Center" KeyDown="AddressTextBox_KeyDown"
                          ToolTipService.ShowDuration="30000">
                     <TextBox.Style>
@@ -156,6 +160,13 @@
                                 <StackPanel Orientation="Horizontal"/>
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
+                        <!-- UI Automation（scripts/ui-tests）からタブを表示名で探せるようにする
+                             （指定しないとViewModelの型名が名前として出る） -->
+                        <ItemsControl.ItemContainerStyle>
+                            <Style TargetType="ContentPresenter">
+                                <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Grid>
@@ -206,11 +217,11 @@
                                         </Border.Style>
                                         <Border.ContextMenu>
                                             <ContextMenu>
-                                                <MenuItem Header="{loc:Loc Tab.New}" Click="NewTabMenuItem_Click"/>
-                                                <MenuItem Header="{loc:Loc Tab.Duplicate}" Click="DuplicateTabMenuItem_Click"/>
+                                                <MenuItem AutomationProperties.AutomationId="NewTabMenuItem" Header="{loc:Loc Tab.New}" Click="NewTabMenuItem_Click"/>
+                                                <MenuItem AutomationProperties.AutomationId="DuplicateTabMenuItem" Header="{loc:Loc Tab.Duplicate}" Click="DuplicateTabMenuItem_Click"/>
                                                 <Separator/>
-                                                <MenuItem Header="{loc:Loc Tab.Close}" Click="CloseTabMenuItem_Click"/>
-                                                <MenuItem Header="{loc:Loc Tab.CloseOthers}" Click="CloseOtherTabsMenuItem_Click"/>
+                                                <MenuItem AutomationProperties.AutomationId="CloseTabMenuItem" Header="{loc:Loc Tab.Close}" Click="CloseTabMenuItem_Click"/>
+                                                <MenuItem AutomationProperties.AutomationId="CloseOtherTabsMenuItem" Header="{loc:Loc Tab.CloseOthers}" Click="CloseOtherTabsMenuItem_Click"/>
                                             </ContextMenu>
                                         </Border.ContextMenu>
                                         <StackPanel Orientation="Horizontal">
@@ -233,6 +244,7 @@
                                             <Button Content="✕" Margin="6,0,0,0" Padding="3,0" FontSize="10"
                                                     Background="Transparent" BorderThickness="0"
                                                     Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                                                    AutomationProperties.AutomationId="CloseTabButton" AutomationProperties.Name="{loc:Loc Tab.Close}"
                                                     ToolTip="{loc:Loc Tab.Close}"
                                                     Click="CloseTabButton_Click"
                                                     Visibility="{Binding DataContext.ShowsTabCloseButton, RelativeSource={RelativeSource AncestorType=ItemsControl}, Converter={StaticResource BooleanToVisibilityConverter}}"/>
@@ -261,6 +273,7 @@
                     <Button Grid.Column="1" Content="＋" MinWidth="28" Padding="4,0" Margin="4,0,0,0"
                             Background="Transparent" BorderThickness="0"
                             Foreground="{DynamicResource TextFillColorPrimaryBrush}"
+                            AutomationProperties.AutomationId="NewTabButton" AutomationProperties.Name="{loc:Loc Tab.New}"
                             ToolTip="{loc:Loc Tab.New}"
                             IsEnabled="{Binding CanAddTab}"
                             Click="NewTabButton_Click"/>
@@ -283,6 +296,8 @@
                          Foregroundが既定の黒に戻ってダークモードで文字が見えなくなる -->
                     <Style TargetType="TreeViewItem" BasedOn="{StaticResource {x:Type TreeViewItem}}">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <!-- UI Automationで表示名から探せるようにする（指定しないとViewModelの型名が出る） -->
+                        <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
                         <Setter Property="ItemsPanel" Value="{StaticResource TreeItemsPanelTemplate}"/>
                         <EventSetter Event="Loaded" Handler="FolderTreeViewItem_Loaded"/>
                         <EventSetter Event="Unloaded" Handler="FolderTreeViewItem_Unloaded"/>
@@ -360,7 +375,7 @@
                 </Grid.ColumnDefinitions>
 
                 <!-- 入力するたびに SearchQuery が更新され、インクリメンタルサーチが実行される -->
-                <TextBox Grid.Column="0" Margin="0,0,8,0"
+                <TextBox Grid.Column="0" Margin="0,0,8,0" AutomationProperties.AutomationId="SearchTextBox"
                          Text="{Binding ActiveTab.SearchQuery, UpdateSourceTrigger=PropertyChanged}"
                          Height="28"
                          VerticalContentAlignment="Center">
@@ -378,7 +393,7 @@
                     </TextBox.Style>
                 </TextBox>
                 <!-- ONのとき、現在フォルダ配下の全ファイルを再帰的に表示する -->
-                <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0"
+                <ToggleButton Grid.Column="1" MinWidth="72" Padding="8,0" AutomationProperties.AutomationId="AllFilesToggleButton"
                               IsChecked="{Binding ActiveTab.IsFlatFileViewEnabled}">
                     <!-- ON時の背景をニュートラルにした（App.xaml参照）ぶん、文字色でONを示す。
                          テンプレート側がON時の文字色を直接指定してくるため、Contentに置いた
@@ -436,13 +451,20 @@
                         </Style.Triggers>
                     </Style>
                 </DataGrid.CellStyle>
+                <!-- UI Automationで行をファイル名から探せるようにする（指定しないとViewModelの型名が出る）。
+                     セルと同じくFluentの行スタイルはキー付きのため、BasedOnで明示的に引き継ぐ -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow" BasedOn="{StaticResource DefaultDataGridRowStyle}">
+                        <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.ContextMenu>
                     <ContextMenu>
-                        <MenuItem Header="{loc:Loc Context.CopyFile}" Click="CopyFileMenuItem_Click"/>
-                        <MenuItem Header="{loc:Loc Context.CopyFileName}" Click="CopyFileNameMenuItem_Click"/>
-                        <MenuItem Header="{loc:Loc Context.CopyFullPath}" Click="CopyFullPathMenuItem_Click"/>
+                        <MenuItem AutomationProperties.AutomationId="CopyFileMenuItem" Header="{loc:Loc Context.CopyFile}" Click="CopyFileMenuItem_Click"/>
+                        <MenuItem AutomationProperties.AutomationId="CopyFileNameMenuItem" Header="{loc:Loc Context.CopyFileName}" Click="CopyFileNameMenuItem_Click"/>
+                        <MenuItem AutomationProperties.AutomationId="CopyFullPathMenuItem" Header="{loc:Loc Context.CopyFullPath}" Click="CopyFullPathMenuItem_Click"/>
                         <Separator/>
-                        <MenuItem Header="{loc:Loc Context.OpenParentFolder}" Click="OpenParentFolderMenuItem_Click"/>
+                        <MenuItem AutomationProperties.AutomationId="OpenParentFolderMenuItem" Header="{loc:Loc Context.OpenParentFolder}" Click="OpenParentFolderMenuItem_Click"/>
                         <Separator/>
                         <!-- フォルダ行のときだけ有効にする（ContextMenuOpeningで切り替え） -->
                         <MenuItem Name="OpenInNewTabMenuItem" Header="{loc:Loc Context.OpenInNewTab}" Click="OpenInNewTabMenuItem_Click"/>

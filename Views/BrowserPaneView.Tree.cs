@@ -1,5 +1,6 @@
 ﻿using System.IO;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -180,6 +181,7 @@ public partial class BrowserPaneView
             IsEnabled = !folderItem.IsScanning
         };
         scanMenuItem.Click += ScanFolderMenuItem_Click;
+        AutomationProperties.SetAutomationId(scanMenuItem, "ScanSubtreeMenuItem");
 
         var contextMenu = new ContextMenu
         {
@@ -197,6 +199,7 @@ public partial class BrowserPaneView
                 IsEnabled = _paneViewModel.CanAddTab
             };
             openInNewTabMenuItem.Click += OpenFolderInNewTabMenuItem_Click;
+            AutomationProperties.SetAutomationId(openInNewTabMenuItem, "TreeOpenInNewTabMenuItem");
 
             contextMenu.Items.Add(openInNewTabMenuItem);
 
@@ -209,6 +212,7 @@ public partial class BrowserPaneView
                 IsEnabled = otherPane?.CanAddTab ?? true
             };
             openInOtherPaneMenuItem.Click += OpenFolderInOtherPaneMenuItem_Click;
+            AutomationProperties.SetAutomationId(openInOtherPaneMenuItem, "TreeOpenInOtherPaneMenuItem");
             contextMenu.Items.Add(openInOtherPaneMenuItem);
 
             contextMenu.Items.Add(new Separator());
@@ -226,6 +230,7 @@ public partial class BrowserPaneView
                 DataContext = folderItem
             };
             favoriteMenuItem.Click += ToggleFavoriteMenuItem_Click;
+            AutomationProperties.SetAutomationId(favoriteMenuItem, "ToggleFavoriteMenuItem");
 
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(favoriteMenuItem);
@@ -236,6 +241,7 @@ public partial class BrowserPaneView
         {
             var closePaneMenuItem = new MenuItem { Header = UiText.Get("Context.ClosePane") };
             closePaneMenuItem.Click += ClosePaneMenuItem_Click;
+            AutomationProperties.SetAutomationId(closePaneMenuItem, "TreeClosePaneMenuItem");
 
             contextMenu.Items.Add(new Separator());
             contextMenu.Items.Add(closePaneMenuItem);
