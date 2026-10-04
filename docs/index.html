@@ -1,530 +1,195 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ParallelScope User Guide</title>
-<meta name="description" content="User guide for ParallelScope, a Windows file browser that spans multiple root folders. Screen layout, first-time setup, search, All Files mode, tabs and the split view, Favorites, Recent and Frequently Used folders, CSV export, the English / Japanese display language, hidden and system items, and how scanning and the cache work — with screenshots.">
+<title>ParallelScope – Multi-Folder File Browser with Instant Search for Windows</title>
+<meta name="description" content="ParallelScope is a Windows file browser that puts folders from several drives and NAS devices into one tree and searches them all as you type, backed by a local cache.">
 <link rel="icon" href="images/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="intro.css">
+<link rel="canonical" href="https://msmsrep.github.io/ParallelScope/">
+<link rel="alternate" hreflang="en" href="https://msmsrep.github.io/ParallelScope/">
+<link rel="alternate" hreflang="ja" href="https://msmsrep.github.io/ParallelScope/index.ja.html">
+<link rel="alternate" hreflang="x-default" href="https://msmsrep.github.io/ParallelScope/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ParallelScope">
+<meta property="og:title" content="ParallelScope – Multi-Folder File Browser with Instant Search for Windows">
+<meta property="og:description" content="ParallelScope is a Windows file browser that puts folders from several drives and NAS devices into one tree and searches them all as you type, backed by a local cache.">
+<meta property="og:url" content="https://msmsrep.github.io/ParallelScope/">
+<meta property="og:image" content="https://msmsrep.github.io/ParallelScope/images/13-split-view.png">
+<meta property="og:image:width" content="1484">
+<meta property="og:image:height" content="752">
+<meta property="og:locale" content="en_US">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ParallelScope",
+  "url": "https://msmsrep.github.io/ParallelScope/",
+  "description": "ParallelScope is a Windows file browser that puts folders from several drives and NAS devices into one tree and searches them all as you type, backed by a local cache.",
+  "inLanguage": "en",
+  "operatingSystem": "Windows 10, Windows 11",
+  "applicationCategory": "UtilitiesApplication",
+  "image": "https://msmsrep.github.io/ParallelScope/images/13-split-view.png",
+  "screenshot": [
+    "https://msmsrep.github.io/ParallelScope/images/13-split-view.png",
+    "https://msmsrep.github.io/ParallelScope/images/02-search.png",
+    "https://msmsrep.github.io/ParallelScope/images/03-allfiles.png",
+    "https://msmsrep.github.io/ParallelScope/images/12-tabs.png",
+    "https://msmsrep.github.io/ParallelScope/images/09-dark.png"
+  ],
+  "downloadUrl": "https://apps.microsoft.com/detail/9P96W3RFPLP6",
+  "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+  },
+  "author": {
+    "@type": "Person",
+    "name": "msmsrep",
+    "url": "https://github.com/msmsrep"
+  },
+  "codeRepository": "https://github.com/msmsrep/ParallelScope"
+}
+</script>
 </head>
 <body>
 
-<header class="hero">
+<header class="topbar">
   <div class="wrap">
-    <div class="langbar"><a class="intro-link" href="intro.html">About ParallelScope</a><span class="current">English</span><a href="index.ja.html">日本語</a></div>
-    <h1>ParallelScope User Guide</h1>
-    <p class="tagline">A Windows desktop app for browsing and searching across several root folders at once.</p>
-    <div class="badges">
-      <span class="badge">Windows 10 / 11</span>
-      <span class="badge">Microsoft Store</span>
-      <span class="badge">Local SQLite cache</span>
-    </div>
+    <a class="brand" href="./"><img src="images/favicon.svg" alt="">ParallelScope</a>
+    <nav>
+      <a href="guide.html">User Guide</a>
+      <a href="https://github.com/msmsrep/ParallelScope">GitHub</a>
+    </nav>
+    <div class="langbar"><span class="current">English</span><a href="index.ja.html">日本語</a></div>
   </div>
 </header>
 
 <div class="wrap">
 
-<nav class="toc">
-  <h2>Contents</h2>
-  <ol>
-    <li><a href="#about">What ParallelScope is</a></li>
-    <li><a href="#screen">The main window</a></li>
-    <li><a href="#setup">First run: add your root folders</a></li>
-    <li><a href="#browse">Browsing and navigating</a></li>
-    <li><a href="#favorites">Favorites, Recent and Frequently Used</a></li>
-    <li><a href="#search">Searching</a></li>
-    <li><a href="#allfiles">All Files mode</a></li>
-    <li><a href="#tabs">Tabs and split view</a></li>
-    <li><a href="#contextmenu">Right-click menus</a></li>
-    <li><a href="#scan">Scanning and the cache</a></li>
-    <li><a href="#customize">Customizing the view</a></li>
-    <li><a href="#csv">Exporting the list to CSV</a></li>
-    <li><a href="#plus">ParallelScope Plus</a></li>
-    <li><a href="#data">Where your data is stored</a></li>
-    <li><a href="#tips">Troubleshooting</a></li>
-    <li><a href="#support">Support development</a></li>
-  </ol>
-</nav>
-
-<section id="about">
-  <h2>What ParallelScope is</h2>
-  <p>
-    ParallelScope is a file browser that pulls folders from unrelated locations into <strong>a single tree</strong>.
-    Register the folders you actually work in — say your active projects, your design assets, and your reports —
-    and you can browse and search all of them from one window instead of juggling Explorer windows.
-  </p>
-  <p>
-    The folder structure and file listings are kept in a local SQLite cache. Listings are drawn from that cache first,
-    so a folder opens instantly; the real file system is then re-read in the background to bring the listing up to date.
-    That keeps the UI responsive even on slow locations such as a NAS over the network.
-  </p>
-  <div class="note">
-    <p>Every screenshot on this page was taken with dummy data placed under <code>C:\ScopeDemo</code>. It is not a real folder structure.</p>
+<section class="intro-hero">
+  <h1>Every folder you care about,<br>in one tree.</h1>
+  <p class="lead">ParallelScope is a Windows file browser for folders spread across drives and NAS devices. Register them once, then browse and search them all together — results appear as you type.</p>
+  <div class="cta">
+    <a class="btn primary" href="https://apps.microsoft.com/detail/9P96W3RFPLP6">Get it from Microsoft Store</a>
+    <a class="btn secondary" href="guide.html">Read the User Guide</a>
   </div>
-</section>
-
-<section id="screen">
-  <h2>The main window</h2>
-  <figure class="callout-shot">
-    <a href="images/01-overview.png"><img src="images/01-overview.png" alt="The ParallelScope main window, with the folder tree on the left and the file list on the right"></a>
-    <span class="pin" style="left:3.8%;  top:10.9%">1</span>
-    <span class="pin" style="left:14.7%; top:10.9%">2</span>
-    <span class="pin" style="left:62%;   top:11%">3</span>
-    <span class="pin" style="left:45%;   top:20.9%">4</span>
-    <span class="pin" style="left:93.2%; top:17.6%">5</span>
-    <span class="pin" style="left:8.8%;  top:86%">6</span>
-    <span class="pin" style="left:60%;   top:85%">7</span>
-  </figure>
-  <ol class="legend">
-    <li><span><strong>License badge</strong> — the title bar shows your current license ("Free", "Plus (monthly)" or "Plus (one-time)") to the right of the app name and version. It is checked right after the app starts, so it can appear a moment later.</span></li>
-    <li><span><strong>Menu</strong> — sits in the title bar, to the left of the app name. It opens the settings window, exports the current list to CSV, and links to this user guide.</span></li>
-    <li><span><strong>Navigation buttons</strong> — the arrow buttons move back and forward through your navigation history and go up to the parent folder. Hover over one to see what it does. With Plus the tab strip shares this row, to the right of the address bar.</span></li>
-    <li><span><strong>Address bar</strong> — the full path of the current folder. Type or paste a path and press <kbd>Enter</kbd> to jump there.</span></li>
-    <li><span><strong>Search box</strong> — searches under the current folder as you type (incremental search).</span></li>
-    <li><span><strong>All Files toggle</strong> — lists every file under the current folder as one flat list.</span></li>
-    <li><span><strong>Folder tree</strong> — your registered root folders, gathered under a top-level "Folders" node. With Plus, "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" appear above it.</span></li>
-    <li><span><strong>File list</strong> — the contents of the selected folder. Click a column header to sort.</span></li>
-  </ol>
-</section>
-
-<section id="setup">
-  <h2>First run: add your root folders</h2>
-  <p>After installation no roots are registered yet, and the app falls back to showing your Desktop. Start by registering the folders you want to browse.</p>
-
-  <ol class="steps">
-    <li><strong>Open "Menu" → "⚙ Settings"</strong></li>
-    <li><strong>On the "Root Folders" page, type the full path of a folder and click "Add"</strong>
-      <br>Roots appear in the tree in the order listed. Reorder them with "↑ Up" / "↓ Down", or drop one with "Remove".</li>
-    <li><strong>Optionally add folders to "Excluded Folders"</strong>
-      <br>Excluding noisy folders such as <code>node_modules</code> or <code>bin</code> keeps them out of the tree, the file list, search results, and scans.</li>
-    <li><strong>Click "Save + Full Scan"</strong>
-      <br>The cache is empty right after you add a root, so scanning once here makes browsing and searching fast from then on. Use "Save" if you only want to store the settings.</li>
-  </ol>
-
-  <div class="shot-pair">
-    <figure>
-      <a href="images/11-menu.png"><img src="images/11-menu.png" alt="Clicking Menu and choosing Settings"></a>
-      <figcaption>"Menu" → "⚙ Settings" opens the settings window.</figcaption>
-    </figure>
-    <figure>
-      <a href="images/06-settings-roots.png"><img src="images/06-settings-roots.png" alt="The Root Folders page of the settings window"></a>
-      <figcaption>Root folders, excluded folders, and the automatic full-scan interval all live here.</figcaption>
-    </figure>
-  </div>
-
-  <div class="note">
-    <p><strong>Exclusions are full paths, not name patterns.</strong> Adding a path excludes exactly that folder and everything under it — it does not exclude every folder that happens to share the name.</p>
-  </div>
-</section>
-
-<section id="browse">
-  <h2>Browsing and navigating</h2>
-  <ul>
-    <li><strong>Select in the tree</strong> — click a folder on the left and its immediate contents appear on the right. Click <code>&gt;</code> to expand a node; children are loaded at that point.</li>
-    <li><strong>Double-click</strong> — double-clicking a folder in the list moves into it; double-clicking a file opens it in the default application.</li>
-    <li><strong>Back / Forward / Up</strong> — the three arrow buttons work the way a browser's do. Hover over one for a tooltip saying which is which.</li>
-    <li><strong>Address bar</strong> — paste a path and press <kbd>Enter</kbd> to go straight there. When the path is too long for the box, hover over it to read the whole thing.</li>
-    <li><strong>Folder tree toggle</strong> — the "☰" button left of the arrows collapses the folder tree so the file list gets the full width, and brings it back. This is a ParallelScope Plus feature; see <a href="#tabs">Tabs and split view</a>.</li>
-    <li><strong>Sorting</strong> — click a column header such as "Name", "Size", or "Modified". Sizes and timestamps are compared as raw values rather than as displayed text, so <code>9 KB</code> and <code>12 MB</code> sort correctly.</li>
-    <li><strong>Scrolling sideways</strong> — when the columns are wider than the list, a horizontal scroll bar appears at the bottom. <kbd>Shift</kbd> + the mouse wheel scrolls sideways too.</li>
-  </ul>
-
-  <h3>The "Folders" node</h3>
-  <p>
-    The node at the very top of the tree is a virtual folder that gathers all your roots. It is not a real path, so selecting it
-    shows <code>::Folders::</code> in the address bar and lists one row per root. Searching from here
-    <strong>searches across every registered root at once</strong>.
-  </p>
-  <p>
-    With Plus, three more virtual nodes sit above it — "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" — and they
-    behave the same way: the address bar shows <code>::Favorites::</code>, <code>::Recent::</code> or <code>::Frequent::</code>, the
-    list shows one row per folder, and searching from there covers every folder gathered under the node.
-    See <a href="#favorites">Favorites, Recent and Frequently Used</a>.
-  </p>
-
-  <h3>Folder sizes</h3>
-  <p>
-    The size shown on a folder row is the total size of its contents, aggregated from the cache. Folders that have not been
-    scanned yet show a blank size until a scan reaches them.
-  </p>
-</section>
-
-<section id="favorites">
-  <h2>Favorites, Recent and Frequently Used</h2>
-  <p>
-    Registering a root folder for every folder you care about quickly gets unwieldy. Three extra nodes at the top of the tree give
-    you shortcuts instead — one you curate by hand, two the app fills in for you. All three are
-    <strong><a href="#plus">ParallelScope Plus</a> features</strong> and are hidden entirely without Plus.
-  </p>
-
-  <h3>★ Favorites</h3>
-  <ul>
-    <li>Right-click any folder in the tree and choose <strong>"★ Add to Favorites"</strong>. Right-click a registered one and the item reads <strong>"☆ Remove from Favorites"</strong> instead.</li>
-    <li>Favorites are listed in the order you added them, and each one expands into its own subtree just like a root folder does.</li>
-    <li>Selecting the "★ Favorites" node itself lists every favorite in one place, and searching from there covers all of them.</li>
-    <li>The list is saved in <code>settings.json</code>, so it survives restarts. A favorite on a disconnected NAS is kept rather than dropped.</li>
-  </ul>
-
-  <h3>🕘 Recent</h3>
-  <ul>
-    <li>The folders you opened most recently, newest first, up to <strong>20</strong>.</li>
-    <li>It draws on the same record as "Frequently Used" — only navigation you perform yourself counts — but sorts by when you last opened each folder instead of how often.</li>
-    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
-    <li>The order is refreshed when the app starts and when you expand the node, not after every move. Selecting the node itself always lists the newest order.</li>
-  </ul>
-
-  <h3>🕒 Frequently Used</h3>
-  <ul>
-    <li>The app counts how often you open each folder and lists the <strong>top 10</strong>, most-visited first (ties broken by the most recent visit).</li>
-    <li>Only navigation you perform yourself is counted — tree clicks, double-clicks, Back / Forward / Up, and the address bar. Folders the app opens for you at startup do not count.</li>
-    <li>Folders already in Favorites are left out, so no folder shows up twice across the nodes. Excluded folders never appear either.</li>
-    <li>The order is refreshed when the app starts and when you expand the node, not after every move — so the tree does not rearrange itself while you are clicking through it.</li>
-  </ul>
-</section>
-
-<section id="search">
-  <h2>Searching</h2>
+  <p class="cta-note">Free to use · Windows 10 / 11 · Open source</p>
   <figure>
-    <a href="images/02-search.png"><img src="images/02-search.png" alt="Searching for report, showing results from several roots at once"></a>
-    <figcaption>Typing <code>report</code> with "Folders" selected: hits from every registered root, in one list.</figcaption>
+    <img src="images/13-split-view.png" alt="ParallelScope in split view: two panes, each with tabs, a folder tree and a file list" width="1484" height="752">
   </figure>
-  <ul>
-    <li><strong>There is no search button.</strong> The list updates as you type.</li>
-    <li>The scope is <strong>everything under the folder you are currently viewing</strong>. To search everywhere, select the top-level "Folders" node first.</li>
-    <li>Search runs <strong>against the cache</strong>, never by walking the live file system, so it stays fast even on a NAS. The flip side: files added since the last scan are not found until the next one.</li>
-    <li>Clear the search box to return to the normal folder listing.</li>
-    <li>Excluded folders never appear in results.</li>
-    <li><strong>Results appear in stages.</strong> On a large folder the first couple of thousand rows are shown right away and the rest fill in behind them, so you do not wait for the whole list before you can start reading it.</li>
-    <li>While a search is running the list you are looking at stays on screen, so it does not flash empty on every keystroke.</li>
-  </ul>
-
-  <h3>Regular expression search (a ParallelScope Plus feature)</h3>
-  <p>
-    Turn on <strong>"Treat the search box text as a regular expression"</strong> on the "Settings &gt; Search" page to search with
-    .NET regular expression syntax instead of a plain substring. The switch applies and is saved immediately — it does not go
-    through the "Save" button.
-  </p>
-  <ul>
-    <li>The pattern is matched against the <strong>file or folder name</strong>, not the full path.</li>
-    <li>Uppercase and lowercase are not distinguished, the same as the normal search.</li>
-    <li>While a pattern is still half-typed and not yet valid, no search runs: the list stays as it was and the search box turns red.</li>
-  </ul>
-
-  <h3>Keeping file names in memory (a ParallelScope Plus feature)</h3>
-  <p>
-    Also on the "Settings &gt; Search" page, <strong>"Speed up search by keeping file names in memory"</strong> builds an in-memory
-    index of every cached name. It too applies and is saved immediately.
-  </p>
-  <ul>
-    <li><strong>Searching gets faster</strong> — roughly 400 ms down to roughly 20 ms on a cache of 1.5 million files.</li>
-    <li><strong>Memory use goes up</strong> — roughly 160 MB for those 1.5 million files. Turning the setting off releases it.</li>
-    <li>The index is built in the background and rebuilt after each scan. <strong>Results do not change</strong> — only how quickly they arrive.</li>
-  </ul>
 </section>
 
-<section id="allfiles">
-  <h2>All Files mode</h2>
+<div class="highlights">
+  <div class="card">
+    <h3>Several roots, one tree</h3>
+    <p>Folders on different drives and NAS devices sit side by side in a single tree.</p>
+  </div>
+  <div class="card">
+    <h3>Search as you type</h3>
+    <p>Search runs against a local cache, so even a NAS answers instantly.</p>
+  </div>
+  <div class="card">
+    <h3>Works when the network doesn't</h3>
+    <p>Roots you cannot reach right now can still be browsed and searched from the cache.</p>
+  </div>
+</div>
+
+<section class="feature">
+  <div class="feature-text">
+    <h2>Find files the moment you type</h2>
+    <p>Type in the search box and everything under the current folder is narrowed down on every keystroke — no Enter key, no waiting for a live disk crawl.</p>
+    <p>Background scans at startup, on a schedule, and whenever you open a folder keep the cache up to date.</p>
+    <p><a href="guide.html#search">How search works →</a></p>
+  </div>
   <figure>
-    <a href="images/03-allfiles.png"><img src="images/03-allfiles.png" alt="All Files enabled, showing every file under Projects in one flat list"></a>
-    <figcaption>With "All Files" on, every file under the current folder appears in a single list, regardless of depth.</figcaption>
+    <img src="images/02-search.png" alt="Searching for &quot;report&quot; lists matching files from every root" width="1484" height="752" loading="lazy">
   </figure>
-  <p>
-    Turning on "All Files" in the top right lists <strong>every file underneath the selected folder</strong>, recursively
-    (folder rows are omitted). It is the fastest way to answer "I know it's in here somewhere".
-  </p>
-  <ul>
-    <li>This view is also built from the cache, so it reflects the most recent scan.</li>
-    <li>Selecting another folder while it is on switches the flat list to that folder.</li>
-    <li>Searching while it is on returns files only.</li>
-    <li>The list appears in stages: the first couple of thousand files show up straight away, and the rest follow, so a folder with a very large subtree does not leave you staring at the previous list.</li>
-    <li>The on/off state is saved per tab and restored the next time you start the app.</li>
-  </ul>
 </section>
 
-<section id="tabs">
-  <h2>Tabs and split view (Plus features)</h2>
-  <p>
-    Tabs and the split view let you keep several folders open and move between them.
-    Both are ParallelScope Plus features: without Plus the tab strip is hidden, "Split View" in the menu stays greyed out, and the folder tree of a pane cannot be collapsed.
-  </p>
-
-  <h3>Tabs</h3>
+<section class="feature reverse">
+  <div class="feature-text">
+    <h2>Everything underneath, in one list</h2>
+    <p>Turn on <strong>All Files</strong> to flatten every file below the current folder into a single list, however deep it goes. Folder sizes are shown too, so you can see what is eating your space.</p>
+    <p><a href="guide.html#allfiles">About All Files mode →</a></p>
+  </div>
   <figure>
-    <a href="images/12-tabs.png"><img src="images/12-tabs.png" alt="A pane with four tabs open"></a>
-    <figcaption>The tab strip sits above the pane. The tab you are looking at is filled in and shown in bold.</figcaption>
+    <img src="images/03-allfiles.png" alt="All Files mode listing every file under a folder" width="1484" height="752" loading="lazy">
   </figure>
-  <ul>
-    <li>The tab strip sits at the top of the pane. "＋" at its right end opens a new tab at the folder you are currently viewing.</li>
-    <li>Close a tab with its "✕" or a middle click. While the window shows a single pane, the last remaining tab cannot be closed. While it is split, closing the last tab of a pane closes that pane too and goes back to a single pane.</li>
-    <li>Drag a tab to reorder it.</li>
-    <li>Each tab keeps its own current folder, back/forward history, search text, All Files mode, and list sort order.</li>
-    <li>A pane holds up to 20 tabs.</li>
-    <li>You can also right-click a folder in the tree and choose "Open in New Tab", or middle-click a folder row in the list.</li>
-  </ul>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Shortcut</th><th>What it does</th></tr></thead>
-      <tbody>
-        <tr><td>Ctrl + T</td><td>Open a new tab</td></tr>
-        <tr><td>Ctrl + W</td><td>Close the current tab</td></tr>
-        <tr><td>Ctrl + Shift + T</td><td>Reopen a closed tab (the last 10, for as long as the app is running)</td></tr>
-        <tr><td>Ctrl + Tab / Ctrl + Shift + Tab</td><td>Go to the next / previous tab</td></tr>
-        <tr><td>Ctrl + 1 to 8</td><td>Go to that tab, counting from the left</td></tr>
-        <tr><td>Ctrl + 9</td><td>Go to the rightmost tab</td></tr>
-        <tr><td>F6</td><td>(while split) Switch which pane you are working in</td></tr>
-      </tbody>
-    </table>
-  </div>
+</section>
 
-  <h3>Split view</h3>
+<section class="feature">
+  <div class="feature-text">
+    <h2>Tabs and split view <span class="plus-tag">Plus</span></h2>
+    <p>Keep several folders open in tabs, or split the window into two panes to compare folders that live far apart. Drag a tab to the other side to move it. Your layout comes back the next time you start.</p>
+    <p><a href="guide.html#tabs">About tabs and split view →</a></p>
+  </div>
   <figure>
-    <a href="images/13-split-view.png"><img src="images/13-split-view.png" alt="The window split into two panes side by side"></a>
-    <figcaption>Two panes side by side, each with its own tabs, address box and file list. The right pane has its folder tree collapsed.</figcaption>
+    <img src="images/12-tabs.png" alt="Several folders open as tabs, with Favorites, Recent and Frequently Used in the tree" width="1484" height="752" loading="lazy">
   </figure>
-  <ul>
-    <li>"Menu &gt; Split View" splits the window in two. Choose "Side by Side" or "Top and Bottom" for the direction.</li>
-    <li>Each side (pane) gets its own folder tree, address box, search box, tab strip and file list, so you can put two folders next to each other.</li>
-    <li>The pane you are working in is outlined. Click it or press F6 to switch. Menu actions such as the CSV export apply to that pane.</li>
-    <li>Drag the divider to change how the space is shared. The ratio is remembered.</li>
-    <li>Drag a tab onto the other pane to move it there, or use "Open in Other Pane" from the tree or list right-click menu (when the window is not split yet, that command splits it for you).</li>
-    <li>When you turn the split off, the tabs of the closing pane move to the end of the remaining one. "Close This Pane" in the tree or list right-click menu closes just that pane the same way.</li>
-    <li>A pane added by splitting starts with its folder tree collapsed, because each side is only half as wide. Open it again with the "☰" button whenever you need it.</li>
-  </ul>
+</section>
 
-  <h3>Collapsing the folder tree</h3>
+<section class="feature reverse">
+  <div class="feature-text">
+    <h2>A right-click away</h2>
+    <p>Copy a file, its name, or its full path in one click, or open its parent folder in Explorer. Right-click a folder in the tree to rescan just that part.</p>
+    <p><a href="guide.html#contextmenu">Right-click menus →</a></p>
+  </div>
   <figure>
-    <a href="images/14-tree-collapsed.png"><img src="images/14-tree-collapsed.png" alt="The window with the folder tree collapsed"></a>
-    <figcaption>With the tree collapsed, the file list uses the whole width. The "☰" button left of "Back" brings it back.</figcaption>
+    <img src="images/04-context-menu.png" alt="The file list's right-click menu" width="1484" height="752" loading="lazy">
   </figure>
-  <ul>
-    <li>The "☰" button left of "Back" collapses that pane's folder tree and gives the whole width to the file list. Press it again to bring the tree back at the width it had.</li>
-    <li>Each pane keeps its own state, so you can leave the tree open on one side and collapsed on the other.</li>
-    <li>The state is saved and restored the next time you start the app.</li>
-    <li>Without Plus the button is not shown and the tree always stays open.</li>
-  </ul>
-  <div class="note">
-    <p>The file list columns, their widths and their order are one shared setting across both panes. If you resize a column on one side while split, that width is saved as the shared setting.</p>
-  </div>
-  <p>
-    Your open tabs and the split state are saved and restored the next time you start the app (search text is not restored).
-    A tab whose folder no longer exists opens at your first root folder instead.
-  </p>
 </section>
 
-<section id="contextmenu">
-  <h2>Right-click menus</h2>
-  <div class="shot-pair">
-    <figure>
-      <a href="images/04-context-menu.png"><img src="images/04-context-menu.png" alt="The right-click menu in the file list"></a>
-      <figcaption>Right-clicking a row in the file list.</figcaption>
-    </figure>
-    <figure>
-      <a href="images/05-tree-context.png"><img src="images/05-tree-context.png" alt="The right-click menu in the folder tree"></a>
-      <figcaption>Right-clicking a node in the folder tree.</figcaption>
-    </figure>
+<section class="feature">
+  <div class="feature-text">
+    <h2>Light, dark, English, Japanese</h2>
+    <p>Pick a color theme and a display language; both apply the moment you choose them and follow your Windows settings by default.</p>
+    <p><a href="guide.html#customize">Customizing the view →</a></p>
   </div>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Menu item</th><th>What it does</th></tr></thead>
-      <tbody>
-        <tr><td>Copy File</td><td>Copies the file itself, so you can paste a copy in Explorer.</td></tr>
-        <tr><td>Copy File Name</td><td>Copies just the file name as text.</td></tr>
-        <tr><td>Copy Full Path</td><td>Copies the full path as text.</td></tr>
-        <tr><td>Open Parent Folder</td><td>Opens the parent folder in Explorer with the item selected.</td></tr>
-        <tr><td>Open in New Tab</td><td>Opens the folder in a <a href="#tabs">new tab</a>. A Plus feature — not available without Plus.</td></tr>
-        <tr><td>Open in Other Pane</td><td>Opens the folder in the <a href="#tabs">other pane</a>. If the window is not split yet, it splits the window and opens the folder in the new pane. A Plus feature, so it is unavailable without Plus.</td></tr>
-        <tr><td>Close This Pane</td><td>Closes the pane you right-clicked and goes back to a single pane. Its tabs move to the end of the remaining pane. Shown only while the window is split.</td></tr>
-        <tr><td>Scan everything under this folder</td><td>(tree) Scans just that subtree and refreshes its cache.</td></tr>
-        <tr><td>★ Add to Favorites / ☆ Remove from Favorites</td><td>(tree) Adds the folder to "★ Favorites", or takes it out again. A Plus feature — the item is not shown without Plus.</td></tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<section id="scan">
-  <h2>Scanning and the cache</h2>
-  <p>Browsing and searching are built on the SQLite cache, which is refreshed in three ways.</p>
-  <ul>
-    <li><strong>Automatic full scan</strong> — once when the app starts, then on the interval you configure (3 hours by default). While it runs, an icon spins next to each root in the tree.</li>
-    <li><strong>Save + Full Scan</strong> — saves your settings and immediately scans everything. Worth doing right after you add or change a root.</li>
-    <li><strong>Per-folder scan</strong> — right-click a folder in the tree and choose "Scan everything under this folder". Much quicker than a full scan when only one area changed.</li>
-  </ul>
-  <p>
-    In addition, opening a folder re-reads <strong>its immediate contents</strong> from the live file system and updates both the
-    listing and the cache. If a file you just added does not turn up in search, scan that folder or wait for the next automatic full scan.
-  </p>
-  <div class="note">
-    <p>The app stays usable while a scan runs. Triggering "Save + Full Scan" during a scan cancels the running one and restarts it with the new settings.</p>
-  </div>
-</section>
-
-<section id="customize">
-  <h2>Customizing the view</h2>
-
-  <h3>Theme</h3>
-  <div class="shot-pair">
-    <figure>
-      <a href="images/08-settings-theme.png"><img src="images/08-settings-theme.png" alt="The Theme page of the settings window"></a>
-      <figcaption>"Settings &gt; Theme" switches between System, Light, and Dark. The choice applies and is saved immediately.</figcaption>
-    </figure>
-    <figure>
-      <a href="images/09-dark.png"><img src="images/09-dark.png" alt="The main window with the dark theme"></a>
-      <figcaption>The main window with Dark selected.</figcaption>
-    </figure>
-  </div>
-
-  <h3>Display language</h3>
-  <p>
-    "Settings &gt; Language" switches the app's own text between English and Japanese. The default, "System (follow Windows)",
-    follows your Windows display language. Like the theme, the choice applies and is saved the moment you pick it — there is no
-    "Save" to press — and it works without Plus.
-  </p>
-  <ul>
-    <li>The whole window swaps over straight away: the menu, the settings window, the file list headers, and the tree's "★ Favorites" / "🕘 Recent" / "🕒 Frequently Used" nodes.</li>
-    <li>The <strong>Type</strong> column is the exception. Those names come from Windows itself, so they follow the language of the OS rather than this setting.</li>
-    <li>CSV exports keep their English headers, so a file exported in one language can still be read by the same script or spreadsheet.</li>
-  </ul>
-
-  <h3>Folder tree (a ParallelScope Plus feature)</h3>
-  <p>
-    "Settings &gt; Folder Tree" controls <strong>which of the top-level shortcut nodes the tree shows and the order they appear
-    in</strong>. Tick "★ Favorites", "🕘 Recent" and "🕒 Frequently Used" to show them, and move any of them with the
-    "↑ Up" / "↓ Down" buttons. The "Folders" node cannot be hidden — otherwise the tree could end up empty — but it can be moved,
-    so you can put it at the very top if you would rather have your roots first.
-  </p>
-  <ul>
-    <li>The change takes effect when you save. If you hide the node you are currently looking at, the list moves back to "Folders".</li>
-    <li>Hiding a node does not throw anything away: "Recent" and "Frequently Used" keep being built from the folders you open, and your favorites are untouched.</li>
-    <li>Like the nodes themselves, this is a paid Plus feature. Without Plus none of the three appear, but the settings are kept for when you buy it.</li>
-  </ul>
-
-  <h3>Columns (a ParallelScope Plus feature)</h3>
   <figure>
-    <a href="images/07-settings-columns.png"><img src="images/07-settings-columns.png" alt="The Display Columns page of the settings window"></a>
-    <figcaption>Without Plus the page is shown greyed out and cannot be changed.</figcaption>
+    <img src="images/09-dark.png" alt="ParallelScope in the dark theme" width="1484" height="752" loading="lazy">
   </figure>
-  <p>
-    "Settings &gt; Display Columns" controls both <strong>which columns the file list shows and the order they appear in</strong>.
-    Tick a column to show it, and move it with the "↑ Up" / "↓ Down" buttons. The columns on offer are Location (the parent folder
-    path), Type, Size, Modified, Created, and Attributes; the Name column is always shown, but it can still be moved.
-  </p>
-  <ul>
-    <li><strong>Header drags are saved too.</strong> Reordering columns by dragging their headers in the file list, and resizing them by dragging the edges, are stored when you close the app and restored the next time you start it.</li>
-    <li><strong>"Reset columns to defaults"</strong> puts the selection, the order, and the widths back to Name / Type / Size / Modified. The widths are cleared when you save.</li>
-    <li>All of this is a paid Plus feature. Without Plus the file list uses the default Name / Type / Size / Modified in the default order — but your settings are kept, so buying Plus brings your layout straight back.</li>
-  </ul>
-
-  <h3>Hidden and system items</h3>
-  <p>
-    Below the column list, the same "Settings &gt; Display Columns" page has <strong>"Hidden and system items"</strong>, with one
-    checkbox for hidden files and folders and one for system files and folders. <strong>Both are ticked by default</strong>, so
-    those items are shown; clear a box to leave them out of the file list and the folder tree alike. Unlike the columns above it,
-    this part of the page works without Plus.
-  </p>
-  <ul>
-    <li>The change takes effect when you save the settings. No rescan is needed — the cache records every item whatever its attributes are, and the filtering happens as the list is drawn.</li>
-    <li>This is the opposite of Explorer's default. ParallelScope shows hidden and system items unless you say otherwise, so files you could already see do not quietly disappear.</li>
-  </ul>
-</section>
-
-<section id="csv">
-  <h2>Exporting the list to CSV</h2>
-  <p>
-    "Menu" → <strong>"📄 Export CSV..."</strong> writes the list you are currently looking at to a CSV file. It is a
-    <strong><a href="#plus">ParallelScope Plus</a> feature</strong>; without Plus the menu item is still there but is
-    greyed out and cannot be clicked.
-  </p>
-  <ul>
-    <li><strong>What you get is what you see</strong> — the same rows in the same sort order, with the same columns. That includes search results and All Files mode, so you can narrow the list down first and export only that.</li>
-    <li>In the save dialog, the <strong>"Save as type"</strong> box picks how the Size column is written: <em>sizes as displayed</em> (<code>11.8 MB</code>) or <em>sizes in bytes</em> (<code>12345678</code>, under the header "Size (bytes)"). Pick the byte form when you want to total or sort sizes in a spreadsheet. Your choice becomes the default next time.</li>
-    <li>The file name defaults to <code>ParallelScope_&lt;folder&gt;_&lt;date&gt;_&lt;time&gt;.csv</code>.</li>
-    <li>The file is written as UTF-8 with a BOM, so Excel opens non-ASCII names and paths without garbling them.</li>
-  </ul>
 </section>
 
 <section id="plus">
-  <h2>ParallelScope Plus (monthly subscription / one-time purchase)</h2>
-  <figure>
-    <a href="images/10-settings-subscription.png"><img src="images/10-settings-subscription.png" alt="The Plus page of the settings window"></a>
-    <figcaption>"Settings &gt; Plus" is where buying (monthly or one-time) and cancelling start.</figcaption>
-  </figure>
-  <ul>
-    <li>The Plus features today are:
+  <h2>Free, with an optional Plus</h2>
+  <p>Browsing, search, All Files mode and scanning are free. ParallelScope Plus is a Microsoft Store add-on, offered as a monthly subscription or a one-time purchase — both unlock exactly the same features.</p>
+  <div class="plans">
+    <div class="card">
+      <h3>Free</h3>
       <ul>
-        <li><a href="#favorites">"★ Favorites", "🕘 Recent" and "🕒 Frequently Used"</a> in the folder tree</li>
-        <li><a href="#customize">Choosing which top-level tree nodes to show, and in what order</a></li>
-        <li><a href="#customize">Customizing the file list columns</a> — which columns, their order, and their widths</li>
-        <li><a href="#search">Regular expression search</a></li>
-        <li><a href="#search">Keeping the file name index in memory</a> to speed up search</li>
-        <li><a href="#csv">Exporting the file list to CSV</a></li>
-        <li><a href="#tabs">Multiple tabs</a></li>
-        <li><a href="#tabs">Split view (two panes)</a></li>
-        <li><a href="#tabs">Collapsing the folder tree of a pane</a></li>
+        <li>Multiple root folders and excluded folders</li>
+        <li>Incremental search across roots</li>
+        <li>All Files mode and folder sizes</li>
+        <li>Scheduled and per-folder scans</li>
+        <li>Themes, display language, hidden/system items</li>
       </ul>
-      Everything else is free.</li>
-    <li>Plus comes as a monthly subscription and as a one-time purchase, and <strong>both unlock exactly the same features</strong>. There is no need to buy both: while you own either one, the other purchase button is hidden.</li>
-    <li>Purchase, billing, and cancellation are handled entirely by the Microsoft Store. "Manage / Cancel subscription" opens the subscriptions page of your Microsoft account (a one-time purchase has nothing to cancel, so that link is hidden once you own it).</li>
-    <li>The license state is checked against your Microsoft Store license, so this only applies to the Microsoft Store build.</li>
-  </ul>
-</section>
-
-<section id="data">
-  <h2>Where your data is stored</h2>
-  <p>Settings and the cache are stored locally. Nothing is uploaded to any server.</p>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>File</th><th>Contents</th></tr></thead>
-      <tbody>
-        <tr><td><code>settings.json</code></td><td>Root folders, excluded folders, scan interval, theme, column layout, favorites, and how often you open each folder</td></tr>
-        <tr><td><code>ParallelScope.sqlite</code></td><td>Cached folder structure and file listings</td></tr>
-      </tbody>
-    </table>
+    </div>
+    <div class="card plus">
+      <h3>Plus</h3>
+      <dl class="prices">
+        <dt>Monthly subscription</dt><dd><strong>¥300</strong> / month<span class="price-note">The first week is a free trial</span></dd>
+        <dt>One-time purchase</dt><dd><strong>¥3,050</strong><span class="price-note">Pay once, no further charges</span></dd>
+      </dl>
+      <p class="price-footnote">Prices are for the Japan Store; the Microsoft Store shows the price for your region.</p>
+      <ul>
+        <li>Multiple tabs and split view</li>
+        <li>★ Favorites, 🕘 Recent, 🕒 Frequently Used</li>
+        <li>Custom file list columns</li>
+        <li>Regular expression search</li>
+        <li>In-memory file name index for faster search</li>
+        <li>CSV export of the current list</li>
+      </ul>
+    </div>
   </div>
-  <p>
-    In the Microsoft Store build they live in <code>%LOCALAPPDATA%\Packages\msmsrep.ParallelScope_77t1an0ygyrva\LocalState</code>.
-    Uninstalling the app removes them as well.
-  </p>
 </section>
 
-<section id="tips">
-  <h2>Troubleshooting</h2>
-
-  <h3>A file I just added does not show up in search</h3>
-  <p>Search reads the cache. Right-click that folder in the tree and run "Scan everything under this folder", or wait for the next automatic full scan.</p>
-
-  <h3>A file I can see in Explorer is missing from the list</h3>
-  <p>Check "Settings &gt; Display Columns" and look at "Hidden and system items". If either box is cleared, files and folders with that attribute are left out of both the list and the tree.</p>
-
-  <h3>A folder is missing from the tree</h3>
-  <p>Check "Settings &gt; Root Folders" and look at Excluded Folders — an excluded path and everything under it is hidden from the tree, the list, and search.</p>
-
-  <h3>A NAS or network drive is slow or disconnected</h3>
-  <p>Roots you cannot reach right now can still be browsed and searched from the cache. Once the connection is back, the next scan brings them up to date.</p>
-
-  <h3>A folder shows no size</h3>
-  <p>Folder totals are aggregated from scanned cache entries, so folders that have not been scanned yet show a blank size.</p>
-
-  <h3>I want different columns</h3>
-  <p>Adding, removing, and reordering columns is a Plus feature. "Settings &gt; Display Columns" links through to the Plus page.</p>
-
-  <h3>My column widths went back to the defaults</h3>
-  <p>Widths and the header order are written out when the app closes, so a forced shutdown loses the last change. They are also ignored while you do not have Plus — the saved layout returns once it is active again.</p>
-
-  <h3>There is no tab strip, and "Split View" is greyed out</h3>
-  <p><a href="#tabs">Tabs and the split view</a> are ParallelScope Plus features; they appear once you buy Plus. A saved tab layout is left untouched while you do not have Plus, so buying it brings the layout back.</p>
-
-  <h3>"Favorites", "Recent" and "Frequently Used" are missing from the tree</h3>
-  <p>All three are Plus features. They appear as soon as the Plus license is confirmed, which can take a moment after the app starts.</p>
-
-  <h3>A folder I just opened is not in "Recent"</h3>
-  <p>The node is re-sorted when the app starts and when you expand it, not after every move, so the tree does not rearrange itself while you are clicking through it. Collapse and expand it to bring it up to date — or select the node itself, which always lists the newest order. Folders already in "★ Favorites" are deliberately left out.</p>
-
-  <h3>A folder I use constantly is not in "Frequently Used"</h3>
-  <p>Folders already in "★ Favorites" are deliberately left out, and the list holds the top 10 only. It is also re-sorted when the app starts and when you expand the node, not after every move.</p>
-
-  <h3>The sizes in my exported CSV are text, not numbers</h3>
-  <p>Choose "CSV - sizes in bytes" in the "Save as type" box of the export dialog. That writes plain byte counts a spreadsheet can total.</p>
+<section id="privacy">
+  <h2>Your files stay on your PC</h2>
+  <p>Everything is processed locally. The cache and settings live in the app's own data folder, nothing is uploaded, and the full source code is public on <a href="https://github.com/msmsrep/ParallelScope">GitHub</a>.</p>
 </section>
 
 <section id="support">
@@ -541,7 +206,7 @@
 <footer>
   <div class="wrap">
     <ul>
-      <li><a href="intro.html">About ParallelScope</a></li>
+      <li><a href="guide.html">User Guide</a></li>
       <li><a href="https://github.com/msmsrep/ParallelScope">GitHub repository</a></li>
       <li><a href="https://github.com/msmsrep/ParallelScope/issues">Questions and bug reports</a></li>
       <li><a href="https://github.com/msmsrep/ParallelScope/blob/main/Readme.md">Readme</a></li>
@@ -549,7 +214,7 @@
       <li><a href="https://ko-fi.com/msmsrep">Ko-fi</a></li>
       <li><a href="https://github.com/sponsors/msmsrep">GitHub Sponsors</a></li>
     </ul>
-    <p>Screenshots were taken with ver1.4.4.0, before Favorites, Recent, Frequently Used, CSV export, and the reworked Display Columns page were added, so those do not appear in them. Later versions may look slightly different.</p>
+    <p>Screenshots come from earlier versions; the current version may look slightly different.</p>
   </div>
 </footer>
 

@@ -287,8 +287,8 @@ public partial class MainWindow : Window
         // アプリの表示言語（CurrentUICultureはAppLanguage.Applyが設定済み）に合わせてページを選ぶ
         // （ページ側にも言語の切り替えリンクがあるため、外した場合も辿り着ける）
         var url = string.Equals(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName, "ja", StringComparison.OrdinalIgnoreCase)
-            ? "https://msmsrep.github.io/ParallelScope/index.ja.html"
-            : "https://msmsrep.github.io/ParallelScope/";
+            ? "https://msmsrep.github.io/ParallelScope/guide.ja.html"
+            : "https://msmsrep.github.io/ParallelScope/guide.html";
 
         try
         {
