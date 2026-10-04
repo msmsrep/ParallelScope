@@ -14,10 +14,12 @@ dotnet build ParallelScope.csproj
 dotnet run --project ParallelScope.csproj
 dotnet publish -c Release
 dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
+pwsh scripts/ui-tests/Run-UiTests.ps1
 ```
 
-- 単体テストは `Tests/ParallelScope.Tests`（xUnit）にあります。対象はUIに依存しない層 — `Utilities/` の各ユーティリティ、`FileItemViewModel` の表示用プロパティ、`FileCacheRepository`・`AppSettingsRepository`（テスト側から一時フォルダを渡し、実際のキャッシュDB・settings.jsonには触れない）、`StoreLicenseService` の未購読側の判定、無料版とPlusの機能分け（`MainWindowViewModel.SetPlusFeaturesEnabled`）、表示言語のローカライズ（対訳表の英日の整合性と `MainWindowViewModel.ApplyLanguage`）です。`MainWindowViewModel` はリポジトリを渡す `internal` コンストラクタ経由でテストします（`AssemblyInfo.cs` の `InternalsVisibleTo`）。WPFのウィンドウのコードビハインドは対象外なので、そこに関わる変更は引き続き実機で確認してください。テストプロジェクトは本体の `.cs` グロブから除外済みです（`ParallelScope.csproj` の `DefaultItemExcludes`）。実行方法・カバー範囲・テストを書くときの決まりごとは `Tests/README.md` を参照してください。
-- 変更の検証は `dotnet build`（0警告・0エラーであることを確認）と `dotnet test` で行い、UIや操作に関わる変更については実際にビルドしたexeを起動して機能を触って確認してください（WPFアプリのためブラウザベースのプレビューは使えません）。ビルドしたexeは `bin/Debug/net10.0-windows10.0.19041.0/win-x64/ParallelScope.exe` にあります（本格的なUI自動化なしで手早く確認するなら、PowerShellの `Start-Process` / `Get-Process ... | Select MainWindowTitle` が便利です）。
+- 単体テストは `Tests/ParallelScope.Tests`（xUnit）にあります。対象はUIに依存しない層 — `Utilities/` の各ユーティリティ、`FileItemViewModel` の表示用プロパティ、`FileCacheRepository`・`AppSettingsRepository`（テスト側から一時フォルダを渡し、実際のキャッシュDB・settings.jsonには触れない）、`StoreLicenseService` の未購読側の判定、無料版とPlusの機能分け（`MainWindowViewModel.SetPlusFeaturesEnabled`）、表示言語のローカライズ（対訳表の英日の整合性と `MainWindowViewModel.ApplyLanguage`）です。`MainWindowViewModel` はリポジトリを渡す `internal` コンストラクタ経由でテストします（`AssemblyInfo.cs` の `InternalsVisibleTo`）。WPFのウィンドウのコードビハインドは対象外で、そちらはUIテスト（下記）で確かめます。テストプロジェクトは本体の `.cs` グロブから除外済みです（`ParallelScope.csproj` の `DefaultItemExcludes`）。実行方法・カバー範囲・テストを書くときの決まりごとは `Tests/README.md` を参照してください。
+- **UIテスト**は `scripts/ui-tests`（winapp CLI の `winapp ui` でビルド済みのexeを実際に操作する。PowerShell 7）にあります。シナリオごとに使い捨てのフォルダ構成と settings.json を作り、環境変数 `PARALLELSCOPE_DATA_DIR`（DEBUGビルドのみ。`AppDataPathProvider`）でアプリデータの置き場を差し替えて起動するため、実際の設定・キャッシュDBには触れません。実行中は実際のマウス・キーボード入力を使うので、PCを触れない状態で流してください。**要素はAutomationIdで指定する**ため、押す・読む要素を足したらXAMLに `AutomationProperties.AutomationId`（アイコンだけのボタンには `AutomationProperties.Name` も）を付けてください。ツリー項目・タブ・一覧の行は `AutomationProperties.Name` を表示名にバインドしてあります（無いとViewModelの型名が出る）。2画面では同じIDが2組並ぶため、ペインには位置で `Pane0` / `Pane1` を付けています（`MainWindow.SplitView.cs`）。実行方法・決まりごとは `scripts/ui-tests/README.md` を参照してください。
+- 変更の検証は `dotnet build`（0警告・0エラーであることを確認）と `dotnet test` で行い、UIや操作に関わる変更については UIテスト（`pwsh scripts/ui-tests/Run-UiTests.ps1`）を流し、必要なら該当するシナリオを足してください（WPFアプリのためブラウザベースのプレビューは使えません）。ビルドしたexeは `bin/Debug/net10.0-windows10.0.19041.0/win-x64/ParallelScope.exe` にあります。
 - EF Core のマイグレーションは `dotnet-tools.json` で宣言されたローカルツール（`dotnet-ef` 10.0.9）を使います。
   ```powershell
   dotnet tool restore
@@ -53,7 +55,7 @@ dotnet test Tests/ParallelScope.Tests/ParallelScope.Tests.csproj
   - `VirtualFolders` / `VirtualFolderKind`: ツリー最上位の仮想ノード（`Folders` / `★ Favorites` / `🕘 Recent` / `🕒 Frequently Used`）の定義。仮想パス（`::Recent::` のようにWindowsのパスに使えない `:` を含む文字列）と表示名の対訳表キーはここに集約されているので、種類を増やすときは `GetKind` / `GetPath` / `GetDisplayNameKey` を足せば呼び出し側の分岐は増えません。
   - `TreeNodes`: ツリー最上位ノードのカスタマイズ（表示/非表示・並び順）で使うキーの定義。`FileListColumns` と同じ形で、キーは `VirtualFolderKind` の名前そのまま（settings.json に保存されるためリネーム不可）。`Folders` は常に表示で並び順の対象にだけ入ります。
   - `HiddenItemVisibility`: 隠し属性・システム属性のファイル/フォルダを表示するかの判定。無料版でも使える設定で、**既定は両方とも表示**です（エクスプローラーの既定とは逆ですが、更新前から見えていたファイルが消えないことを優先しています。`AppSettings` 側もプロパティ初期化子で `true` にしてあり、この設定を持たない既存の settings.json も表示側に倒れます）。スキャンとキャッシュは属性に関わらず全件記録し、絞り込みは表示側（`BrowserTabViewModel.ToViewModels`）だけで行うため、切り替えにスキャンし直しは不要です。ツリーの子フォルダ列挙は `FolderItemViewModel.AttributesToSkip`（アプリ全体で1つの静的な値）に反映し、変更後は `FolderItemViewModel.Reload()` で読み込み済みの子を捨てて読み直します。
-  - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。
+  - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。DEBUGビルドに限り、環境変数 `PARALLELSCOPE_DATA_DIR` があればそちらを使います（UIテスト用）。
   - `FileSizeFormatter`: バイト数を `"12.3 MB"` のような表示用文字列に変換します。
   - `AppVersionProvider`: `AppxManifest.xml`（csprojの設定によりexeと同じフォルダにコピーされる）の `Identity/@Version` を読み取り、ウィンドウタイトルにバージョンを表示するために使います。
   - `AppTheme` / `AppThemeSetting`: 配色テーマ設定（System/Light/Dark）の解釈と、`Application.ThemeMode` へのアプリ全体への適用。`ThemeMode` は実験的APIのため、この中で診断 `WPF0001` を抑止しています。
