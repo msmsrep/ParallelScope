@@ -28,11 +28,12 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 
 ## テストの範囲
 
-対象は**UIに依存しない層**だけです。WPFのウィンドウ（`MainWindow` / `SettingsWindow`）のコードビハインドは対象外なので、そこに関わる変更は従来どおりビルドしたexeを起動して手で確認してください。`MainWindowViewModel` は、保存先を差し替えたリポジトリを渡すテスト用コンストラクタ（後述）を使って一部だけテストしています。
+対象は**UIに依存しない層**だけです。WPFのウィンドウ（`MainWindow` / `SettingsWindow`）のコードビハインドは対象外で、そちらは winapp CLI でexeを操作するUIテスト（`scripts/ui-tests/README.md`）で確かめます。`MainWindowViewModel` は、保存先を差し替えたリポジトリを渡すテスト用コンストラクタ（後述）を使って一部だけテストしています。
 
 | テストクラス | 対象 | 主に守っていること |
 | --- | --- | --- |
 | `Utilities/PathNormalizerTests` | `PathNormalizer` | 末尾区切りの除去、ドライブルート（`C:\`）は区切りを残す、仮想パスの正規形、`C:\Temp` が `C:\Temporary` の祖先と誤判定されないこと |
+| `Utilities/AppDataPathProviderTests` | `AppDataPathProvider` | DEBUGビルドでは環境変数 `PARALLELSCOPE_DATA_DIR` の保存先を使うこと（UIテストが実際のアプリデータから切り離すための差し替え口） |
 | `Utilities/FileSizeFormatterTests` | `FileSizeFormatter` | 単位の繰り上げ、小数第2位への丸め、TBで打ち止め |
 | `Utilities/VirtualFoldersTests` | `VirtualFolders` | 仮想ノードの種類判定（大文字小文字を無視）、正規形、表示名（対訳表キーと、言語に追従した文字列）、実在パスと衝突しない文字を含むこと |
 | `Utilities/AppThemeTests` | `AppTheme.Parse` | 未設定・不正値をOS追従（System）へ丸めること。`Apply` は `Application` が要るため対象外 |

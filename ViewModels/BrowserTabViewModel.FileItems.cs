@@ -77,7 +77,7 @@ public partial class BrowserTabViewModel
 
         // 並びは新しい一覧のとおり。既存アイテムはサイズ表示等を保持するためインスタンスを再利用する
         var mergedItems = new List<FileItemViewModel>(newItems.Count);
-        var itemsToAdd = new List<FileItemViewModel>();
+        var keptItems = new List<FileItemViewModel>(Math.Min(newItems.Count, FileItems.Count));
         var addedItemCount = 0;
 
         foreach (var newItem in newItems)
@@ -86,17 +86,12 @@ public partial class BrowserTabViewModel
             {
                 ApplyItemUpdate(existingItem, newItem);
                 mergedItems.Add(existingItem);
+                keptItems.Add(existingItem);
                 continue;
             }
 
             mergedItems.Add(newItem);
             addedItemCount++;
-
-            // 追加が閾値を超えた時点で一括差し替えが確定するため、それ以降は控えない
-            if (addedItemCount <= BulkReplaceThreshold)
-            {
-                itemsToAdd.Add(newItem);
-            }
         }
 
         if (remainingItems.Count + addedItemCount > BulkReplaceThreshold)
@@ -115,10 +110,24 @@ public partial class BrowserTabViewModel
             FileItems.Remove(item);
         }
 
-        // 追加
-        foreach (var item in itemsToAdd)
+        // 残した行どうしの並びが新しい一覧と食い違う場合は、1件ずつ動かすと件数の2乗の手間に
+        // なりうるため差し替える（並びの基準は変わらないので、通常はここに来ない）
+        if (!FileItems.SequenceEqual(keptItems, ReferenceEqualityComparer.Instance))
         {
-            FileItems.Add(item);
+            FileItems = new ObservableCollection<FileItemViewModel>(mergedItems);
+            _host.RequestMemoryTrim(replacedItemCount);
+            return;
+        }
+
+        // 追加は末尾ではなく新しい一覧での位置へ差し込む —— 末尾へ足すと、All Filesを解除して
+        // 直下一覧へ戻したときなどに「フォルダが先・名前順」の並びが崩れる。
+        // 残した行の並びは揃っているので、食い違う位置にあるのは必ず追加する行になる
+        for (var i = 0; i < mergedItems.Count; i++)
+        {
+            if (i >= FileItems.Count || !ReferenceEquals(FileItems[i], mergedItems[i]))
+            {
+                FileItems.Insert(i, mergedItems[i]);
+            }
         }
     }
 

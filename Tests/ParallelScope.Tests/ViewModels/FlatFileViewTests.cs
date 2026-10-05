@@ -151,6 +151,59 @@ public class FlatFileViewTests : IDisposable
         Assert.Equal("only.txt", tab.FileItems[0].Name);
     }
 
+    /// <summary>一覧の並びが期待どおりになるまで待つ（届かなければ失敗させる）。</summary>
+    private static void WaitForItemNames(BrowserTabViewModel tab, params string[] expectedNames)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        while (stopwatch.Elapsed < TimeSpan.FromSeconds(30))
+        {
+            if (tab.FileItems.Select(x => x.Name).SequenceEqual(expectedNames))
+            {
+                return;
+            }
+
+            Thread.Sleep(20);
+        }
+
+        Assert.Fail($"一覧が [{string.Join(", ", expectedNames)}] になりませんでした（実際は [{string.Join(", ", tab.FileItems.Select(x => x.Name))}]）");
+    }
+
+    // OFFに戻すと差分適用で直下一覧へ戻るが、その際に新しく加わる行（フォルダ）を末尾へ足すと
+    // 「フォルダが先・名前順」の並びが崩れる（UIテスト scripts/ui-tests で見つかった）
+    [Fact]
+    public void FlatFileView_TurningOffRestoresTheFolderFirstOrder()
+    {
+        var alphaPath = Path.Combine(_root.Path, "Alpha");
+        Directory.CreateDirectory(alphaPath);
+        Directory.CreateDirectory(Path.Combine(_root.Path, "Beta"));
+        File.WriteAllText(Path.Combine(alphaPath, "alpha1.txt"), "x");
+        File.WriteAllText(Path.Combine(_root.Path, "readme.txt"), "x");
+        // All Filesはキャッシュだけを引くため、ルートを開いても読み直されないAlpha配下はキャッシュへ入れておく
+        _fileCacheRepository.ReplaceEntriesByParentPath(alphaPath, new[]
+        {
+            new CachedFileSystemEntry(
+                alphaPath,
+                Path.Combine(alphaPath, "alpha1.txt"),
+                "alpha1.txt",
+                IsFolder: false,
+                SizeBytes: 1,
+                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
+                CreationTimeUtc: null,
+                Attributes: 32)
+        });
+
+        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var tab = viewModel.ActivePane.ActiveTab;
+        Assert.True(tab.NavigateTo(_root.Path, addToHistory: false));
+        WaitForItemNames(tab, "Alpha", "Beta", "readme.txt");
+
+        tab.IsFlatFileViewEnabled = true;
+        WaitForItemNames(tab, "alpha1.txt", "readme.txt");
+
+        tab.IsFlatFileViewEnabled = false;
+        WaitForItemNames(tab, "Alpha", "Beta", "readme.txt");
+    }
+
     [Fact]
     public void FlatFileView_ShowsAllFilesWhenFewerThanTheFirstBatch()
     {

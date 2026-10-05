@@ -1,4 +1,5 @@
 ﻿using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using ParallelScope.ViewModels;
 using ParallelScope.Views;
@@ -70,6 +71,7 @@ public partial class MainWindow
             Cursor = isVertical ? System.Windows.Input.Cursors.SizeWE : System.Windows.Input.Cursors.SizeNS
         };
         splitter.DragCompleted += SplitViewSplitter_DragCompleted;
+        AutomationProperties.SetAutomationId(splitter, "PaneSplitter");
 
         if (isVertical)
         {
@@ -125,6 +127,13 @@ public partial class MainWindow
 
         // ビューの並びをViewModelの並びに合わせる
         _panes.Sort((a, b) => _viewModel.Panes.IndexOf(a.ViewModel).CompareTo(_viewModel.Panes.IndexOf(b.ViewModel)));
+
+        // 2画面では同じAutomationIdの要素が2組並ぶため、UI Automation（scripts/ui-tests）が
+        // ペインを起点に探せるよう位置で名前を付ける（ペインを閉じると位置が詰まるので毎回付け直す）
+        for (var i = 0; i < _panes.Count; i++)
+        {
+            AutomationProperties.SetAutomationId(_panes[i], $"Pane{i}");
+        }
     }
 
     // スプリッターを離した時点の比率を控える（次に組み立て直すときの初期値になる）
