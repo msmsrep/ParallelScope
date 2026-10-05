@@ -119,6 +119,35 @@ dotnet ef migrations add <MigrationName>
 dotnet ef database update
 ```
 
+### Building the MSIX Package
+
+`scripts/build-msix.ps1` runs Release publish → MSIX packaging → signing → copy to `MSIX/verX.Y.Z.W/` in one go (PowerShell).
+The version is read from `Identity/@Version` in `AppxManifest.xml`, so bump it there first.
+
+Prerequisites:
+
+- [winapp CLI](https://github.com/microsoft/WinAppCli) (`winget install Microsoft.WinAppCli`)
+- For a signed package: the certificate at `.env/msmsrep.pfx` and its password in the `PARALLELSCOPE_CERT_PASSWORD` environment variable
+
+```powershell
+# Signed package (for sideloading)
+$env:PARALLELSCOPE_CERT_PASSWORD = '<password>'
+.\scripts\build-msix.ps1
+
+# Unsigned package (for Microsoft Store submission; the Store re-signs it)
+.\scripts\build-msix.ps1 -NoSign
+```
+
+The output is `MSIX/verX.Y.Z.W/ParallelScope.msix` (`MSIX/` is git-ignored).
+
+| Parameter | Description |
+| --- | --- |
+| `-NoSign` | Skip signing (for Store submission) |
+| `-Force` | Overwrite an existing package of the same version (otherwise the script stops) |
+| `-OutputRoot <path>` | Where to create the `verX.Y.Z.W` folder (default: `MSIX` at the repository root) |
+| `-CertPath <path>` | Certificate (.pfx) to sign with (default: `.env/msmsrep.pfx`) |
+| `-TimestampUrl <url>` | Timestamp server used when signing (default: `http://timestamp.digicert.com`) |
+
 ### Main Structure
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: main window (menu and the host for the panes)
