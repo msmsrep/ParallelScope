@@ -196,6 +196,31 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 切断中だったボリュームが再び見えるようになったときに、そのボリュームを表示中のタブを読み直す
+    /// （切断中はキャッシュだけで表示しており、ファイルシステムからの最新化を省いていたため）。
+    /// 非表示のタブは印だけ付けて、次に表示するときに読み直させる。
+    /// </summary>
+    public void RefreshAfterVolumeRestored(string volumeRoot)
+    {
+        foreach (var tab in AllTabs)
+        {
+            if (!string.Equals(VolumeAvailabilityTracker.GetVolumeRoot(tab.CurrentPath), volumeRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (tab.IsActive)
+            {
+                tab.RefreshCurrentFolder();
+            }
+            else
+            {
+                tab.MarkStale();
+            }
+        }
+    }
+
     /// <summary>言語切り替え後に、仮想ノードを開いているタブの見出しを引き直す。</summary>
     private void RefreshLocalizedTabNames()
     {

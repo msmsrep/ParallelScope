@@ -45,6 +45,14 @@ public partial class MainWindow : Window
         SourceInitialized += MainWindow_SourceInitialized;
         // タブのショートカットは、アドレス欄・検索欄に入力中でも効かせたいのでウィンドウ側で拾う
         PreviewKeyDown += MainWindow_PreviewKeyDown;
+        // 切断中だったNASが戻ったら、キャッシュだけで表示していた一覧を読み直す
+        VolumeAvailabilityTracker.Shared.VolumeRestored += VolumeAvailabilityTracker_VolumeRestored;
+    }
+
+    // 確認用のスレッドから呼ばれるため、UIスレッドへ移してから反映する
+    private void VolumeAvailabilityTracker_VolumeRestored(string volumeRoot)
+    {
+        Dispatcher.InvokeAsync(() => _viewModel.RefreshAfterVolumeRestored(volumeRoot));
     }
 
     // ウィンドウ表示後に自動フルスキャンを1回だけ実行し、以降は定期スキャンタイマーに切り替える
@@ -87,6 +95,7 @@ public partial class MainWindow : Window
         _scheduledFullScanTimer.Stop();
         _scheduledFullScanTimer.Tick -= ScheduledFullScanTimer_Tick;
         PreviewKeyDown -= MainWindow_PreviewKeyDown;
+        VolumeAvailabilityTracker.Shared.VolumeRestored -= VolumeAvailabilityTracker_VolumeRestored;
 
         foreach (var pane in _panes)
         {

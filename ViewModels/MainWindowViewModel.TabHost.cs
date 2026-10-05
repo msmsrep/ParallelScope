@@ -44,6 +44,9 @@ public partial class MainWindowViewModel : IBrowserTabHost
     string IBrowserTabHost.ResolvePathCasing(string normalizedPath)
         => PathCasingResolver.Resolve(normalizedPath, _rootPathsSnapshot, IsCachedFolderPath);
 
+    bool IBrowserTabHost.CanOpenOffline(string normalizedPath)
+        => _rootPathsSnapshot.Any(root => PathNormalizer.AreSame(root, normalizedPath)) || IsCachedFolderPath(normalizedPath);
+
     private bool IsCachedFolderPath(string fullPath)
     {
         try

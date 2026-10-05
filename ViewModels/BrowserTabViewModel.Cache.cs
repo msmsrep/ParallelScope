@@ -118,17 +118,27 @@ public partial class BrowserTabViewModel
     /// <summary>実際のファイルシステムを読み取ってキャッシュを置き換え、画面へ反映する。</summary>
     private async Task RefreshFromFileSystemInBackground(string folderPath, int navigationVersion)
     {
-        List<CachedFileSystemEntry> liveEntries;
+        List<CachedFileSystemEntry>? liveEntries;
 
         try
         {
-            // 列挙は専用のゲートで行う（応答しないNASがキャッシュ読みの枠を塞がないように）
-            liveEntries = await _host.FileSystemGate.RunAsync(() => _host.ReadEntriesFromFileSystem(folderPath));
+            // 列挙は専用のゲートで行う（応答しないNASがキャッシュ読みの枠を塞がないように）。
+            // つながらないと分かっているボリュームは列挙しない —— 枠の空き待ちの間に分かった場合も含めて、
+            // 列挙を始める直前に確かめる（SMBのタイムアウトまで枠とスレッドを握らせないため）
+            liveEntries = await _host.FileSystemGate.RunAsync(() =>
+                VolumeAvailabilityTracker.Shared.IsUnreachable(folderPath) ? null : _host.ReadEntriesFromFileSystem(folderPath));
         }
         catch
         {
             // 列挙失敗（NASの瞬断等）時はキャッシュ由来の表示を維持し、キャッシュも書き換えない
-            // （ここで続行すると空一覧の表示とキャッシュの空上書きにつながる）
+            // （ここで続行すると空一覧の表示とキャッシュの空上書きにつながる）。
+            // ボリュームごと見えなくなっていれば控え、以後の移動で問い合わせずに済むようにする
+            VolumeAvailabilityTracker.Shared.ReportFailure(folderPath);
+            return;
+        }
+
+        if (liveEntries is null)
+        {
             return;
         }
 

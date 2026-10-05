@@ -62,6 +62,12 @@ internal interface IBrowserTabHost
     /// </summary>
     string ResolvePathCasing(string normalizedPath);
 
+    /// <summary>
+    /// ボリュームがつながらない（切断中のNAS等）ときに、キャッシュの内容で開いてよいフォルダか
+    /// （登録済みルートか、キャッシュにフォルダとして載っているか）。バックグラウンドから呼ばれる。例外は投げない。
+    /// </summary>
+    bool CanOpenOffline(string normalizedPath);
+
     /// <summary>1フォルダ直下をファイルシステムから列挙する（除外設定を反映済み）。</summary>
     List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath);
 
