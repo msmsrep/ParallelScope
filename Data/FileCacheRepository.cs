@@ -173,6 +173,29 @@ public class FileCacheRepository
     }
 
     /// <summary>
+    /// 指定した親パス直下のキャッシュ済みフォルダだけを取得する（フォルダツリーの子の表示用）。
+    /// 直下に数万のファイルがあるフォルダでも、ファイル行を読まずに済ませる。
+    /// </summary>
+    public List<CachedFileSystemEntry> GetSubFoldersByParentPath(string parentPath)
+    {
+        using var db = CreateDbContext();
+
+        return db.FileSystemEntries
+            .AsNoTracking()
+            .Where(x => x.ParentPath == parentPath && x.IsFolder)
+            .Select(x => new CachedFileSystemEntry(
+                parentPath,
+                x.FullPath,
+                x.Name,
+                true,
+                x.SizeBytes,
+                x.LastWriteTimeUtc,
+                x.CreationTimeUtc,
+                x.Attributes))
+            .ToList();
+    }
+
+    /// <summary>
     /// 指定した表記のままのフォルダがキャッシュに載っているか（大文字小文字も区別する）。
     /// 移動先の表記が正しいかを、ファイルシステムへ問い合わせずに確かめるために使う。
     /// </summary>

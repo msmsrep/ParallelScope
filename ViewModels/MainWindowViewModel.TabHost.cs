@@ -47,6 +47,13 @@ public partial class MainWindowViewModel : IBrowserTabHost
     bool IBrowserTabHost.CanOpenOffline(string normalizedPath)
         => _rootPathsSnapshot.Any(root => PathNormalizer.AreSame(root, normalizedPath)) || IsCachedFolderPath(normalizedPath);
 
+    /// <summary>
+    /// キャッシュに載っている直下の子フォルダを返す（フォルダツリーがファイルシステムより先に表示するため。
+    /// バックグラウンドから呼ばれる）。
+    /// </summary>
+    internal IReadOnlyList<CachedFileSystemEntry> GetCachedSubFolders(string folderPath)
+        => _fileCacheRepository.GetSubFoldersByParentPath(folderPath);
+
     private bool IsCachedFolderPath(string fullPath)
     {
         try

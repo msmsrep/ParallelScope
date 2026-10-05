@@ -141,7 +141,7 @@ public partial class BrowserPaneViewModel
     /// <summary>お気に入り／最近／よく使う配下に置く、実体ツリーの複製ノードを生成する。</summary>
     private FolderItemViewModel CreateShortcutNode(string path)
     {
-        return new FolderItemViewModel(path, _shell.IsExcludedPath, isShortcut: true);
+        return new FolderItemViewModel(path, _shell.IsExcludedPath, isShortcut: true, _shell.GetCachedSubFolders);
     }
 
     /// <summary>ルートフォルダのノードを、指定のパス群へ差分更新する。</summary>
@@ -164,7 +164,7 @@ public partial class BrowserPaneViewModel
         {
             if (!existingRootPaths.Contains(rootPath))
             {
-                var newRootFolder = new FolderItemViewModel(rootPath, _shell.IsExcludedPath);
+                var newRootFolder = new FolderItemViewModel(rootPath, _shell.IsExcludedPath, getCachedSubFolders: _shell.GetCachedSubFolders);
                 // ルートフォルダは追加時に即座に読み込みを開始する（遅延展開ではなく）。
                 // ただし同期版だと切断中のNASルートでUIスレッドがSMBタイムアウトまでブロックするため、
                 // 非同期版で開始だけして先へ進む（読み込み完了までツリーにはダミーの子が表示される）

@@ -1,5 +1,6 @@
 using System.Collections.Specialized;
 using System.IO;
+using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.ViewModels;
 
@@ -101,5 +102,81 @@ public class FolderItemViewModelTests : IDisposable
         await node.EnsureLoadedAsync();
 
         Assert.Equal(new[] { "Alpha", "Beta" }, node.SubFolders.Select(x => x.DisplayName));
+    }
+
+    private static CachedFileSystemEntry CachedFolder(string parentPath, string name)
+        => new(parentPath, Path.Combine(parentPath, name), name, true, null, DateTime.UtcNow, null, null);
+
+    /// <summary>
+    /// 切断中のNASを想定し、ファイルシステムからは読めないフォルダでもキャッシュの子フォルダを出す。
+    /// 読めなかったので、次の展開で読み直せるよう読み込み済みにはしない。
+    /// </summary>
+    [Fact]
+    public async Task EnsureLoadedAsync_ShowsCachedSubFoldersWhenTheFileSystemIsUnreadable()
+    {
+        var offlinePath = Path.Combine(_root.Path, "Offline");
+        var node = new FolderItemViewModel(
+            offlinePath,
+            getCachedSubFolders: path => path == offlinePath
+                ? new[] { CachedFolder(offlinePath, "Beta"), CachedFolder(offlinePath, "Alpha") }
+                : Array.Empty<CachedFileSystemEntry>());
+
+        await node.EnsureLoadedAsync();
+        var cached = node.SubFolders;
+
+        Assert.Equal(new[] { "Alpha", "Beta" }, cached.Select(x => x.DisplayName));
+        Assert.True(node.HasSubFolders);
+
+        await node.BackgroundRefresh;
+
+        // 読み直しても（まだ読めないので）キャッシュ由来の表示が残る
+        await node.EnsureLoadedAsync();
+        await node.BackgroundRefresh;
+        Assert.Equal(new[] { "Alpha", "Beta" }, node.SubFolders.Select(x => x.DisplayName));
+    }
+
+    /// <summary>キャッシュで先に出した子は、ファイルシステムの結果で置き換えるときも使い回す（展開状態を保つため）。</summary>
+    [Fact]
+    public async Task EnsureLoadedAsync_MergesLiveSubFoldersIntoTheCachedOnes()
+    {
+        CreateSubFolders("Alpha", "Beta");
+        var node = new FolderItemViewModel(
+            _root.Path,
+            getCachedSubFolders: path => path == _root.Path
+                ? new[] { CachedFolder(_root.Path, "Alpha"), CachedFolder(_root.Path, "Stale") }
+                : Array.Empty<CachedFileSystemEntry>());
+
+        // キャッシュ由来の最初の表示を、差し替えた時点（同じスレッド）で控える
+        // （ファイルシステムの結果は裏で反映されるため、await 後に読むと既に入れ替わっていることがある）
+        List<string>? cachedNames = null;
+        FolderItemViewModel? alpha = null;
+        node.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(FolderItemViewModel.SubFolders) && cachedNames is null)
+            {
+                cachedNames = node.SubFolders.Select(x => x.DisplayName).ToList();
+                alpha = node.SubFolders[0];
+            }
+        };
+
+        await node.EnsureLoadedAsync();
+        await node.BackgroundRefresh;
+
+        Assert.Equal(new[] { "Alpha", "Stale" }, cachedNames);
+
+        Assert.Equal(new[] { "Alpha", "Beta" }, node.SubFolders.Select(x => x.DisplayName));
+        Assert.Same(alpha, node.SubFolders[0]);
+    }
+
+    /// <summary>何も出せないまま読めなかった場合は、ダミーを外しつつ展開ボタンは残す（読み直す手段を残すため）。</summary>
+    [Fact]
+    public async Task EnsureLoadedAsync_KeepsTheExpanderWhenNothingCouldBeRead()
+    {
+        var node = new FolderItemViewModel(Path.Combine(_root.Path, "Missing"));
+
+        await node.EnsureLoadedAsync();
+
+        Assert.True(node.HasSubFolders);
+        Assert.Empty(node.SubFolders);
     }
 }
