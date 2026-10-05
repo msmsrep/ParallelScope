@@ -89,14 +89,20 @@ public sealed class FileNameIndex
     /// <summary>
     /// 索引を作り直す（バックグラウンドから呼ぶこと。150万件で2秒強かかる）。
     /// 出来上がった索引を差し替えたら true、途中で <see cref="Clear"/> された・別の組み立てに
-    /// 追い越された・組み立て中に変更が多すぎた場合は差し替えずに false を返す。
+    /// 追い越された・組み立て中に変更が多すぎた場合・<paramref name="shouldPublish"/> が false を返した場合は
+    /// 差し替えずに false を返す。
     /// </summary>
+    /// <param name="shouldPublish">
+    /// 差し替える直前に（<see cref="Clear"/> と同じロックの内側で）呼び、まだ索引を使う状態かを確かめる。
+    /// 呼び出し側が「使う状態か」を確かめてからここで控えを取り始めるまでの間に <see cref="Clear"/> が入ると、
+    /// この組み立ては Clear を知らないまま差し替えてしまうため、使う状態かを差し替えの時点で確かめ直させる。
+    /// </param>
     /// <remarks>
     /// 変更の控えは読み出しの前から取り始める。読み終えてから控え直すと、読み出し中（150万件で約1秒）に
     /// 書き換わった親フォルダを取りこぼし、次の作り直しまで検索結果が古いままになるため。
     /// 読む前に控え始めた分は、実際には読み出しに間に合っていても引き直すだけなので害はない。
     /// </remarks>
-    public bool Build()
+    public bool Build(Func<bool>? shouldPublish = null)
     {
         var changes = new ChangeLog();
         lock (_changeGate)
@@ -134,7 +140,7 @@ public sealed class FileNameIndex
             }
 
             _buildChanges = null;
-            if (changes.Overflowed)
+            if (changes.Overflowed || shouldPublish?.Invoke() == false)
             {
                 return false;
             }

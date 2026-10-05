@@ -23,6 +23,12 @@ public partial class MainWindowViewModel
     /// </summary>
     private int _isNameIndexBuildRequested;
 
+    /// <summary>
+    /// 走っている（最後に走らせた）組み立てループ。組み立て中に来た要求もこのループが拾うので、
+    /// これを待てば受け付けた要求はすべて処理済みになる（単体テストで待つため）。
+    /// </summary>
+    internal Task NameIndexBuildTask { get; private set; } = Task.CompletedTask;
+
     /// <summary>ファイル名索引の設定が有効か（購読状態は問わない。設定画面へ返す値）。</summary>
     public bool GetNameIndexEnabled() => _isNameIndexEnabled;
 
@@ -60,7 +66,7 @@ public partial class MainWindowViewModel
             return;
         }
 
-        _ = Task.Run(RunNameIndexBuildLoop);
+        NameIndexBuildTask = Task.Run(RunNameIndexBuildLoop);
     }
 
     /// <summary>要求の印が残っている限り組み立てを繰り返す（組み立て中に来た要求を取りこぼさない）。</summary>
@@ -79,7 +85,9 @@ public partial class MainWindowViewModel
 
                 try
                 {
-                    if (_fileNameIndex.Build())
+                    // 使う状態かは差し替えの直前にも確かめ直させる（上の確認のあとに無効化が割り込みうるため。
+                    // 無効化側は設定値を書いてから Clear するので、Clear より後の差し替えは必ず無効を見る）
+                    if (_fileNameIndex.Build(() => ShouldUseNameIndex))
                     {
                         // 並べ替え前の配列（150万件で80MB規模）はここで用済みになる。
                         // LOHに残ったままだとコミット済みのワーキングセットが積み上がるため回収を予約する

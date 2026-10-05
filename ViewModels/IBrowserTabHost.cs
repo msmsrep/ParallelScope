@@ -20,6 +20,12 @@ internal interface IBrowserTabHost
     /// <summary>タブの背景処理の同時実行数を絞るゲート（アプリ全体で1インスタンス）。</summary>
     BackgroundWorkGate BackgroundGate { get; }
 
+    /// <summary>
+    /// ファイルシステムの列挙専用のゲート（アプリ全体で1インスタンス）。応答しないNASへの列挙が
+    /// <see cref="BackgroundGate"/> の枠を握り続けてキャッシュ読みを止めないよう、枠を分けてある。
+    /// </summary>
+    BackgroundWorkGate FileSystemGate { get; }
+
     /// <summary>全ペイン合わせて開いているタブの本数（1タブが抱えてよい一覧の件数を決めるのに使う）。</summary>
     int TotalTabCount { get; }
 
@@ -55,6 +61,12 @@ internal interface IBrowserTabHost
     /// （バックグラウンドから呼ばれる。例外は投げない）。
     /// </summary>
     string ResolvePathCasing(string normalizedPath);
+
+    /// <summary>
+    /// ボリュームがつながらない（切断中のNAS等）ときに、キャッシュの内容で開いてよいフォルダか
+    /// （登録済みルートか、キャッシュにフォルダとして載っているか）。バックグラウンドから呼ばれる。例外は投げない。
+    /// </summary>
+    bool CanOpenOffline(string normalizedPath);
 
     /// <summary>1フォルダ直下をファイルシステムから列挙する（除外設定を反映済み）。</summary>
     List<CachedFileSystemEntry> ReadEntriesFromFileSystem(string folderPath);

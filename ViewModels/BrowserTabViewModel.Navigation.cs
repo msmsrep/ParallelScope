@@ -162,8 +162,9 @@ public partial class BrowserTabViewModel
         }
 
         // 切断中のNASでもUIを固めないよう、存在確認はタイムアウト付きで行う。
-        // タイムアウト時は存在する扱いで進み、キャッシュからの表示（LoadFromCacheAsync）に任せる。
+        // タイムアウト時・ボリュームごと見えない時は存在する扱いで進み、キャッシュからの表示（LoadFromCacheAsync）に任せる。
         // 実際に読めない場合はバックグラウンド更新が何もせず終わるだけで、キャッシュ由来の一覧は閲覧できる。
+        // 一度つながらないと分かったボリュームは復帰まで問い合わせない（VolumeAvailabilityTracker）ので、待つのは最初の1回だけ。
         // あわせて大文字小文字を実際の表記へそろえる —— 入力の表記のまま開くと、同じフォルダの中身が
         // 別の親パスとしてキャッシュに二重に書き込まれる（PathCasingResolver 参照）
         if (string.IsNullOrWhiteSpace(folderPath))
@@ -171,7 +172,7 @@ public partial class BrowserTabViewModel
             return false;
         }
 
-        var resolvedPath = DirectoryAvailabilityChecker.ResolveExistingOrTimedOut(folderPath, _host.ResolvePathCasing);
+        var resolvedPath = DirectoryAvailabilityChecker.ResolveExistingOrTimedOut(folderPath, _host.ResolvePathCasing, _host.CanOpenOffline);
         if (resolvedPath is null)
         {
             return false;

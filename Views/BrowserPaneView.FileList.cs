@@ -135,7 +135,7 @@ public partial class BrowserPaneView
     }
 
     // ダブルクリック時、フォルダなら中へ移動、ファイルなら関連付けアプリで開く
-    private void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private async void FileListDataGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (sender is not DataGrid dataGrid)
         {
@@ -156,18 +156,36 @@ public partial class BrowserPaneView
             return;
         }
 
+        if (VolumeAvailabilityTracker.Shared.IsUnreachable(item.FullPath))
+        {
+            MessageBox.Show(UiText.Get("File.VolumeUnreachable"), UiText.Get("Dialog.Error"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         try
         {
-            Process.Start(new ProcessStartInfo
+            // シェルでの起動はUIスレッドで行わない —— NAS上のファイルではシェルが応答するまで（切断中はSMBの
+            // タイムアウトまで）戻らず、その間アプリ全体が固まるため
+            await RunBlockingAsync(() => Process.Start(new ProcessStartInfo
             {
                 FileName = item.FullPath,
                 UseShellExecute = true
-            });
+            }));
         }
         catch (Exception ex)
         {
+            VolumeAvailabilityTracker.Shared.ReportFailure(item.FullPath);
             MessageBox.Show(UiText.Format("File.OpenFailed", ex.Message), UiText.Get("Dialog.Error"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    /// <summary>
+    /// ブロックしうる処理（NAS上のパスへの問い合わせ・シェルでの起動）をバックグラウンドで行う。
+    /// スレッドプールを使わないのは、切断中はSMBのタイムアウトまでスレッドを握るため。
+    /// </summary>
+    private static Task<T> RunBlockingAsync<T>(Func<T> work)
+    {
+        return Task.Factory.StartNew(work, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
     }
 
     // 中クリックされたフォルダ行を新しいタブで開く
@@ -439,29 +457,44 @@ public partial class BrowserPaneView
     }
 
     // 選択中のアイテムの親フォルダをWindowsのエクスプローラーで開き、アイテムを選択状態にする
-    private void OpenParentFolderMenuItem_Click(object sender, RoutedEventArgs e)
+    private async void OpenParentFolderMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (GetSelectedFileItem() is not { } item)
         {
             return;
         }
 
+        if (VolumeAvailabilityTracker.Shared.IsUnreachable(item.FullPath))
+        {
+            MessageBox.Show(UiText.Get("File.VolumeUnreachable"), UiText.Get("ParentFolder.Caption"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         try
         {
             // /select は対象の親フォルダを開いて対象を選択する。パスが存在しない場合でも
-            // explorer.exe は既定フォルダを開くだけでエラーにならないため、事前に存在確認する
-            if (!File.Exists(item.FullPath) && !Directory.Exists(item.FullPath))
+            // explorer.exe は既定フォルダを開くだけでエラーにならないため、事前に存在確認する。
+            // 確認はUIスレッドで行わない（切断中のNASではSMBのタイムアウトまで戻らないため）
+            var fullPath = item.FullPath;
+            var exists = await RunBlockingAsync(() => File.Exists(fullPath) || Directory.Exists(fullPath));
+            if (!exists)
             {
-                MessageBox.Show(UiText.Get("ParentFolder.Missing"), UiText.Get("ParentFolder.Caption"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                // 見えないのが項目だけか、ボリュームごと（切断中）かで案内を分ける
+                var isVolumeReachable = await RunBlockingAsync(() => VolumeAvailabilityTracker.Shared.CheckVolume(fullPath));
+                MessageBox.Show(
+                    UiText.Get(isVolumeReachable ? "ParentFolder.Missing" : "File.VolumeUnreachable"),
+                    UiText.Get("ParentFolder.Caption"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
                 return;
             }
 
-            Process.Start(new ProcessStartInfo
+            await RunBlockingAsync(() => Process.Start(new ProcessStartInfo
             {
                 FileName = "explorer.exe",
-                Arguments = $"/select,\"{item.FullPath}\"",
+                Arguments = $"/select,\"{fullPath}\"",
                 UseShellExecute = true
-            });
+            }));
         }
         catch (Exception ex)
         {

@@ -35,10 +35,27 @@ public partial class MainWindowViewModel
 
         // スキャン対象は実在する（かつ除外されていない）ルートのみ。
         // 掃除の基準には全ルートを渡し、切断中のドライブ等のキャッシュを誤削除しないようにする。
-        // 切断中のNASルートへの Directory.Exists はUIスレッドを長時間ブロックしうるため、選別はバックグラウンドで行う
+        // 切断中のNASルートへの Directory.Exists はUIスレッドを長時間ブロックしうるため、選別はバックグラウンドで行う。
+        // つながらないと分かっているボリュームは確かめもせず飛ばし、残りは並列に確かめる
+        // （切断中のルートが複数あると、1本ずつではSMBのタイムアウトが積み上がるため）
+        var volumes = VolumeAvailabilityTracker.Shared;
         var scannableRootPaths = await Task.Run(
             () => allConfiguredRootPaths
-                .Where(path => Directory.Exists(path) && !IsExcludedPath(path))
+                .Where(path => !IsExcludedPath(path) && !volumes.IsUnreachable(path))
+                .AsParallel()
+                .AsOrdered()
+                .WithDegreeOfParallelism(Math.Max(1, Math.Min(allConfiguredRootPaths.Count, 8)))
+                .Where(path =>
+                {
+                    if (Directory.Exists(path))
+                    {
+                        return true;
+                    }
+
+                    // ボリュームごと見えなければ控え、移動やツリーの展開で問い合わせずに済むようにする
+                    volumes.ReportFailure(path);
+                    return false;
+                })
                 .ToList(),
             token);
 
@@ -68,6 +85,11 @@ public partial class MainWindowViewModel
 
         // Directory.Exists は切断中のNASで長時間ブロックしうるため、呼び出し元（UIスレッド）ではなくバックグラウンドで確認する。
         // ルート外の掃除はフルスキャン時のみ行うため、ここでは null を渡す
+        if (VolumeAvailabilityTracker.Shared.IsUnreachable(folderPath))
+        {
+            return Task.FromResult(0);
+        }
+
         return Task.Run(() => Directory.Exists(folderPath) ? ScanFolderSubtrees(new[] { folderPath }, null) : 0);
     }
 
@@ -233,7 +255,16 @@ public partial class MainWindowViewModel
 
                 if (entries is null)
                 {
-                    // 列挙に失敗したフォルダはキャッシュを書き換えず（空と区別がつかないため）、失敗原因で扱いを分ける
+                    // 列挙に失敗したフォルダはキャッシュを書き換えず（空と区別がつかないため）、失敗原因で扱いを分ける。
+                    // ボリュームがつながらないと分かっていれば、確かめるまでもなく切断として打ち切る
+                    // （切断中は Directory.Exists 1回ごとにSMBのタイムアウトまで待たされるため）
+                    if (VolumeAvailabilityTracker.Shared.IsUnreachable(rootPath))
+                    {
+                        completed = false;
+                        abortScan = true;
+                        break;
+                    }
+
                     if (Directory.Exists(normalizedPath))
                     {
                         // フォルダは見えるのに列挙できない（一時的なI/Oエラー等）。配下が未訪問のまま残り
@@ -246,6 +277,7 @@ public partial class MainWindowViewModel
                     {
                         // ルートごと見えない＝ネットワーク切断とみなし、このルートを未完走として打ち切る
                         // （完走扱いにすると未訪問フォルダのキャッシュが残骸として削除されてしまう）
+                        VolumeAvailabilityTracker.Shared.ReportFailure(rootPath);
                         completed = false;
                         abortScan = true;
                         break;

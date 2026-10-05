@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
+using ParallelScope.Data;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
@@ -36,6 +37,12 @@ public class FolderItemViewModel : ObservableObject
 
     private readonly string _path;
     private readonly Func<string, bool>? _isExcludedPath;
+    private readonly Func<string, IReadOnlyList<CachedFileSystemEntry>>? _getCachedSubFolders;
+    // 読み込みの世代。Reload で読み直しが始まったら、古い読み込みの結果は反映しない
+    private int _loadVersion;
+
+    /// <summary>キャッシュで先に表示したあと裏で続けている、ファイルシステムからの読み直し（単体テストで待つため）。</summary>
+    internal Task BackgroundRefresh { get; private set; } = Task.CompletedTask;
     private readonly bool _isShortcut;
     private ObservableCollection<FolderItemViewModel>? _subFolders;
     private bool _isScanning;
@@ -120,10 +127,19 @@ public class FolderItemViewModel : ObservableObject
         OnPropertyChanged(nameof(SubFolders));
     }
 
-    public FolderItemViewModel(string path, Func<string, bool>? isExcludedPath = null, bool isShortcut = false)
+    /// <param name="getCachedSubFolders">
+    /// キャッシュDBに載っている直下の子フォルダを返す（バックグラウンドから呼ばれる。省略時はファイルシステムだけを読む）。
+    /// 子ノードにも引き継ぐ。
+    /// </param>
+    public FolderItemViewModel(
+        string path,
+        Func<string, bool>? isExcludedPath = null,
+        bool isShortcut = false,
+        Func<string, IReadOnlyList<CachedFileSystemEntry>>? getCachedSubFolders = null)
     {
         _path = path;
         _isExcludedPath = isExcludedPath;
+        _getCachedSubFolders = getCachedSubFolders;
         _isShortcut = isShortcut;
         DisplayName = GetDisplayName(path);
         IconSource = WindowsShellIconProvider.GetFolderSmallIcon();
@@ -133,10 +149,7 @@ public class FolderItemViewModel : ObservableObject
         if (!string.IsNullOrEmpty(path))
         {
             HasSubFolders = true;
-            _subFolders = new ObservableCollection<FolderItemViewModel>();
-            var dummy = new FolderItemViewModel(string.Empty, null);
-            dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
-            _subFolders.Add(dummy);
+            _subFolders = new ObservableCollection<FolderItemViewModel> { CreatePlaceholder() };
         }
     }
 
@@ -178,6 +191,9 @@ public class FolderItemViewModel : ObservableObject
     /// 子フォルダを遅延読み込みする。列挙は必ずバックグラウンドで行う
     /// —— 子が2万を超えるフォルダでは列挙だけでUIスレッドが数百msブロックされるため、
     /// パス遡査のような「すぐ結果が要る」経路も含めて同期版は持たない。
+    /// キャッシュDBに子フォルダが載っていれば先にそれを出して返り、ファイルシステムの読み直しは裏で続ける
+    /// —— 切断中のNASではファイルシステムの列挙がSMBのタイムアウト（数十秒）まで戻らず、
+    /// その間ツリーが「読み込み中...」のまま展開もパスの追従もできなくなるため（ファイル一覧と同じ2段構え）。
     /// </summary>
     public async Task EnsureLoadedAsync()
     {
@@ -187,19 +203,78 @@ public class FolderItemViewModel : ObservableObject
         }
 
         _isLoaded = true;
+        var version = ++_loadVersion;
 
-        // バックグラウンドスレッドで子フォルダリストを構築
-        var subDirs = await Task.Run(GetSubFoldersList);
-
-        // UIスレッドに戻ってコレクションを更新（単体テストなど Application が無い場合はそのまま反映する）
-        var dispatcher = Application.Current?.Dispatcher;
-        if (dispatcher is null)
+        if (_getCachedSubFolders is not null)
         {
-            ApplySubFolders(subDirs);
+            var cachedSubFolders = await Task.Run(GetCachedSubFoldersList);
+            if (version != _loadVersion)
+            {
+                return;
+            }
+
+            if (cachedSubFolders.Count > 0)
+            {
+                await RunOnUiThreadAsync(() => MergeSubFolders(cachedSubFolders));
+                BackgroundRefresh = RefreshFromFileSystemAsync(version);
+                return;
+            }
+        }
+
+        await RefreshFromFileSystemAsync(version);
+    }
+
+    /// <summary>ファイルシステムから子フォルダを読み直して反映する。読めなければ今の表示（キャッシュ由来）を残す。</summary>
+    private async Task RefreshFromFileSystemAsync(int version)
+    {
+        List<FolderItemViewModel>? subDirs = null;
+
+        // つながらないと分かっているボリュームには問い合わせない
+        if (!VolumeAvailabilityTracker.Shared.IsUnreachable(_path))
+        {
+            // 列挙はスレッドプールを使わない —— 応答しない共有ではSMBのタイムアウトまでスレッドを握るため
+            subDirs = await Task.Factory.StartNew(
+                GetSubFoldersListOrNull,
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+        }
+
+        await RunOnUiThreadAsync(() =>
+        {
+            // 待っている間に Reload された（条件が変わった）なら、古い条件の結果は捨てる
+            if (version != _loadVersion)
+            {
+                return;
+            }
+
+            if (subDirs is not null)
+            {
+                MergeSubFolders(subDirs);
+                return;
+            }
+
+            // 読めなかった（切断中など）。キャッシュ由来の表示はそのまま残し、次の展開で読み直させる。
+            // 何も出せていなければダミーだけ外し、展開ボタンは残す（消すと読み直す手段がなくなる）
+            _isLoaded = false;
+            if (IsShowingPlaceholder())
+            {
+                SetSubFolders(Array.Empty<FolderItemViewModel>());
+            }
+        });
+    }
+
+    /// <summary>UIスレッドで処理する（単体テストなど Application が無い場合はそのまま実行する）。</summary>
+    private static async Task RunOnUiThreadAsync(Action action)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+        {
+            action();
             return;
         }
 
-        await dispatcher.InvokeAsync(() => ApplySubFolders(subDirs));
+        await dispatcher.InvokeAsync(action);
     }
 
     /// <summary>
@@ -216,10 +291,10 @@ public class FolderItemViewModel : ObservableObject
         }
 
         _isLoaded = false;
+        // 読み込み途中の結果は古い条件で作られているので捨てさせる
+        _loadVersion++;
 
-        var dummy = new FolderItemViewModel(string.Empty, null);
-        dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
-        SetSubFolders(new[] { dummy });
+        SetSubFolders(new[] { CreatePlaceholder() });
         HasSubFolders = true;
 
         if (IsExpanded)
@@ -228,8 +303,41 @@ public class FolderItemViewModel : ObservableObject
         }
     }
 
-    /// <summary>直下の子フォルダ一覧を取得する。アクセス不可などの場合は空リストを返す。</summary>
-    private List<FolderItemViewModel> GetSubFoldersList()
+    private static FolderItemViewModel CreatePlaceholder()
+    {
+        var dummy = new FolderItemViewModel(string.Empty, null);
+        dummy.SetLocalizedDisplayName(LoadingDisplayNameKey);
+        return dummy;
+    }
+
+    /// <summary>まだ実際の子を1つも出していない（ダミーだけ、または空）か。</summary>
+    private bool IsShowingPlaceholder()
+    {
+        return _subFolders is null || _subFolders.All(x => string.IsNullOrEmpty(x._path));
+    }
+
+    /// <summary>キャッシュDBに載っている直下の子フォルダを、ファイルシステムからの列挙と同じ条件・並びで返す。</summary>
+    private List<FolderItemViewModel> GetCachedSubFoldersList()
+    {
+        try
+        {
+            var attributesToSkip = AttributesToSkip;
+            return _getCachedSubFolders!(_path)
+                .Where(entry => entry.Attributes is not { } attributes || ((FileAttributes)attributes & attributesToSkip) == 0)
+                .Where(entry => _isExcludedPath?.Invoke(entry.FullPath) != true)
+                .OrderBy(entry => entry.Name)
+                .Select(entry => CreateChild(entry.FullPath))
+                .ToList();
+        }
+        catch
+        {
+            // キャッシュが読めなければファイルシステム側に任せる
+            return new List<FolderItemViewModel>();
+        }
+    }
+
+    /// <summary>直下の子フォルダ一覧を取得する。フォルダ自体を読めない場合（切断・アクセス権なし等）は null を返す。</summary>
+    private List<FolderItemViewModel>? GetSubFoldersListOrNull()
     {
         try
         {
@@ -238,23 +346,89 @@ public class FolderItemViewModel : ObservableObject
                 .EnumerateDirectories("*", _nonRecursiveEnumerationOptions)
                 .Where(d => _isExcludedPath?.Invoke(d.FullName) != true)
                 .OrderBy(d => d.Name)
-                .Select(d => new FolderItemViewModel(d.FullName, _isExcludedPath, _isShortcut))
+                .Select(d => CreateChild(d.FullName))
                 .ToList();
         }
         catch
         {
-            // アクセス権限がない場合などはスキップ
-            return new List<FolderItemViewModel>();
+            // ボリュームごと見えなくなっていれば控え、以後は問い合わせずに済ませる
+            VolumeAvailabilityTracker.Shared.ReportFailure(_path);
+            return null;
         }
     }
 
-    /// <summary>取得した子フォルダ一覧をコレクションへ反映する（遅延読み込み中のダミーもここで消える）。</summary>
-    private void ApplySubFolders(List<FolderItemViewModel> subDirs)
+    private FolderItemViewModel CreateChild(string fullPath)
     {
-        SetSubFolders(subDirs);
+        return new FolderItemViewModel(fullPath, _isExcludedPath, _isShortcut, _getCachedSubFolders);
+    }
 
-        // サブフォルダがない場合、展開ボタンを表示しない
-        HasSubFolders = subDirs.Count > 0;
+    /// <summary>
+    /// 取得した子フォルダ一覧を反映する（遅延読み込み中のダミーもここで消える）。
+    /// 既に出ている子と同じフォルダは既存のノードを使い回す —— キャッシュ由来の表示をファイルシステムの結果で
+    /// 置き換えるときに作り直すと、展開済みの孫や展開状態が失われるため。
+    /// 差が少なければその場で足し引きし、多ければコレクションごと差し替える（件数分の通知を避ける。<see cref="SetSubFolders"/>）。
+    /// </summary>
+    private void MergeSubFolders(List<FolderItemViewModel> loaded)
+    {
+        HasSubFolders = loaded.Count > 0;
+
+        if (IsShowingPlaceholder())
+        {
+            SetSubFolders(loaded);
+            return;
+        }
+
+        var current = _subFolders!;
+        var currentByPath = new Dictionary<string, FolderItemViewModel>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in current)
+        {
+            currentByPath.TryAdd(item._path, item);
+        }
+
+        var target = loaded
+            .Select(item => currentByPath.GetValueOrDefault(item._path) ?? item)
+            .ToList();
+
+        if (target.Count == current.Count && target.Zip(current).All(pair => ReferenceEquals(pair.First, pair.Second)))
+        {
+            return;
+        }
+
+        const int maxInPlaceChanges = 100;
+        var targetSet = new HashSet<FolderItemViewModel>(target, ReferenceEqualityComparer.Instance);
+        var removedCount = current.Count(item => !targetSet.Contains(item));
+        var addedCount = target.Count - (current.Count - removedCount);
+        if (removedCount + addedCount > maxInPlaceChanges)
+        {
+            SetSubFolders(target);
+            return;
+        }
+
+        for (var i = current.Count - 1; i >= 0; i--)
+        {
+            if (!targetSet.Contains(current[i]))
+            {
+                current.RemoveAt(i);
+            }
+        }
+
+        var kept = new HashSet<FolderItemViewModel>(current, ReferenceEqualityComparer.Instance);
+        for (var i = 0; i < target.Count; i++)
+        {
+            if (i < current.Count && ReferenceEquals(current[i], target[i]))
+            {
+                continue;
+            }
+
+            if (kept.Contains(target[i]))
+            {
+                // 残した子の並びが入れ替わっている（足し引きでは合わせられない）
+                SetSubFolders(target);
+                return;
+            }
+
+            current.Insert(i, target[i]);
+        }
     }
 
     private static string GetDisplayName(string path)

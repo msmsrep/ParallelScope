@@ -17,6 +17,8 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     BackgroundWorkGate IBrowserTabHost.BackgroundGate => _backgroundWorkGate;
 
+    BackgroundWorkGate IBrowserTabHost.FileSystemGate => _fileSystemWorkGate;
+
     int IBrowserTabHost.TotalTabCount => AllTabs.Count();
 
     void IBrowserTabHost.RequestMemoryTrim(int replacedItemCount) => RequestMemoryTrim(replacedItemCount);
@@ -41,6 +43,16 @@ public partial class MainWindowViewModel : IBrowserTabHost
     // ルート一覧は参照ごと差し替えられるだけなので、バックグラウンドから読んでもよい
     string IBrowserTabHost.ResolvePathCasing(string normalizedPath)
         => PathCasingResolver.Resolve(normalizedPath, _rootPathsSnapshot, IsCachedFolderPath);
+
+    bool IBrowserTabHost.CanOpenOffline(string normalizedPath)
+        => _rootPathsSnapshot.Any(root => PathNormalizer.AreSame(root, normalizedPath)) || IsCachedFolderPath(normalizedPath);
+
+    /// <summary>
+    /// キャッシュに載っている直下の子フォルダを返す（フォルダツリーがファイルシステムより先に表示するため。
+    /// バックグラウンドから呼ばれる）。
+    /// </summary>
+    internal IReadOnlyList<CachedFileSystemEntry> GetCachedSubFolders(string folderPath)
+        => _fileCacheRepository.GetSubFoldersByParentPath(folderPath);
 
     private bool IsCachedFolderPath(string fullPath)
     {
