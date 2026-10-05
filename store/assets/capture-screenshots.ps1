@@ -117,6 +117,11 @@ function Capture($handle, $path) {
     $w = $rect.Right - $rect.Left
     $h = $rect.Bottom - $rect.Top
 
+    # マウスが一覧の上に残っているとセルのツールチップが写り込むため、ウィンドウの外（画面の右下隅）へ逃がす
+    $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+    [System.Windows.Forms.Cursor]::Position = New-Object System.Drawing.Point ($screen.Right - 1), ($screen.Bottom - 1)
+    Start-Sleep -Milliseconds 800
+
     $window = New-Object System.Drawing.Bitmap $w, $h
     $graphics = [System.Drawing.Graphics]::FromImage($window)
     $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $window.Size)
@@ -485,9 +490,10 @@ try {
                     }
 
                     # ツリーに残るキーボードフォーカスの黒枠が写らないよう、
-                    # 最後にアドレス欄へフォーカスを戻してから撮る
+                    # 最後に検索欄へフォーカスを移してから撮る。アドレス欄はパス全体のツールチップを持ち、
+                    # キーボードフォーカスでも出るため写り込む
                     [void][Win]::SetForegroundWindow($handle)
-                    $addressBox.SetFocus()
+                    $searchBox.SetFocus()
                     Start-Sleep -Milliseconds 800
 
                     $size = Capture $handle (Join-Path $output $shot.File)
