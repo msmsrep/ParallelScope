@@ -17,6 +17,8 @@ public partial class MainWindowViewModel : IBrowserTabHost
 
     BackgroundWorkGate IBrowserTabHost.BackgroundGate => _backgroundWorkGate;
 
+    BackgroundWorkGate IBrowserTabHost.FileSystemGate => _fileSystemWorkGate;
+
     int IBrowserTabHost.TotalTabCount => AllTabs.Count();
 
     void IBrowserTabHost.RequestMemoryTrim(int replacedItemCount) => RequestMemoryTrim(replacedItemCount);

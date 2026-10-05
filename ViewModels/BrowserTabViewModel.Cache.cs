@@ -122,7 +122,8 @@ public partial class BrowserTabViewModel
 
         try
         {
-            liveEntries = await _host.BackgroundGate.RunAsync(() => _host.ReadEntriesFromFileSystem(folderPath));
+            // 列挙は専用のゲートで行う（応答しないNASがキャッシュ読みの枠を塞がないように）
+            liveEntries = await _host.FileSystemGate.RunAsync(() => _host.ReadEntriesFromFileSystem(folderPath));
         }
         catch
         {

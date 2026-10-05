@@ -24,6 +24,9 @@ public partial class MainWindowViewModel : ObservableObject
     // タブの背景処理の同時実行数を絞るゲート。タブごとのコアレサーはタブ内でしか統合しないため、
     // タブ数ぶんの処理が一斉に走らないようアプリ全体で本数を抑える
     private readonly BackgroundWorkGate _backgroundWorkGate = new(BackgroundWorkGate.DefaultMaxConcurrency);
+    // ファイルシステムの列挙専用のゲート。切断中のNASへの列挙はSMBのタイムアウト（数十秒）まで枠を握るため、
+    // キャッシュ読みと同じ枠を使うと、NASのフォルダを数回開くだけで全タブのキャッシュ表示まで待たされる
+    private readonly BackgroundWorkGate _fileSystemWorkGate = new(BackgroundWorkGate.DefaultMaxConcurrency);
     private int _fullScanIntervalHours = AppSettings.DefaultFullScanIntervalHours;
     private HashSet<string> _excludedPaths = new(StringComparer.OrdinalIgnoreCase);
     // 除外判定用に、除外パスと「区切り文字付きの接頭辞」を作り置きした配列（SetExcludedPathsで更新）
