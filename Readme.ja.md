@@ -118,6 +118,35 @@ dotnet ef migrations add <MigrationName>
 dotnet ef database update
 ```
 
+### MSIXパッケージの作成
+
+`scripts/build-msix.ps1`（PowerShell）で、Release発行 → MSIX化 → 署名 → `MSIX/verX.Y.Z.W/` への配置までを一括で行います。
+バージョンは `AppxManifest.xml` の `Identity/@Version` から読むので、先にそちらを上げておいてください。
+
+事前準備:
+
+- [winapp CLI](https://github.com/microsoft/WinAppCli)（`winget install Microsoft.WinAppCli`）
+- 署名する場合は、証明書 `.env/msmsrep.pfx` と、そのパスワードを入れた環境変数 `PARALLELSCOPE_CERT_PASSWORD`
+
+```powershell
+# 署名済みパッケージ（サイドロード用）
+$env:PARALLELSCOPE_CERT_PASSWORD = '<パスワード>'
+.\scripts\build-msix.ps1
+
+# 未署名パッケージ（Microsoft Store 提出用。ストア側で署名し直されます）
+.\scripts\build-msix.ps1 -NoSign
+```
+
+出力先は `MSIX/verX.Y.Z.W/ParallelScope.msix` です（`MSIX/` は .gitignore 対象）。
+
+| パラメーター | 説明 |
+| --- | --- |
+| `-NoSign` | 署名しない（ストア提出用） |
+| `-Force` | 同じバージョンのパッケージが既にあっても上書きする（指定しないとエラーで止まります） |
+| `-OutputRoot <パス>` | `verX.Y.Z.W` フォルダを作る場所（既定はリポジトリ直下の `MSIX`） |
+| `-CertPath <パス>` | 署名に使う証明書（.pfx）（既定は `.env/msmsrep.pfx`） |
+| `-TimestampUrl <URL>` | 署名時のタイムスタンプサーバー（既定は `http://timestamp.digicert.com`） |
+
 ### 主な構成
 
 - `MainWindow.xaml` / `MainWindow.xaml.cs`: メイン画面（メニューとペインの置き場）
