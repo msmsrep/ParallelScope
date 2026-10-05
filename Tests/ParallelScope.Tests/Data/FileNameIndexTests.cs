@@ -230,6 +230,20 @@ public class FileNameIndexTests : IDisposable
         Assert.Null(_index.SearchUnderPath(@"C:\Root", Substring("readme")));
     }
 
+    // 使う状態かを確かめてから組み立てを始めるまでの間に無効化（Clear）が割り込むと、組み立て側はそれを知らない。
+    // 差し替えの直前に確かめ直し、使わない状態なら出来上がりを捨てる
+    [Fact]
+    public void Build_DiscardsTheResultWhenItShouldNoLongerBePublished()
+    {
+        SeedTree();
+
+        Assert.False(_index.Build(shouldPublish: () => false));
+        Assert.False(_index.IsReady);
+
+        Assert.True(_index.Build(shouldPublish: () => true));
+        Assert.True(_index.IsReady);
+    }
+
     [Fact]
     public void Clear_MakesTheIndexUnusableSoSearchFallsBackToTheDatabase()
     {

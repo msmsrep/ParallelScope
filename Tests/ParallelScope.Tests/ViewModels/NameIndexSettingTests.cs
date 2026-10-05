@@ -147,14 +147,14 @@ public class NameIndexSettingTests : IDisposable
 
     // 組み立て中に無効へ切り替えたら、出来上がった索引を差し替えずに捨てる（無効なのにメモリを抱え続けない）
     [Fact]
-    public void IndexTurnedOffWhileBuildingIsNotKept()
+    public async Task IndexTurnedOffWhileBuildingIsNotKept()
     {
         var viewModel = CreateViewModel();
         viewModel.SetPlusFeaturesEnabled(true);
 
         viewModel.SetNameIndexEnabled(true);
         viewModel.SetNameIndexEnabled(false);
-        Thread.Sleep(500);
+        await viewModel.NameIndexBuildTask;
 
         Assert.False(viewModel.IsNameIndexReady);
     }
