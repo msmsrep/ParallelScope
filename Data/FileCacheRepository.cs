@@ -207,6 +207,23 @@ public class FileCacheRepository
     }
 
     /// <summary>
+    /// 起動直後に裏で呼び、最初の一覧・ツリー表示で払うEFの初期化（モデル構築・クエリのコンパイル）を先に済ませる。
+    /// コンパイル結果は形が同じクエリで使い回されるため、該当行の無い親パスで1回ずつ流しておけばよい。
+    /// </summary>
+    public void WarmUpQueries()
+    {
+        try
+        {
+            GetEntriesByParentPath(string.Empty);
+            GetSubFoldersByParentPath(string.Empty);
+        }
+        catch
+        {
+            // 下準備にすぎないので、失敗しても本番のクエリが同じ初期化を払うだけ
+        }
+    }
+
+    /// <summary>
     /// 指定した親パス直下のキャッシュ済みフォルダだけを取得する（フォルダツリーの子の表示用）。
     /// 直下に数万のファイルがあるフォルダでも、ファイル行を読まずに済ませる。
     /// </summary>

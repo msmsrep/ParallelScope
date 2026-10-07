@@ -7,10 +7,9 @@ namespace ParallelScope.ViewModels;
 /// <summary>ルートフォルダ・除外パス・フルスキャン間隔などのアプリ設定に関する処理。</summary>
 public partial class MainWindowViewModel
 {
-    /// <summary>起動時に保存済み設定を読み込み、ルートフォルダ一覧を構築する。</summary>
-    private void InitializeRootFolders()
+    /// <summary>起動時に読み込んだ保存済み設定を反映し、ルートフォルダ一覧を構築する。</summary>
+    private void InitializeRootFolders(AppSettings settings)
     {
-        var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         SetExcludedPaths(settings.ExcludedPaths);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む

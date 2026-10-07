@@ -16,7 +16,8 @@ namespace ParallelScope;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
-    private readonly StoreLicenseService _storeLicenseService = new();
+    // Storeへの問い合わせは起動直後から裏で始めてある（StartupPreload）
+    private readonly StoreLicenseService _storeLicenseService = StartupPreload.TakeStoreLicenseService();
 
     public MainWindow()
     {
