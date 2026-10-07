@@ -174,6 +174,44 @@ public class PaneRestoreTests : IDisposable
         Assert.Equal(2, subscribed.Panes[0].Tabs.Count);
     }
 
+    /// <summary>
+    /// 保存済みのタブ構成があるときは、復元するまで最初のルートを読み込まない（移動先を控えるだけ）ことの確認。
+    /// 控えている間の移動は履歴を積まずに移動先を差し替えるだけなので、戻れるかどうかで見分ける。
+    /// </summary>
+    [Fact]
+    public void WithSavedLayout_FirstRootIsNotLoadedBeforeRestore()
+    {
+        var first = Start();
+        first.ActiveTab.NavigateTo(_rootB.Path, false);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+
+        var restarted = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        Assert.Equal(_rootA.Path, restarted.ActiveTab.CurrentPath);
+        restarted.ActiveTab.NavigateTo(subFolder, true);
+
+        Assert.False(restarted.ActiveTab.CanGoBack);
+
+        restarted.SetPlusFeaturesEnabled(true);
+        restarted.RestorePanes(true);
+
+        Assert.Equal(_rootB.Path, restarted.ActiveTab.CurrentPath);
+    }
+
+    [Fact]
+    public void WithSavedLayoutButWithoutPlus_FirstRootIsLoadedWhenRestoreIsSkipped()
+    {
+        var first = Start();
+        first.ActiveTab.NavigateTo(_rootB.Path, false);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+
+        var free = Start(arePlusFeaturesEnabled: false);
+
+        Assert.Equal(_rootA.Path, free.ActiveTab.CurrentPath);
+        // 控えが解消されて実際に開いているので、移動すれば戻る履歴が積まれる
+        free.ActiveTab.NavigateTo(subFolder, true);
+        Assert.True(free.ActiveTab.CanGoBack);
+    }
+
     [Fact]
     public void SettingsWithoutPaneState_StartsWithASingleTab()
     {

@@ -33,7 +33,12 @@ public partial class MainWindowViewModel
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
         LoadFavoritesAndUsage(settings);
         LoadPaneStates(settings);
+        // 保存済みのタブ構成があれば、購読が確定して復元した時点で最初のタブも別のフォルダへ移り直す。
+        // 先に最初のルートを読み込むとキャッシュ読み・列挙・書き込みが丸ごと無駄になるため、移動先を控えるだけにして
+        // 読み込みは RestorePanes（復元しない場合も含む）まで遅らせる
+        _defersInitialNavigation = _savedPaneStates is { Count: > 0 };
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
+        _defersInitialNavigation = false;
     }
 
     /// <summary>現在設定されているルートフォルダのパス一覧を取得する（除外設定に該当するものは除く）。</summary>
@@ -309,7 +314,14 @@ public partial class MainWindowViewModel
             if (string.IsNullOrWhiteSpace(tab.CurrentPath)
                 || !_rootPathsSnapshot.Any(rootPath => PathNormalizer.IsAncestorOrSame(rootPath, tab.CurrentPath)))
             {
-                tab.NavigateTo(currentRoot, false);
+                if (_defersInitialNavigation)
+                {
+                    tab.PrepareDeferredRestore(currentRoot, null);
+                }
+                else
+                {
+                    tab.NavigateTo(currentRoot, false);
+                }
             }
         }
     }
