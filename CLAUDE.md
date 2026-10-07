@@ -26,6 +26,7 @@ pwsh scripts/ui-tests/Run-UiTests.ps1
   dotnet dotnet-ef migrations add <MigrationName>
   dotnet dotnet-ef database update
   ```
+  マイグレーションを追加したら `FileCacheRepository.LatestMigrationId` も更新してください（起動時はこれと適用済みIDが一致すれば `Migrate()` を省き、EFの初期化をUIスレッドから外しています。更新し忘れは単体テストで検出します）。
 
 ## アーキテクチャ
 
