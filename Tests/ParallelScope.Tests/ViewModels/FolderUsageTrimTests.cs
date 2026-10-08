@@ -9,37 +9,21 @@ namespace ParallelScope.Tests.ViewModels;
 /// アクセス実績（「最近」「よく使う」の元データ）の件数が上限で頭打ちになることの確認。
 /// 上限が無いと訪問したフォルダの数だけ settings.json が際限なく育つ。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class FolderUsageTrimTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class FolderUsageTrimTests : ShellTestBase
 {
     private const int Cap = MainWindowViewModel.MaxFolderUsages;
-
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
-
-    public FolderUsageTrimTests()
-    {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
 
     /// <summary>アクセス実績を保存してからViewModelを起動する（読み込み時に絞られる）。</summary>
     private MainWindowViewModel Start(IEnumerable<FolderUsageEntry> usages)
     {
-        _settingsRepository.Save(new AppSettings
+        SettingsRepository.Save(new AppSettings
         {
             RootPaths = { @"C:\UsageTest" },
             FolderUsages = usages.ToList()
         });
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         viewModel.SetPlusFeaturesEnabled(true);
         return viewModel;
     }
@@ -65,7 +49,7 @@ public class FolderUsageTrimTests : IDisposable
     private IReadOnlyList<FolderUsageEntry> SaveAndReload(MainWindowViewModel viewModel)
     {
         viewModel.SetRegexSearchEnabled(true);
-        return _settingsRepository.Load().FolderUsages;
+        return SettingsRepository.Load().FolderUsages;
     }
 
     [Fact]
@@ -116,10 +100,10 @@ public class FolderUsageTrimTests : IDisposable
     [Fact]
     public void NavigatingToNewFolders_DoesNotGrowBeyondTheCap()
     {
-        var root = Directory.CreateDirectory(Path.Combine(_temp.Path, "Roots")).FullName;
-        _settingsRepository.Save(new AppSettings { RootPaths = { root } });
+        var root = Directory.CreateDirectory(Path.Combine(NewTempDirectory().Path, "Roots")).FullName;
+        SettingsRepository.Save(new AppSettings { RootPaths = { root } });
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         viewModel.SetPlusFeaturesEnabled(true);
 
         for (var i = 0; i < Cap + 25; i++)
@@ -129,6 +113,6 @@ public class FolderUsageTrimTests : IDisposable
             viewModel.ActiveTab.LoadFiles(folder);
         }
 
-        Assert.Equal(Cap, _settingsRepository.Load().FolderUsages.Count);
+        Assert.Equal(Cap, SettingsRepository.Load().FolderUsages.Count);
     }
 }

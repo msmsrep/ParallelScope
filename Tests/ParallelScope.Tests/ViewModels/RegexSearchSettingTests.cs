@@ -8,29 +8,16 @@ namespace ParallelScope.Tests.ViewModels;
 /// 正規表現検索の設定（Plus機能）の確認。設定値の保存と、購読状態による有効/無効の切り替わり方を見る。
 /// 照合そのものは <see cref="Utilities.NameSearchPatternTests"/> で確かめている。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class RegexSearchSettingTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class RegexSearchSettingTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _root = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _root;
 
     public RegexSearchSettingTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
+        _root = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
     }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _root.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel() => new(_fileCacheRepository, _settingsRepository);
 
     [Fact]
     public void DefaultsToDisabled()
@@ -49,7 +36,7 @@ public class RegexSearchSettingTests : IDisposable
 
         viewModel.SetRegexSearchEnabled(true);
 
-        Assert.True(_settingsRepository.Load().IsRegexSearchEnabled);
+        Assert.True(SettingsRepository.Load().IsRegexSearchEnabled);
         Assert.True(CreateViewModel().GetRegexSearchEnabled());
     }
 
@@ -87,5 +74,32 @@ public class RegexSearchSettingTests : IDisposable
 
         Assert.False(viewModel.IsRegexSearchActive);
         Assert.True(viewModel.GetRegexSearchEnabled());
+    }
+
+    // 打ちかけで式が成立しない間は一覧を据え置き、検索欄を赤くするだけにする（1文字ごとに一覧を消さないため）
+    [Fact]
+    public void BrokenPatternKeepsTheListAndFlagsTheQuery()
+    {
+        var sub = Path.Combine(_root.Path, "Sub");
+        FileCacheRepository.ReplaceEntriesByParentPath(sub, new[]
+        {
+            CacheEntries.File(sub, "alpha.txt"),
+            CacheEntries.File(sub, "beta.txt")
+        });
+        var viewModel = CreateViewModel();
+        viewModel.SetPlusFeaturesEnabled(true);
+        viewModel.SetRegexSearchEnabled(true);
+        var tab = viewModel.ActiveTab;
+
+        tab.SearchQuery = "^a";
+        Wait.ForItemNames(tab, "alpha.txt");
+
+        tab.SearchQuery = "^a(";
+        Assert.True(tab.IsSearchQueryInvalid);
+        Assert.Equal(new[] { "alpha.txt" }, tab.FileItems.Select(x => x.Name));
+
+        tab.SearchQuery = "^b";
+        Assert.False(tab.IsSearchQueryInvalid);
+        Wait.ForItemNames(tab, "beta.txt");
     }
 }

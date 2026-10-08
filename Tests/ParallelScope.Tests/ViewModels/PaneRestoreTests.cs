@@ -9,34 +9,23 @@ namespace ParallelScope.Tests.ViewModels;
 /// タブ構成・分割状態の保存と復元の確認。
 /// アプリと同じく「起動 → 購読状態が確定した時点で <see cref="MainWindowViewModel.RestorePanes"/>」の順で操作する。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class PaneRestoreTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class PaneRestoreTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _rootA = new();
-    private readonly TempDirectory _rootB = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _rootA;
+    private readonly TempDirectory _rootB;
 
     public PaneRestoreTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _rootA.Dispose();
-        _rootB.Dispose();
+        _rootA = NewTempDirectory();
+        _rootB = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
     }
 
     /// <summary>アプリの起動と同じ手順（生成 → 購読状態が確定して復元）でViewModelを用意する。</summary>
     private MainWindowViewModel Start(bool arePlusFeaturesEnabled = true)
     {
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         viewModel.SetPlusFeaturesEnabled(arePlusFeaturesEnabled);
         viewModel.RestorePanes(arePlusFeaturesEnabled);
         return viewModel;
@@ -135,6 +124,31 @@ public class PaneRestoreTests : IDisposable
         Assert.Equal(_rootA.Path, hiddenTab.CurrentPath);
     }
 
+    /// <summary>
+    /// まだ表示していないタブへの移動は、控えてある移動先を差し替えるだけにする（ツリーの右クリック等から入りうる）。
+    /// 読み込みは初回表示のときに差し替え後の移動先でまとめて行う。
+    /// </summary>
+    [Fact]
+    public void HiddenTab_NavigateToOnlyRedirectsUntilItIsShown()
+    {
+        var first = Start();
+        first.ActivePane.OpenTab(_rootB.Path);
+        first.ActivePane.ActivateTabAt(0);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+        File.WriteAllText(Path.Combine(subFolder, "inside.txt"), "x");
+
+        var restarted = Start();
+        var hiddenTab = restarted.ActivePane.Tabs[1];
+
+        Assert.True(hiddenTab.NavigateTo(subFolder, addToHistory: true));
+        Assert.Equal(subFolder, hiddenTab.CurrentPath);
+        Assert.Empty(hiddenTab.FileItems);
+
+        restarted.ActivePane.ActivateTabAt(1);
+
+        Wait.ForItemNames(hiddenTab, "inside.txt");
+    }
+
     /// <summary>表示を遅らせたタブも、閉じて開き直すまでの間に構成が変わればその内容で開く。</summary>
     [Fact]
     public void HiddenTab_FollowsRootChangesMadeBeforeItIsShown()
@@ -227,7 +241,7 @@ public class PaneRestoreTests : IDisposable
         first.ActiveTab.NavigateTo(_rootB.Path, false);
         var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
 
-        var restarted = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var restarted = CreateViewModel();
         Assert.Equal(_rootA.Path, restarted.ActiveTab.CurrentPath);
         restarted.ActiveTab.NavigateTo(subFolder, true);
 
@@ -258,7 +272,7 @@ public class PaneRestoreTests : IDisposable
     public void SettingsWithoutPaneState_StartsWithASingleTab()
     {
         // 旧バージョンの settings.json（Panesを持たない）からの移行
-        _settingsRepository.Save(new AppSettings
+        SettingsRepository.Save(new AppSettings
         {
             RootPaths = { _rootA.Path, _rootB.Path },
             IsFlatFileViewEnabled = true

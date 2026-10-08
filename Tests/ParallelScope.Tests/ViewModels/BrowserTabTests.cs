@@ -8,33 +8,22 @@ namespace ParallelScope.Tests.ViewModels;
 /// 1ペイン内のタブ操作（追加・複製・クローズ・切り替え・並べ替え・開き直し）の確認。
 /// ファイルシステムへ実際に移動できる必要があるため、起点には一時フォルダを使う。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class BrowserTabTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class BrowserTabTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _rootA = new();
-    private readonly TempDirectory _rootB = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _rootA;
+    private readonly TempDirectory _rootB;
 
     public BrowserTabTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _rootA.Dispose();
-        _rootB.Dispose();
+        _rootA = NewTempDirectory();
+        _rootB = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
     }
 
     private BrowserPaneViewModel CreatePane()
     {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository).ActivePane;
+        return CreateViewModel().ActivePane;
     }
 
     /// <summary>
@@ -320,7 +309,7 @@ public class BrowserTabTests : IDisposable
     [Fact]
     public void ActiveTabChange_IsNotifiedToTheShell()
     {
-        var shell = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var shell = CreateViewModel();
         var pane = shell.ActivePane;
         var changed = new List<string?>();
         shell.PropertyChanged += (_, e) => changed.Add(e.PropertyName);

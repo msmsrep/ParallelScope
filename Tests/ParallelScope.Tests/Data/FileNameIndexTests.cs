@@ -26,31 +26,9 @@ public class FileNameIndexTests : IDisposable
         _temp.Dispose();
     }
 
-    private static CachedFileSystemEntry File(string parentPath, string name)
-    {
-        return new CachedFileSystemEntry(
-            parentPath,
-            System.IO.Path.Combine(parentPath, name),
-            name,
-            IsFolder: false,
-            SizeBytes: 100,
-            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            CreationTimeUtc: null,
-            Attributes: 32);
-    }
+    private static CachedFileSystemEntry File(string parentPath, string name) => CacheEntries.File(parentPath, name);
 
-    private static CachedFileSystemEntry Folder(string parentPath, string name)
-    {
-        return new CachedFileSystemEntry(
-            parentPath,
-            System.IO.Path.Combine(parentPath, name),
-            name,
-            IsFolder: true,
-            SizeBytes: null,
-            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            CreationTimeUtc: null,
-            Attributes: 16);
-    }
+    private static CachedFileSystemEntry Folder(string parentPath, string name) => CacheEntries.Folder(parentPath, name);
 
     private void SeedTree()
     {

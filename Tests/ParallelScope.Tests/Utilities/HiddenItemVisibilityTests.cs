@@ -8,28 +8,16 @@ public class HiddenItemVisibilityTests
 {
     private static int Attributes(FileAttributes attributes) => (int)attributes;
 
-    [Fact]
-    public void IsVisible_HidesHiddenItemsWhenTurnedOff()
+    [Theory]
+    [InlineData(FileAttributes.Hidden, false, false, false)]
+    [InlineData(FileAttributes.System, false, false, false)]
+    [InlineData(FileAttributes.Archive, false, false, true)]
+    [InlineData(FileAttributes.Hidden, true, false, true)]
+    [InlineData(FileAttributes.System, false, true, true)]
+    public void IsVisible_FollowsTheSettingForEachAttribute(
+        FileAttributes attributes, bool showHiddenItems, bool showSystemItems, bool expected)
     {
-        Assert.False(HiddenItemVisibility.IsVisible(Attributes(FileAttributes.Hidden), showHiddenItems: false, showSystemItems: false));
-    }
-
-    [Fact]
-    public void IsVisible_HidesSystemItemsWhenTurnedOff()
-    {
-        Assert.False(HiddenItemVisibility.IsVisible(Attributes(FileAttributes.System), showHiddenItems: false, showSystemItems: false));
-    }
-
-    [Fact]
-    public void IsVisible_ShowsNormalItems()
-    {
-        Assert.True(HiddenItemVisibility.IsVisible(Attributes(FileAttributes.Archive), showHiddenItems: false, showSystemItems: false));
-    }
-
-    [Fact]
-    public void IsVisible_ShowsHiddenItemsWhenEnabled()
-    {
-        Assert.True(HiddenItemVisibility.IsVisible(Attributes(FileAttributes.Hidden), showHiddenItems: true, showSystemItems: false));
+        Assert.Equal(expected, HiddenItemVisibility.IsVisible(Attributes(attributes), showHiddenItems, showSystemItems));
     }
 
     [Fact]

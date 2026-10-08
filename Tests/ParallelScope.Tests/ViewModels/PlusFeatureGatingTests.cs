@@ -11,32 +11,17 @@ namespace ParallelScope.Tests.ViewModels;
 /// その結果が <see cref="MainWindowViewModel.SetPlusFeaturesEnabled"/> に渡ってくる前提で、
 /// 渡された後の切り替わり方をテストする。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class PlusFeatureGatingTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class PlusFeatureGatingTests : ShellTestBase
 {
     private const string FavoritePath = @"C:\PlusTest\Favorite";
     private const string FrequentPath = @"C:\PlusTest\Frequent";
     private const string RecentPath = @"C:\PlusTest\Recent";
 
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-
-    public PlusFeatureGatingTests()
-    {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
-
     /// <summary>お気に入り・アクセス実績を保存済みの状態でViewModelを起動する。</summary>
-    private MainWindowViewModel CreateViewModel()
+    private MainWindowViewModel StartWithSavedUsage()
     {
-        var settingsRepository = new AppSettingsRepository(_temp.Path);
-        settingsRepository.Save(new AppSettings
+        SettingsRepository.Save(new AppSettings
         {
             RootPaths = { @"C:\PlusTest" },
             FavoritePaths = { FavoritePath },
@@ -49,7 +34,7 @@ public class PlusFeatureGatingTests : IDisposable
             VisibleColumns = new List<string> { FileListColumns.Attributes }
         });
 
-        return new MainWindowViewModel(_fileCacheRepository, settingsRepository);
+        return CreateViewModel();
     }
 
     private static IReadOnlyList<string> TreeRootPaths(MainWindowViewModel viewModel)
@@ -60,7 +45,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void FreeVersion_ShowsOnlyTheFoldersNodeInTheTree()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         // 起動直後はライセンス未取得のため無料版と同じ状態
         Assert.False(viewModel.ArePlusFeaturesEnabled);
@@ -70,7 +55,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void PlusVersion_AddsFavoritesRecentAndFrequentNodesBelowFolders()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         viewModel.SetPlusFeaturesEnabled(true);
 
@@ -84,7 +69,7 @@ public class PlusFeatureGatingTests : IDisposable
     public void DisablingPlus_RemovesFavoritesRecentAndFrequentNodesAgain()
     {
         // 購読が切れた場合（設定画面から戻った時など）に無料版の表示へ戻ること
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         viewModel.SetPlusFeaturesEnabled(true);
         viewModel.SetPlusFeaturesEnabled(false);
@@ -97,7 +82,7 @@ public class PlusFeatureGatingTests : IDisposable
     public void SetPlusFeaturesEnabled_IsIdempotent()
     {
         // 起動時と設定画面を閉じた時など複数回呼ばれるため、同じ値で呼んでもノードが増えない
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         viewModel.SetPlusFeaturesEnabled(true);
         viewModel.SetPlusFeaturesEnabled(true);
@@ -110,7 +95,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void DisablingPlus_MovesAwayFromAVirtualNodeThatIsNoLongerVisible()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
         viewModel.SetPlusFeaturesEnabled(true);
         viewModel.LoadFiles(VirtualFolders.FavoritesPath);
         Assert.Equal(VirtualFolders.FavoritesPath, viewModel.CurrentPath);
@@ -124,9 +109,9 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void DisablingPlus_KeepsTheCurrentFolderWhenItIsARealPath()
     {
-        // 移動先は実在フォルダである必要があるため、一時フォルダ自身を使う
-        var realFolder = PathNormalizer.Normalize(_temp.Path);
-        var viewModel = CreateViewModel();
+        // 移動先は実在フォルダである必要があるため、一時フォルダを使う
+        var realFolder = PathNormalizer.Normalize(NewTempDirectory().Path);
+        var viewModel = StartWithSavedUsage();
         viewModel.SetPlusFeaturesEnabled(true);
         Assert.True(viewModel.LoadFiles(realFolder));
 
@@ -139,7 +124,7 @@ public class PlusFeatureGatingTests : IDisposable
     public void FavoritesAndUsage_AreKeptWhilePlusIsDisabled()
     {
         // 購読が切れても保存済みのお気に入り・アクセス実績は消さない（購読すればそのまま復活する）
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         Assert.Equal(new[] { FavoritePath }, viewModel.GetFavoritePaths());
         Assert.Equal(new[] { FrequentPath, RecentPath }, viewModel.GetFrequentPaths());
@@ -155,7 +140,7 @@ public class PlusFeatureGatingTests : IDisposable
     public void RecentPaths_AreOrderedByTheMostRecentAccess()
     {
         // 「よく使う」は回数順、「最近」は最終アクセス順で、同じ実績から別の並びになる
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         Assert.Equal(new[] { RecentPath, FrequentPath }, viewModel.GetRecentPaths());
         Assert.Equal(new[] { FrequentPath, RecentPath }, viewModel.GetFrequentPaths());
@@ -164,7 +149,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void RecentPaths_LeaveOutFavoritesSoTheTreeHasNoDuplicates()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
         Assert.Contains(RecentPath, viewModel.GetRecentPaths());
 
         viewModel.ToggleFavorite(RecentPath);
@@ -175,7 +160,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void DisablingPlus_MovesAwayFromTheRecentNode()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
         viewModel.SetPlusFeaturesEnabled(true);
         viewModel.LoadFiles(VirtualFolders.RecentPath);
         Assert.Equal(VirtualFolders.RecentPath, viewModel.CurrentPath);
@@ -192,7 +177,7 @@ public class PlusFeatureGatingTests : IDisposable
     {
         // ToggleFavorite自体はゲートを持たない。呼び出し側（コンテキストメニュー）が
         // ArePlusFeaturesEnabled を見て出し分けているという前提を固定しておく
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
         viewModel.SetPlusFeaturesEnabled(arePlusFeaturesEnabled);
 
         Assert.True(viewModel.ToggleFavorite(@"C:\PlusTest\Another"));
@@ -202,7 +187,7 @@ public class PlusFeatureGatingTests : IDisposable
     [Fact]
     public void EffectiveVisibleColumns_FallsBackToTheDefaultsForTheFreeVersion()
     {
-        var viewModel = CreateViewModel();
+        var viewModel = StartWithSavedUsage();
 
         // 保存済みの列設定（Attributesのみ）は購読中だけ効く
         Assert.Equal(

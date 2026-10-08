@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.ViewModels;
@@ -9,26 +8,15 @@ namespace ParallelScope.Tests.ViewModels;
 /// All Filesモード（フラット表示）の取得結果の確認。取得は「貯まった分から順に出す」段階表示のため、
 /// 途中経過を挟んでも最終的に全件そろうことを見る。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
-public class FlatFileViewTests : IDisposable
+[Collection(SharedStateCollection.Name)]
+public class FlatFileViewTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _root = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _root;
 
     public FlatFileViewTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _root.Dispose();
+        _root = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
     }
 
     /// <summary>途中経過が複数回入るよう、最初の表示件数（2,000）を超える数のファイルをキャッシュへ入れる。</summary>
@@ -37,36 +25,7 @@ public class FlatFileViewTests : IDisposable
         var subFolderPath = Path.Combine(_root.Path, "Sub");
         Directory.CreateDirectory(subFolderPath);
 
-        var entries = Enumerable.Range(0, fileCount)
-            .Select(i => new CachedFileSystemEntry(
-                subFolderPath,
-                Path.Combine(subFolderPath, $"file{i:D6}.txt"),
-                $"file{i:D6}.txt",
-                IsFolder: false,
-                SizeBytes: i,
-                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-                CreationTimeUtc: null,
-                Attributes: 32))
-            .ToList();
-
-        _fileCacheRepository.ReplaceEntriesByParentPath(subFolderPath, entries);
-    }
-
-    /// <summary>取得はバックグラウンドで進むため、期待件数に届くまで待つ（届かなければ失敗させる）。</summary>
-    private static void WaitForItemCount(BrowserTabViewModel tab, int expectedCount)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (stopwatch.Elapsed < TimeSpan.FromSeconds(30))
-        {
-            if (tab.FileItems.Count == expectedCount)
-            {
-                return;
-            }
-
-            Thread.Sleep(20);
-        }
-
-        Assert.Fail($"一覧が {expectedCount} 件になりませんでした（実際は {tab.FileItems.Count} 件）");
+        FileCacheRepository.ReplaceEntriesByParentPath(subFolderPath, CacheEntries.NumberedFiles(subFolderPath, fileCount));
     }
 
     [Fact]
@@ -76,7 +35,7 @@ public class FlatFileViewTests : IDisposable
         const int fileCount = 17_000;
         SeedCachedFiles(fileCount);
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         var tab = viewModel.ActivePane.ActiveTab;
         Assert.True(tab.NavigateTo(_root.Path, addToHistory: false));
 
@@ -95,7 +54,7 @@ public class FlatFileViewTests : IDisposable
 
         tab.IsFlatFileViewEnabled = true;
 
-        WaitForItemCount(tab, fileCount);
+        Wait.ForItemCount(tab, fileCount);
         Assert.All(tab.FileItems, item => Assert.False(item.IsFolder));
         // 途中経過の複製で同じアイテムが二重に載っていないこと
         Assert.Equal(fileCount, tab.FileItems.Select(x => x.Name).Distinct().Count());
@@ -121,20 +80,9 @@ public class FlatFileViewTests : IDisposable
         // 移動先はライブのファイルシステムも読み直されてキャッシュが上書きされるため、実体も置く
         // （キャッシュだけ入れておくと、上書きで消えて空一覧になる）
         File.WriteAllText(Path.Combine(otherFolderPath, "only.txt"), "x");
-        _fileCacheRepository.ReplaceEntriesByParentPath(otherFolderPath, new[]
-        {
-            new CachedFileSystemEntry(
-                otherFolderPath,
-                Path.Combine(otherFolderPath, "only.txt"),
-                "only.txt",
-                IsFolder: false,
-                SizeBytes: 1,
-                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-                CreationTimeUtc: null,
-                Attributes: 32)
-        });
+        FileCacheRepository.ReplaceEntriesByParentPath(otherFolderPath, new[] { CacheEntries.File(otherFolderPath, "only.txt", sizeBytes: 1) });
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         var tab = viewModel.ActivePane.ActiveTab;
         Assert.True(tab.NavigateTo(_root.Path, addToHistory: false));
 
@@ -142,30 +90,13 @@ public class FlatFileViewTests : IDisposable
         // ルート配下の取得が終わる前に移動する
         Assert.True(tab.NavigateTo(otherFolderPath, addToHistory: false));
 
-        WaitForItemCount(tab, 1);
+        Wait.ForItemCount(tab, 1);
         Assert.Equal("only.txt", tab.FileItems[0].Name);
 
         // 打ち切ったはずの取得が後から結果を流し込んでこないこと
         Thread.Sleep(500);
         Assert.Single(tab.FileItems);
         Assert.Equal("only.txt", tab.FileItems[0].Name);
-    }
-
-    /// <summary>一覧の並びが期待どおりになるまで待つ（届かなければ失敗させる）。</summary>
-    private static void WaitForItemNames(BrowserTabViewModel tab, params string[] expectedNames)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (stopwatch.Elapsed < TimeSpan.FromSeconds(30))
-        {
-            if (tab.FileItems.Select(x => x.Name).SequenceEqual(expectedNames))
-            {
-                return;
-            }
-
-            Thread.Sleep(20);
-        }
-
-        Assert.Fail($"一覧が [{string.Join(", ", expectedNames)}] になりませんでした（実際は [{string.Join(", ", tab.FileItems.Select(x => x.Name))}]）");
     }
 
     // OFFに戻すと差分適用で直下一覧へ戻るが、その際に新しく加わる行（フォルダ）を末尾へ足すと
@@ -179,29 +110,18 @@ public class FlatFileViewTests : IDisposable
         File.WriteAllText(Path.Combine(alphaPath, "alpha1.txt"), "x");
         File.WriteAllText(Path.Combine(_root.Path, "readme.txt"), "x");
         // All Filesはキャッシュだけを引くため、ルートを開いても読み直されないAlpha配下はキャッシュへ入れておく
-        _fileCacheRepository.ReplaceEntriesByParentPath(alphaPath, new[]
-        {
-            new CachedFileSystemEntry(
-                alphaPath,
-                Path.Combine(alphaPath, "alpha1.txt"),
-                "alpha1.txt",
-                IsFolder: false,
-                SizeBytes: 1,
-                new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-                CreationTimeUtc: null,
-                Attributes: 32)
-        });
+        FileCacheRepository.ReplaceEntriesByParentPath(alphaPath, new[] { CacheEntries.File(alphaPath, "alpha1.txt", sizeBytes: 1) });
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         var tab = viewModel.ActivePane.ActiveTab;
         Assert.True(tab.NavigateTo(_root.Path, addToHistory: false));
-        WaitForItemNames(tab, "Alpha", "Beta", "readme.txt");
+        Wait.ForItemNames(tab, "Alpha", "Beta", "readme.txt");
 
         tab.IsFlatFileViewEnabled = true;
-        WaitForItemNames(tab, "alpha1.txt", "readme.txt");
+        Wait.ForItemNames(tab, "alpha1.txt", "readme.txt");
 
         tab.IsFlatFileViewEnabled = false;
-        WaitForItemNames(tab, "Alpha", "Beta", "readme.txt");
+        Wait.ForItemNames(tab, "Alpha", "Beta", "readme.txt");
     }
 
     [Fact]
@@ -210,12 +130,12 @@ public class FlatFileViewTests : IDisposable
         const int fileCount = 10;
         SeedCachedFiles(fileCount);
 
-        var viewModel = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        var viewModel = CreateViewModel();
         var tab = viewModel.ActivePane.ActiveTab;
         Assert.True(tab.NavigateTo(_root.Path, addToHistory: false));
 
         tab.IsFlatFileViewEnabled = true;
 
-        WaitForItemCount(tab, fileCount);
+        Wait.ForItemCount(tab, fileCount);
     }
 }
