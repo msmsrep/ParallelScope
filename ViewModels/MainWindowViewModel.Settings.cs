@@ -7,10 +7,9 @@ namespace ParallelScope.ViewModels;
 /// <summary>ルートフォルダ・除外パス・フルスキャン間隔などのアプリ設定に関する処理。</summary>
 public partial class MainWindowViewModel
 {
-    /// <summary>起動時に保存済み設定を読み込み、ルートフォルダ一覧を構築する。</summary>
-    private void InitializeRootFolders()
+    /// <summary>起動時に読み込んだ保存済み設定を反映し、ルートフォルダ一覧を構築する。</summary>
+    private void InitializeRootFolders(AppSettings settings)
     {
-        var settings = _appSettingsRepository.Load();
         _fullScanIntervalHours = NormalizeFullScanIntervalHours(settings.FullScanIntervalHours);
         SetExcludedPaths(settings.ExcludedPaths);
         // プロパティセッター経由だとCurrentPath未設定の状態でリクエストが走ってしまうため、副作用の無い初期化用APIで読み込む
@@ -26,6 +25,7 @@ public partial class MainWindowViewModel
         _isRegexSearchEnabled = settings.IsRegexSearchEnabled;
         ApplyHiddenItemVisibilityToTree();
         _developerUnlockKey = settings.DeveloperUnlockKey;
+        _lastKnownPlusActive = settings.LastKnownPlusActive;
         _theme = AppTheme.Parse(settings.Theme);
         _language = AppLanguage.Parse(settings.Language);
         _visibleTreeNodes = NormalizeVisibleTreeNodes(settings.VisibleTreeNodes);
@@ -33,7 +33,12 @@ public partial class MainWindowViewModel
         // 除外パスの読み込み後に呼ぶ（「よく使う」の絞り込みで除外設定を参照するため）
         LoadFavoritesAndUsage(settings);
         LoadPaneStates(settings);
+        // 保存済みのタブ構成があれば、購読が確定して復元した時点で最初のタブも別のフォルダへ移り直す。
+        // 先に最初のルートを読み込むとキャッシュ読み・列挙・書き込みが丸ごと無駄になるため、移動先を控えるだけにして
+        // 読み込みは RestorePanes（復元しない場合も含む）まで遅らせる
+        _defersInitialNavigation = _savedPaneStates is { Count: > 0 };
         ApplyRootPaths(settings.RootPaths ?? Enumerable.Empty<string>(), false);
+        _defersInitialNavigation = false;
     }
 
     /// <summary>現在設定されているルートフォルダのパス一覧を取得する（除外設定に該当するものは除く）。</summary>
@@ -142,6 +147,24 @@ public partial class MainWindowViewModel
         }
 
         _csvExportSizeInBytes = sizeInBytes;
+        SaveSettings();
+    }
+
+    /// <summary>前回の起動で確定したPlusの購読状態を取得する（起動直後、確定前の画面の組み立てに使う）。</summary>
+    public bool GetLastKnownPlusActive()
+    {
+        return _lastKnownPlusActive;
+    }
+
+    /// <summary>確定したPlusの購読状態を、次回起動時の先回り用に記憶する。</summary>
+    public void SetLastKnownPlusActive(bool isActive)
+    {
+        if (_lastKnownPlusActive == isActive)
+        {
+            return;
+        }
+
+        _lastKnownPlusActive = isActive;
         SaveSettings();
     }
 
@@ -309,7 +332,14 @@ public partial class MainWindowViewModel
             if (string.IsNullOrWhiteSpace(tab.CurrentPath)
                 || !_rootPathsSnapshot.Any(rootPath => PathNormalizer.IsAncestorOrSame(rootPath, tab.CurrentPath)))
             {
-                tab.NavigateTo(currentRoot, false);
+                if (_defersInitialNavigation)
+                {
+                    tab.PrepareDeferredRestore(currentRoot, null);
+                }
+                else
+                {
+                    tab.NavigateTo(currentRoot, false);
+                }
             }
         }
     }
@@ -349,7 +379,8 @@ public partial class MainWindowViewModel
             TreeNodeOrder = _treeNodeOrder.ToList(),
             FavoritePaths = _favoritePaths.ToList(),
             FolderUsages = _folderUsages.Values.ToList(),
-            DeveloperUnlockKey = _developerUnlockKey
+            DeveloperUnlockKey = _developerUnlockKey,
+            LastKnownPlusActive = _lastKnownPlusActive
         });
     }
 

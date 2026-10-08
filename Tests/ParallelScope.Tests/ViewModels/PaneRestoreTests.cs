@@ -174,6 +174,86 @@ public class PaneRestoreTests : IDisposable
         Assert.Equal(2, subscribed.Panes[0].Tabs.Count);
     }
 
+    /// <summary>
+    /// 前回Plusだったので購読状態の確定前に先回りして復元したが、確定したら未購読だった場合の確認。
+    /// 未購読の起動と同じ1画面・1タブ（最初のルート）に戻り、保存済みの構成は消えない。
+    /// </summary>
+    [Fact]
+    public void ProvisionalRestore_IsUndoneWhenPlusTurnsOutInactive()
+    {
+        var first = Start();
+        first.ActivePane.OpenTab(_rootB.Path);
+        var secondPane = first.EnableSplitView();
+        secondPane.ActiveTab.NavigateTo(_rootB.Path, false);
+
+        var restarted = Start();
+        restarted.UndoPaneRestore();
+        restarted.SetPlusFeaturesEnabled(false);
+        restarted.RestorePanes(false);
+
+        Assert.False(restarted.IsSplitViewEnabled);
+        Assert.Single(restarted.Panes);
+        Assert.Single(restarted.ActivePane.Tabs);
+        Assert.Equal(_rootA.Path, restarted.ActiveTab.CurrentPath);
+
+        // 未購読のまま操作しても、保存済みの構成は消えない
+        restarted.ActiveTab.NavigateTo(_rootB.Path, true);
+
+        var subscribed = Start();
+
+        Assert.True(subscribed.IsSplitViewEnabled);
+        Assert.Equal(2, subscribed.Panes[0].Tabs.Count);
+    }
+
+    [Fact]
+    public void LastKnownPlusState_IsKeptForTheNextStart()
+    {
+        var first = Start();
+        Assert.False(first.GetLastKnownPlusActive());
+
+        first.SetLastKnownPlusActive(true);
+
+        Assert.True(Start().GetLastKnownPlusActive());
+    }
+
+    /// <summary>
+    /// 保存済みのタブ構成があるときは、復元するまで最初のルートを読み込まない（移動先を控えるだけ）ことの確認。
+    /// 控えている間の移動は履歴を積まずに移動先を差し替えるだけなので、戻れるかどうかで見分ける。
+    /// </summary>
+    [Fact]
+    public void WithSavedLayout_FirstRootIsNotLoadedBeforeRestore()
+    {
+        var first = Start();
+        first.ActiveTab.NavigateTo(_rootB.Path, false);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+
+        var restarted = new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        Assert.Equal(_rootA.Path, restarted.ActiveTab.CurrentPath);
+        restarted.ActiveTab.NavigateTo(subFolder, true);
+
+        Assert.False(restarted.ActiveTab.CanGoBack);
+
+        restarted.SetPlusFeaturesEnabled(true);
+        restarted.RestorePanes(true);
+
+        Assert.Equal(_rootB.Path, restarted.ActiveTab.CurrentPath);
+    }
+
+    [Fact]
+    public void WithSavedLayoutButWithoutPlus_FirstRootIsLoadedWhenRestoreIsSkipped()
+    {
+        var first = Start();
+        first.ActiveTab.NavigateTo(_rootB.Path, false);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+
+        var free = Start(arePlusFeaturesEnabled: false);
+
+        Assert.Equal(_rootA.Path, free.ActiveTab.CurrentPath);
+        // 控えが解消されて実際に開いているので、移動すれば戻る履歴が積まれる
+        free.ActiveTab.NavigateTo(subFolder, true);
+        Assert.True(free.ActiveTab.CanGoBack);
+    }
+
     [Fact]
     public void SettingsWithoutPaneState_StartsWithASingleTab()
     {

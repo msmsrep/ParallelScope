@@ -24,8 +24,9 @@ public sealed class StoreLicenseService
 
     private StoreContext? _context;
     private bool _isDeveloperUnlocked;
+    private Task<LicenseQueryResult>? _prefetchedLicense;
 
-    /// <summary>Plus機能が現在有効か（月額・買い切りのどちらか）。RefreshLicenseAsync完了まではfalse。</summary>
+    /// <summary>Plus機能が現在有効か（月額・買い切りのどちらか）。RefreshLicenseAsync完了までは false か、ApplyProvisionalState で入れた仮の値。</summary>
     public bool IsPlusActive { get; private set; }
 
     /// <summary>月額サブスクリプションが現在有効か。</summary>
@@ -73,25 +74,59 @@ public sealed class StoreLicenseService
             return;
         }
 #endif
+        // 起動直後に裏で始めた問い合わせがあれば、その結果を受け取る（1回だけ）
+        var prefetched = Interlocked.Exchange(ref _prefetchedLicense, null);
+        var result = await (prefetched ?? QueryStoreLicenseAsync(_context));
+
+        _context = result.Context;
+        IsSubscriptionActive = result.IsSubscriptionActive;
+        IsLifetimeOwned = result.IsLifetimeOwned;
+        IsPlusActive = IsSubscriptionActive || IsLifetimeOwned;
+    }
+
+    /// <summary>
+    /// 購読状態が確定するまでの仮の値を入れる（前回の起動で確定した状態）。起動直後、<see cref="RefreshLicenseAsync"/> より前に呼ぶ。
+    /// Storeへの問い合わせを待たずに画面を組み立てるためのもので、確定すれば上書きされる。
+    /// 月額・買い切りの別は確定するまで分からないため、<see cref="IsPlusActive"/> だけを立てる。
+    /// </summary>
+    public void ApplyProvisionalState(bool isPlusActive)
+    {
+        IsPlusActive = isPlusActive;
+    }
+
+    /// <summary>
+    /// Storeへの問い合わせを裏で始めておく。起動直後に1回だけ呼ぶ。
+    /// パッケージ実行ではStoreContextの初期化だけで呼び出し元のスレッドが数百ms止まり、
+    /// UIスレッドで行うとそのぶんウィンドウの初回描画が遅れるため。
+    /// 結果は次の <see cref="RefreshLicenseAsync"/> で受け取るまでプロパティへは反映しない
+    /// （画面側は確定前の値（仮の値）で組み立てて確定時にまとめて直すため、UIスレッドの外で途中に値が変わらないようにする）。
+    /// </summary>
+    public void StartPrefetch()
+    {
+        _prefetchedLicense = Task.Run(() => QueryStoreLicenseAsync(null));
+    }
+
+    private static async Task<LicenseQueryResult> QueryStoreLicenseAsync(StoreContext? context)
+    {
         try
         {
-            _context ??= StoreContext.GetDefault();
-            var license = await _context.GetAppLicenseAsync();
+            context ??= StoreContext.GetDefault();
+            var license = await context.GetAppLicenseAsync();
             // アドオンライセンスはSkuStoreIdが「StoreId/xxxx」形式になるため前方一致で判定する。
             // サブスクリプションの期限切れ・解約済みはIsActiveがfalseになる（買い切りは返金時のみfalse）
-            IsSubscriptionActive = HasActiveLicense(license, PlusSubscriptionAddOnStoreId);
-            IsLifetimeOwned = HasActiveLicense(license, PlusLifetimeAddOnStoreId);
-            IsPlusActive = IsSubscriptionActive || IsLifetimeOwned;
+            return new LicenseQueryResult(
+                context,
+                HasActiveLicense(license, PlusSubscriptionAddOnStoreId),
+                HasActiveLicense(license, PlusLifetimeAddOnStoreId));
         }
         catch
         {
             // package identityが無い（非パッケージ実行）等。未購入扱いで続行する
-            _context = null;
-            IsSubscriptionActive = false;
-            IsLifetimeOwned = false;
-            IsPlusActive = false;
+            return new LicenseQueryResult(null, false, false);
         }
     }
+
+    private readonly record struct LicenseQueryResult(StoreContext? Context, bool IsSubscriptionActive, bool IsLifetimeOwned);
 
     private static bool HasActiveLicense(StoreAppLicense license, string addOnStoreId)
         => license.AddOnLicenses.Values

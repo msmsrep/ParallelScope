@@ -65,6 +65,12 @@ if (-not $NoSign) {
 
 $publishDir = Join-Path $root 'bin\Release\net10.0-windows10.0.19041.0\win-x64\publish'
 
+# ReadyToRunの中間出力は入力が変わらない限り再利用される。一度でも別の設定（PublishReadyToRunComposite等）で
+# 発行すると、その形式のDLLが残ったまま通常の発行に混ざり、起動直後にcoreclrごと落ちるパッケージができる
+# （WinRT系DLLで実際に起きた）。毎回作り直して、発行物を設定どおりのものにそろえる
+$r2rIntermediateDir = Join-Path $root 'obj\Release\net10.0-windows10.0.19041.0\win-x64\R2R'
+if (Test-Path $r2rIntermediateDir) { Remove-Item $r2rIntermediateDir -Recurse -Force }
+
 Invoke-Step 'dotnet publish' { dotnet publish (Join-Path $root 'ParallelScope.csproj') -c Release }
 
 New-Item -ItemType Directory -Force $outDir | Out-Null

@@ -13,6 +13,9 @@
     <!-- .NETランタイムはMSIXフレームワークパッケージとして配布されておらず、ストア経由でも自動導入されない。
          フレームワーク依存だと初回起動時にランタイム導入を促されるため、自己完結で発行する -->
     <SelfContained>true</SelfContained>
+    <!-- 同梱の.NET/WPF本体は事前コンパイル済みだが、本体・EF Core等はそのままだと起動時にJITが走る。
+         発行時に事前コンパイルしておき、起動を速くする（dotnet build / F5 には影響しない） -->
+    <PublishReadyToRun>true</PublishReadyToRun>
     <!-- アプリのアイコンをMSIXにも設定 -->
     <ApplicationIcon>Assets/logo.ico</ApplicationIcon>
     <!-- 自己完結発行だとWPFの各国語リソースまで同梱される。アプリUIは英語と日本語のみなので、

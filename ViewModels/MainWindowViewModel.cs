@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using ParallelScope.Data;
+using ParallelScope.Services;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.ViewModels;
@@ -33,6 +34,7 @@ public partial class MainWindowViewModel : ObservableObject
     private (string Path, string Prefix)[] _excludedPathMatchers = Array.Empty<(string, string)>();
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
+    private bool _lastKnownPlusActive;
     private AppThemeSetting _theme = AppThemeSetting.System;
     private AppLanguageSetting _language = AppLanguageSetting.System;
 
@@ -122,15 +124,21 @@ public partial class MainWindowViewModel : ObservableObject
     public bool CanGoUp => ActiveTab.CanGoUp;
 
     public MainWindowViewModel()
-        : this(new FileCacheRepository(), new AppSettingsRepository())
+        : this(StartupPreload.TakeFileCacheRepository(), StartupPreload.TakeSettings())
+    {
+    }
+
+    private MainWindowViewModel(FileCacheRepository fileCacheRepository, (AppSettingsRepository Repository, AppSettings Settings) preloadedSettings)
+        : this(fileCacheRepository, preloadedSettings.Repository, preloadedSettings.Settings)
     {
     }
 
     /// <summary>
     /// 保存先を差し替えたリポジトリを渡して生成する（単体テスト用）。
-    /// アプリ本体は引数なしのコンストラクタを使い、リポジトリはここで直接newする。
+    /// アプリ本体は引数なしのコンストラクタを使い、リポジトリは起動直後に裏で用意したもの（<see cref="StartupPreload"/>）を受け取る。
     /// </summary>
-    internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository)
+    /// <param name="initialSettings">読み込み済みの設定（nullならここで読み込む）。</param>
+    internal MainWindowViewModel(FileCacheRepository fileCacheRepository, AppSettingsRepository appSettingsRepository, AppSettings? initialSettings = null)
     {
         _fileCacheRepository = fileCacheRepository;
         _appSettingsRepository = appSettingsRepository;
@@ -144,7 +152,7 @@ public partial class MainWindowViewModel : ObservableObject
         _observedTab = pane.ActiveTab;
         _observedTab.PropertyChanged += ActiveTab_PropertyChanged;
 
-        InitializeRootFolders();
+        InitializeRootFolders(initialSettings ?? _appSettingsRepository.Load());
         _isInitialized = true;
     }
 

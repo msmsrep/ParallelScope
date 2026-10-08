@@ -81,6 +81,12 @@ public sealed class AppSettings
     public List<PaneStateSettings>? Panes { get; set; }
 
     /// <summary>
+    /// 前回の起動で確定したPlusの購読状態。起動直後はStoreへの問い合わせを待たずにこの状態で画面を組み立て、
+    /// 確定後に食い違っていれば直す（表示の先回りに使うだけで、機能の解放はStoreの判定に従う）。
+    /// </summary>
+    public bool LastKnownPlusActive { get; set; }
+
+    /// <summary>
     /// 開発者専用: Plus機能をStoreの購読なしで解放するためのキー。通常はnull。
     /// 正しいキーかどうかはStoreLicenseServiceが埋め込みハッシュとの照合で判定する。
     /// </summary>

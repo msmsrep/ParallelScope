@@ -16,7 +16,10 @@ namespace ParallelScope;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
-    private readonly StoreLicenseService _storeLicenseService = new();
+    // Storeへの問い合わせは起動直後から裏で始めてある（StartupPreload）
+    private readonly StoreLicenseService _storeLicenseService = StartupPreload.TakeStoreLicenseService();
+    // 起動直後、購読状態の確定前に仮に使った状態（前回の起動で確定した状態）
+    private readonly bool _isProvisionalPlusActive;
 
     public MainWindow()
     {
@@ -38,6 +41,13 @@ public partial class MainWindow : Window
 
         // ペインは列レイアウトの初期化にViewModelを必要とするため、ViewModelの生成後に組み立てる
         RebuildPaneLayout();
+
+        // 購読状態の確定（Storeへの問い合わせ。パッケージ実行では1秒前後かかる）を待たずに、
+        // 前回の起動で確定した状態で組み立てて一覧の読み込みを始める。食い違っていれば確定後に直す
+        // （購読の開始・終了の直後だけ一瞬違う見た目になるが、許容している）
+        _isProvisionalPlusActive = _viewModel.GetLastKnownPlusActive();
+        _storeLicenseService.ApplyProvisionalState(_isProvisionalPlusActive);
+        ApplyPlusFeatures(isLicenseConfirmed: false);
 
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
@@ -65,12 +75,20 @@ public partial class MainWindow : Window
 
         _hasStartedAutomaticFullScan = true;
 
-        // Plusの購読状態を確認し、購読済みならユーザー設定の表示列を反映し直す
-        // （コンストラクタ時点ではライセンス未取得のためデフォルト列で表示されている）。
+        // Plusの購読状態を確定させ、仮の状態（前回の起動時の状態）で組み立てた画面を直す。
         // settings.jsonに開発者キーが設定されていればStoreの購読状態に関わらずPlusを有効化する
         _storeLicenseService.ApplyDeveloperUnlockKey(_viewModel.GetDeveloperUnlockKey());
         await _storeLicenseService.RefreshLicenseAsync();
-        ApplyPlusFeatures();
+
+        var isActive = _storeLicenseService.IsPlusActive;
+        if (_isProvisionalPlusActive && !isActive)
+        {
+            // 先回りして復元したタブ構成は、未購読の起動と同じ状態へ戻す（保存済みの構成には触れない）
+            _viewModel.UndoPaneRestore();
+        }
+
+        ApplyPlusFeatures(isLicenseConfirmed: true);
+        _viewModel.SetLastKnownPlusActive(isActive);
 
         RequestAutomaticFullScan();
         ConfigureScheduledFullScanTimer();
@@ -104,8 +122,8 @@ public partial class MainWindow : Window
     }
 
     // Plus機能（ツリーのお気に入り・最近・よく使うノード、一覧の表示列・列幅、CSV書き出し）を
-    // 購読状態に合わせて出し分ける
-    private void ApplyPlusFeatures()
+    // 購読状態に合わせて出し分ける。確定前（仮の状態）の間は課金状況の表示だけ出さない
+    private void ApplyPlusFeatures(bool isLicenseConfirmed = true)
     {
         var isActive = _storeLicenseService.IsPlusActive;
 
@@ -134,7 +152,10 @@ public partial class MainWindow : Window
             pane.ApplyFileListColumnLayout();
         }
 
-        ApplyLicenseBadge();
+        if (isLicenseConfirmed)
+        {
+            ApplyLicenseBadge();
+        }
     }
 
     // タイトルバーのアプリ名の右へ課金状況を出す。

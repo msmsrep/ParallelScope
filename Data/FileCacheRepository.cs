@@ -50,8 +50,14 @@ public class FileCacheRepository
         var dbPath = Path.Combine(appDataDir, "ParallelScope.sqlite");
 
         _dbOptions = BuildDbOptions(dbPath);
-        MigrateDatabaseAndApplyPragmas();
+        MigrateDatabaseAndApplyPragmas(dbPath);
     }
+
+    /// <summary>
+    /// 最新のマイグレーションID。マイグレーションを追加したら更新すること
+    /// （更新し忘れは単体テストで検出する。古いままだと毎回 Migrate() が走るだけで、壊れはしない）。
+    /// </summary>
+    internal const string LatestMigrationId = "20260717125758_AddCreationTimeAndAttributes";
 
     /// <summary>DbContext のオプション（SQLite接続文字列・クエリ分割設定）を構築する。</summary>
     private static DbContextOptions<ParallelScopeDbContext> BuildDbOptions(string dbPath)
@@ -71,15 +77,20 @@ public class FileCacheRepository
     }
 
     /// <summary>マイグレーションを適用し、DBファイルに永続化されるSQLite設定（WAL・インデックス）を整える。</summary>
-    private void MigrateDatabaseAndApplyPragmas()
+    private void MigrateDatabaseAndApplyPragmas(string dbPath)
     {
-        using var db = CreateDbContext();
-        db.Database.Migrate();
+        // Migrate() はEFのモデル構築と履歴照会を伴い、UIスレッドで数百msかかる（起動時はウィンドウ表示前に走る）。
+        // スキーマが最新なら素の接続で済ませ、EFの初期化は最初のクエリ（バックグラウンド）まで遅らせる
+        if (!IsSchemaUpToDate(dbPath))
+        {
+            using var db = CreateDbContext();
+            db.Database.Migrate();
+        }
 
         // journal_mode と CREATE INDEX はDBファイル側に永続化されるため起動時に1回だけ実行する。
         // 接続ごとに効くPRAGMA（synchronous等）は PerConnectionPragmaInterceptor が接続オープンの都度適用する
-        db.Database.OpenConnection();
-        var conn = db.Database.GetDbConnection();
+        using var conn = new SqliteConnection($"Data Source={dbPath};");
+        conn.Open();
         using var cmd = conn.CreateCommand();
         cmd.CommandText = @"
             PRAGMA journal_mode = WAL;
@@ -89,6 +100,29 @@ public class FileCacheRepository
             ON FileSystemEntries(IsFolder, FullPath);
         ";
         cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>適用済みの最新マイグレーションが <see cref="LatestMigrationId"/> と一致するか（DBファイルが無い・読めない場合はfalse）。</summary>
+    private static bool IsSchemaUpToDate(string dbPath)
+    {
+        if (!File.Exists(dbPath))
+        {
+            return false;
+        }
+
+        try
+        {
+            using var conn = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly;");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT MAX(MigrationId) FROM __EFMigrationsHistory;";
+            return cmd.ExecuteScalar() as string == LatestMigrationId;
+        }
+        catch (SqliteException)
+        {
+            // 履歴テーブルが無い（作成直後の空ファイル等）。Migrate() に任せる
+            return false;
+        }
     }
 
     /// <summary>
@@ -170,6 +204,23 @@ public class FileCacheRepository
                 x.CreationTimeUtc,
                 x.Attributes))
             .ToList();
+    }
+
+    /// <summary>
+    /// 起動直後に裏で呼び、最初の一覧・ツリー表示で払うEFの初期化（モデル構築・クエリのコンパイル）を先に済ませる。
+    /// コンパイル結果は形が同じクエリで使い回されるため、該当行の無い親パスで1回ずつ流しておけばよい。
+    /// </summary>
+    public void WarmUpQueries()
+    {
+        try
+        {
+            GetEntriesByParentPath(string.Empty);
+            GetSubFoldersByParentPath(string.Empty);
+        }
+        catch
+        {
+            // 下準備にすぎないので、失敗しても本番のクエリが同じ初期化を払うだけ
+        }
     }
 
     /// <summary>

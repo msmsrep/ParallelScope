@@ -35,6 +35,8 @@ public partial class MainWindowViewModel
     private bool _savedIsSplitViewEnabled;
     private int _savedActivePaneIndex;
     private bool _hasRestoredPanes;
+    // 起動時の最初のルートへの移動を、読み込まずに控えるだけにしている間 true（InitializeRootFolders 参照）
+    private bool _defersInitialNavigation;
 
     /// <summary>操作対象のペイン（メニューやスキャンの反映先）。</summary>
     public BrowserPaneViewModel ActivePane => Panes[_activePaneIndex];
@@ -73,6 +75,13 @@ public partial class MainWindowViewModel
     {
         if (_hasRestoredPanes || !arePlusFeaturesEnabled)
         {
+            // 起動時に控えるだけにしておいた最初のルートへの移動は、復元しない場合ここで読み込む
+            // （控えが無ければ何もしない）
+            foreach (var pane in Panes)
+            {
+                pane.ActiveTab.OnActivated();
+            }
+
             return;
         }
 
@@ -101,6 +110,36 @@ public partial class MainWindowViewModel
         LeaveHiddenVirtualFolder();
 
         _hasRestoredPanes = true;
+        SaveSettings();
+    }
+
+    /// <summary>
+    /// 購読状態の確定前に（前回の起動でPlusだったので）先回りして復元したタブ構成を取り消し、
+    /// 未購読の起動と同じ1画面・1タブ（最初のルート）に戻す。確定したら未購読だった場合に呼ぶ。
+    /// 保存済みの内容は、未購読の間は触れない原則どおり読み込んだまま書き戻す状態へ戻す。
+    /// </summary>
+    public void UndoPaneRestore()
+    {
+        if (!_hasRestoredPanes)
+        {
+            return;
+        }
+
+        // 先に戻しておく（以降のペイン操作で走る保存が、畳んだ後の構成を書き出さないようにする）
+        _hasRestoredPanes = false;
+
+        if (_isSplitViewEnabled)
+        {
+            ClosePane(Panes[1], moveTabs: false);
+        }
+
+        var pane = Panes[0];
+        pane.CloseOtherTabs(pane.ActiveTab);
+        if (_rootPathsSnapshot.FirstOrDefault() is { } firstRoot && !PathNormalizer.AreSame(ActiveTab.CurrentPath, firstRoot))
+        {
+            ActiveTab.NavigateTo(firstRoot, false);
+        }
+
         SaveSettings();
     }
 
