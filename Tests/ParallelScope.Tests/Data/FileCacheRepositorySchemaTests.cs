@@ -30,18 +30,8 @@ public class FileCacheRepositorySchemaTests : IDisposable
         return new ParallelScopeDbContext(options);
     }
 
-    private static CachedFileSystemEntry FileWithCreationTime(string parentPath, string name)
-    {
-        return new CachedFileSystemEntry(
-            parentPath,
-            System.IO.Path.Combine(parentPath, name),
-            name,
-            IsFolder: false,
-            SizeBytes: 100,
-            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            Attributes: 32);
-    }
+    private static CachedFileSystemEntry FileWithCreationTime(string parentPath, string name) =>
+        CacheEntries.File(parentPath, name, creationTimeUtc: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
     [Fact]
     public void LatestMigrationId_MatchesLastMigrationInAssembly()

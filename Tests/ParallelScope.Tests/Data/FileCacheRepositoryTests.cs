@@ -28,31 +28,11 @@ public class FileCacheRepositoryTests : IDisposable
     /// <summary>従来どおりの部分一致で検索する照合器。</summary>
     private static NameSearchPattern Substring(string query) => NameSearchPattern.Create(query, useRegex: false);
 
-    private static CachedFileSystemEntry File(string parentPath, string name, long sizeBytes = 100)
-    {
-        return new CachedFileSystemEntry(
-            parentPath,
-            System.IO.Path.Combine(parentPath, name),
-            name,
-            IsFolder: false,
-            sizeBytes,
-            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-            Attributes: 32);
-    }
+    // 作成日時も入れておき、全列のラウンドトリップで欠けないことを確かめられるようにする
+    private static CachedFileSystemEntry File(string parentPath, string name, long sizeBytes = 100) =>
+        CacheEntries.File(parentPath, name, sizeBytes, creationTimeUtc: new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
 
-    private static CachedFileSystemEntry Folder(string parentPath, string name)
-    {
-        return new CachedFileSystemEntry(
-            parentPath,
-            System.IO.Path.Combine(parentPath, name),
-            name,
-            IsFolder: true,
-            SizeBytes: null,
-            new DateTime(2026, 1, 2, 3, 4, 5, DateTimeKind.Utc),
-            CreationTimeUtc: null,
-            Attributes: 16);
-    }
+    private static CachedFileSystemEntry Folder(string parentPath, string name) => CacheEntries.Folder(parentPath, name);
 
     [Fact]
     public void GetEntriesByParentPath_ReturnsFoldersFirstThenNamesAscending()

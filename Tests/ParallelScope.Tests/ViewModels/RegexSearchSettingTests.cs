@@ -9,28 +9,15 @@ namespace ParallelScope.Tests.ViewModels;
 /// 照合そのものは <see cref="Utilities.NameSearchPatternTests"/> で確かめている。
 /// </summary>
 [Collection(SharedStateCollection.Name)]
-public class RegexSearchSettingTests : IDisposable
+public class RegexSearchSettingTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _root = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _root;
 
     public RegexSearchSettingTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
+        _root = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
     }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _root.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel() => new(_fileCacheRepository, _settingsRepository);
 
     [Fact]
     public void DefaultsToDisabled()
@@ -49,7 +36,7 @@ public class RegexSearchSettingTests : IDisposable
 
         viewModel.SetRegexSearchEnabled(true);
 
-        Assert.True(_settingsRepository.Load().IsRegexSearchEnabled);
+        Assert.True(SettingsRepository.Load().IsRegexSearchEnabled);
         Assert.True(CreateViewModel().GetRegexSearchEnabled());
     }
 

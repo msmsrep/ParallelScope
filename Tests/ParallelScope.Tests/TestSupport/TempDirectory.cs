@@ -7,7 +7,7 @@ namespace ParallelScope.Tests.TestSupport;
 /// 実際のアプリデータフォルダ（%LOCALAPPDATA%\ParallelScope）を汚さないため、
 /// リポジトリ類にはこのフォルダを渡す。
 /// </summary>
-internal sealed class TempDirectory : IDisposable
+public sealed class TempDirectory : IDisposable
 {
     public string Path { get; }
 

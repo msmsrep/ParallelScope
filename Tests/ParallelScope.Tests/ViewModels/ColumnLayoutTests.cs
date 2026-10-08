@@ -7,28 +7,11 @@ namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>ファイル一覧の列レイアウト（並び順・列幅）の保存とリセットの確認。</summary>
 [Collection(SharedStateCollection.Name)]
-public class ColumnLayoutTests : IDisposable
+public class ColumnLayoutTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
-
     public ColumnLayoutTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { @"C:\ColumnTest" } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel()
-    {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        SettingsRepository.Save(new AppSettings { RootPaths = { @"C:\ColumnTest" } });
     }
 
     [Fact]
@@ -41,7 +24,7 @@ public class ColumnLayoutTests : IDisposable
             new Dictionary<string, double> { [FileListColumns.Size] = 123 });
 
         Assert.Equal(123, viewModel.GetColumnWidths()[FileListColumns.Size]);
-        Assert.Equal(123, _settingsRepository.Load().ColumnWidths?[FileListColumns.Size]);
+        Assert.Equal(123, SettingsRepository.Load().ColumnWidths?[FileListColumns.Size]);
     }
 
     [Fact]
@@ -59,7 +42,7 @@ public class ColumnLayoutTests : IDisposable
         Assert.Equal(reorderedColumns, viewModel.GetColumnOrder());
 
         // リセットは設定ファイルにも反映される（再起動しても既定幅のまま）
-        var saved = _settingsRepository.Load();
+        var saved = SettingsRepository.Load();
         Assert.Empty(saved.ColumnWidths ?? new Dictionary<string, double>());
         Assert.Equal(reorderedColumns, saved.ColumnOrder);
     }

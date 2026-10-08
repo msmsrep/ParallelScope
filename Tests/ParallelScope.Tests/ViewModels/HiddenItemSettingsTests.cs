@@ -6,28 +6,11 @@ namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>隠し属性・システム属性の表示設定が反映され、保存・復元されることの確認。</summary>
 [Collection(SharedStateCollection.Name)]
-public class HiddenItemSettingsTests : IDisposable
+public class HiddenItemSettingsTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
-
     public HiddenItemSettingsTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { @"C:\HiddenItemTest" } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel()
-    {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        SettingsRepository.Save(new AppSettings { RootPaths = { @"C:\HiddenItemTest" } });
     }
 
     private static void ApplyHiddenItemSettings(MainWindowViewModel viewModel, bool showHiddenItems, bool showSystemItems)
@@ -78,7 +61,7 @@ public class HiddenItemSettingsTests : IDisposable
 
         Assert.False(viewModel.GetShowHiddenItems());
         Assert.False(viewModel.GetShowSystemItems());
-        Assert.False(_settingsRepository.Load().ShowHiddenItems);
+        Assert.False(SettingsRepository.Load().ShowHiddenItems);
         Assert.True(FolderItemViewModel.AttributesToSkip.HasFlag(System.IO.FileAttributes.Hidden));
     }
 

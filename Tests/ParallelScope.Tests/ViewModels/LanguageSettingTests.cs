@@ -7,30 +7,19 @@ namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>表示言語の設定が保存・復元され、ツリーの表示名まで追従することの確認。</summary>
 [Collection(SharedStateCollection.Name)]
-public class LanguageSettingTests : IDisposable
+public class LanguageSettingTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
     private readonly AppLanguageSetting _originalLanguage = AppLanguage.Current;
 
     public LanguageSettingTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { @"C:\LanguageTest" } });
+        SettingsRepository.Save(new AppSettings { RootPaths = { @"C:\LanguageTest" } });
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         AppLanguage.Apply(_originalLanguage);
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel()
-    {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        base.Dispose();
     }
 
     [Fact]
@@ -48,7 +37,7 @@ public class LanguageSettingTests : IDisposable
 
         Assert.Equal(AppLanguageSetting.Japanese, viewModel.GetLanguage());
         Assert.True(AppLanguage.IsJapanese);
-        Assert.Equal(nameof(AppLanguageSetting.Japanese), _settingsRepository.Load().Language);
+        Assert.Equal(nameof(AppLanguageSetting.Japanese), SettingsRepository.Load().Language);
     }
 
     [Fact]

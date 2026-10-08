@@ -6,32 +6,16 @@ namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>2画面（分割表示）でのペインの増減・操作対象の切り替え・タブのペイン間移動の確認。</summary>
 [Collection(SharedStateCollection.Name)]
-public class SplitViewTests : IDisposable
+public class SplitViewTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _rootA = new();
-    private readonly TempDirectory _rootB = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _rootA;
+    private readonly TempDirectory _rootB;
 
     public SplitViewTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _rootA.Dispose();
-        _rootB.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel()
-    {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        _rootA = NewTempDirectory();
+        _rootB = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _rootA.Path, _rootB.Path } });
     }
 
     [Fact]

@@ -7,28 +7,11 @@ namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>ツリー最上位ノードの表示/非表示・並び順の設定が反映され、保存・復元されることの確認。</summary>
 [Collection(SharedStateCollection.Name)]
-public class TreeNodeSettingsTests : IDisposable
+public class TreeNodeSettingsTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
-
     public TreeNodeSettingsTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { @"C:\TreeNodeTest" } });
-    }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel()
-    {
-        return new MainWindowViewModel(_fileCacheRepository, _settingsRepository);
+        SettingsRepository.Save(new AppSettings { RootPaths = { @"C:\TreeNodeTest" } });
     }
 
     private static IReadOnlyList<string> TreeRootPaths(MainWindowViewModel viewModel)
@@ -125,7 +108,7 @@ public class TreeNodeSettingsTests : IDisposable
         var viewModel = CreateViewModel();
         ApplyTreeNodes(viewModel, new[] { TreeNodes.Recent }, order);
 
-        var saved = _settingsRepository.Load();
+        var saved = SettingsRepository.Load();
         Assert.Equal(new[] { TreeNodes.Recent }, saved.VisibleTreeNodes);
         Assert.Equal(order, saved.TreeNodeOrder);
 
@@ -143,7 +126,7 @@ public class TreeNodeSettingsTests : IDisposable
     public void OlderSettingsWithoutTheKeys_FallBackToTheDefaults()
     {
         // 旧バージョンが書いた settings.json（ツリーノードの項目が無い）
-        _settingsRepository.Save(new AppSettings
+        SettingsRepository.Save(new AppSettings
         {
             RootPaths = { @"C:\TreeNodeTest" },
             VisibleTreeNodes = null,

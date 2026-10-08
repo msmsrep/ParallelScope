@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using ParallelScope.Data;
 using ParallelScope.Tests.TestSupport;
 using ParallelScope.Utilities;
@@ -11,44 +10,20 @@ namespace ParallelScope.Tests.ViewModels;
 /// 索引そのものの検索結果は <see cref="Data.FileNameIndexTests"/> で確かめている。
 /// </summary>
 [Collection(SharedStateCollection.Name)]
-public class NameIndexSettingTests : IDisposable
+public class NameIndexSettingTests : ShellTestBase
 {
-    private readonly TempDirectory _temp = new();
-    private readonly TempDirectory _root = new();
-    private readonly FileCacheRepository _fileCacheRepository;
-    private readonly AppSettingsRepository _settingsRepository;
+    private readonly TempDirectory _root;
 
     public NameIndexSettingTests()
     {
-        _fileCacheRepository = new FileCacheRepository(_temp.Path);
-        _settingsRepository = new AppSettingsRepository(_temp.Path);
-        _settingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
+        _root = NewTempDirectory();
+        SettingsRepository.Save(new AppSettings { RootPaths = { _root.Path } });
     }
-
-    public void Dispose()
-    {
-        _fileCacheRepository.ReleasePooledConnections();
-        _temp.Dispose();
-        _root.Dispose();
-    }
-
-    private MainWindowViewModel CreateViewModel() => new(_fileCacheRepository, _settingsRepository);
 
     /// <summary>索引の組み立てはバックグラウンドで走るため、出来上がるまで待つ。</summary>
     private static void WaitForIndexReady(MainWindowViewModel viewModel, bool expected)
     {
-        var stopwatch = Stopwatch.StartNew();
-        while (stopwatch.Elapsed < TimeSpan.FromSeconds(30))
-        {
-            if (viewModel.IsNameIndexReady == expected)
-            {
-                return;
-            }
-
-            Thread.Sleep(20);
-        }
-
-        Assert.Fail($"索引の状態が {expected} になりませんでした");
+        Wait.Until(() => viewModel.IsNameIndexReady == expected, () => $"索引の状態が {expected} になりませんでした");
     }
 
     [Fact]
@@ -68,7 +43,7 @@ public class NameIndexSettingTests : IDisposable
 
         viewModel.SetNameIndexEnabled(true);
 
-        Assert.True(_settingsRepository.Load().IsNameIndexEnabled);
+        Assert.True(SettingsRepository.Load().IsNameIndexEnabled);
         Assert.True(CreateViewModel().GetNameIndexEnabled());
     }
 
@@ -120,7 +95,7 @@ public class NameIndexSettingTests : IDisposable
         viewModel.SetNameIndexEnabled(false);
 
         Assert.False(viewModel.IsNameIndexReady);
-        Assert.False(_settingsRepository.Load().IsNameIndexEnabled);
+        Assert.False(SettingsRepository.Load().IsNameIndexEnabled);
     }
 
     // スキャンで書き換えた行は行IDが変わる。索引へ控えないと、作り直すまで検索結果から消え、増えたファイルも出ない
