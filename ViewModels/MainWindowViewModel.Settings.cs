@@ -25,6 +25,7 @@ public partial class MainWindowViewModel
         _isRegexSearchEnabled = settings.IsRegexSearchEnabled;
         ApplyHiddenItemVisibilityToTree();
         _developerUnlockKey = settings.DeveloperUnlockKey;
+        _lastKnownPlusActive = settings.LastKnownPlusActive;
         _theme = AppTheme.Parse(settings.Theme);
         _language = AppLanguage.Parse(settings.Language);
         _visibleTreeNodes = NormalizeVisibleTreeNodes(settings.VisibleTreeNodes);
@@ -146,6 +147,24 @@ public partial class MainWindowViewModel
         }
 
         _csvExportSizeInBytes = sizeInBytes;
+        SaveSettings();
+    }
+
+    /// <summary>前回の起動で確定したPlusの購読状態を取得する（起動直後、確定前の画面の組み立てに使う）。</summary>
+    public bool GetLastKnownPlusActive()
+    {
+        return _lastKnownPlusActive;
+    }
+
+    /// <summary>確定したPlusの購読状態を、次回起動時の先回り用に記憶する。</summary>
+    public void SetLastKnownPlusActive(bool isActive)
+    {
+        if (_lastKnownPlusActive == isActive)
+        {
+            return;
+        }
+
+        _lastKnownPlusActive = isActive;
         SaveSettings();
     }
 
@@ -360,7 +379,8 @@ public partial class MainWindowViewModel
             TreeNodeOrder = _treeNodeOrder.ToList(),
             FavoritePaths = _favoritePaths.ToList(),
             FolderUsages = _folderUsages.Values.ToList(),
-            DeveloperUnlockKey = _developerUnlockKey
+            DeveloperUnlockKey = _developerUnlockKey,
+            LastKnownPlusActive = _lastKnownPlusActive
         });
     }
 

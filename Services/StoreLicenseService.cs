@@ -26,7 +26,7 @@ public sealed class StoreLicenseService
     private bool _isDeveloperUnlocked;
     private Task<LicenseQueryResult>? _prefetchedLicense;
 
-    /// <summary>Plus機能が現在有効か（月額・買い切りのどちらか）。RefreshLicenseAsync完了まではfalse。</summary>
+    /// <summary>Plus機能が現在有効か（月額・買い切りのどちらか）。RefreshLicenseAsync完了までは false か、ApplyProvisionalState で入れた仮の値。</summary>
     public bool IsPlusActive { get; private set; }
 
     /// <summary>月額サブスクリプションが現在有効か。</summary>
@@ -85,11 +85,21 @@ public sealed class StoreLicenseService
     }
 
     /// <summary>
+    /// 購読状態が確定するまでの仮の値を入れる（前回の起動で確定した状態）。起動直後、<see cref="RefreshLicenseAsync"/> より前に呼ぶ。
+    /// Storeへの問い合わせを待たずに画面を組み立てるためのもので、確定すれば上書きされる。
+    /// 月額・買い切りの別は確定するまで分からないため、<see cref="IsPlusActive"/> だけを立てる。
+    /// </summary>
+    public void ApplyProvisionalState(bool isPlusActive)
+    {
+        IsPlusActive = isPlusActive;
+    }
+
+    /// <summary>
     /// Storeへの問い合わせを裏で始めておく。起動直後に1回だけ呼ぶ。
     /// パッケージ実行ではStoreContextの初期化だけで呼び出し元のスレッドが数百ms止まり、
     /// UIスレッドで行うとそのぶんウィンドウの初回描画が遅れるため。
     /// 結果は次の <see cref="RefreshLicenseAsync"/> で受け取るまでプロパティへは反映しない
-    /// （画面側はライセンスの確定前は未購入として組み立てる前提のため、途中で値が変わらないようにする）。
+    /// （画面側は確定前の値（仮の値）で組み立てて確定時にまとめて直すため、UIスレッドの外で途中に値が変わらないようにする）。
     /// </summary>
     public void StartPrefetch()
     {

@@ -34,6 +34,7 @@ public partial class MainWindowViewModel : ObservableObject
     private (string Path, string Prefix)[] _excludedPathMatchers = Array.Empty<(string, string)>();
     // 開発者専用のPlus解放キー。設定画面では編集できないため、SaveSettingsで消えないよう読み込んだ値を保持し続ける
     private string? _developerUnlockKey;
+    private bool _lastKnownPlusActive;
     private AppThemeSetting _theme = AppThemeSetting.System;
     private AppLanguageSetting _language = AppLanguageSetting.System;
 
