@@ -124,6 +124,31 @@ public class PaneRestoreTests : ShellTestBase
         Assert.Equal(_rootA.Path, hiddenTab.CurrentPath);
     }
 
+    /// <summary>
+    /// まだ表示していないタブへの移動は、控えてある移動先を差し替えるだけにする（ツリーの右クリック等から入りうる）。
+    /// 読み込みは初回表示のときに差し替え後の移動先でまとめて行う。
+    /// </summary>
+    [Fact]
+    public void HiddenTab_NavigateToOnlyRedirectsUntilItIsShown()
+    {
+        var first = Start();
+        first.ActivePane.OpenTab(_rootB.Path);
+        first.ActivePane.ActivateTabAt(0);
+        var subFolder = Directory.CreateDirectory(Path.Combine(_rootA.Path, "Sub")).FullName;
+        File.WriteAllText(Path.Combine(subFolder, "inside.txt"), "x");
+
+        var restarted = Start();
+        var hiddenTab = restarted.ActivePane.Tabs[1];
+
+        Assert.True(hiddenTab.NavigateTo(subFolder, addToHistory: true));
+        Assert.Equal(subFolder, hiddenTab.CurrentPath);
+        Assert.Empty(hiddenTab.FileItems);
+
+        restarted.ActivePane.ActivateTabAt(1);
+
+        Wait.ForItemNames(hiddenTab, "inside.txt");
+    }
+
     /// <summary>表示を遅らせたタブも、閉じて開き直すまでの間に構成が変わればその内容で開く。</summary>
     [Fact]
     public void HiddenTab_FollowsRootChangesMadeBeforeItIsShown()
