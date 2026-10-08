@@ -134,19 +134,6 @@ public class AppSettingsRepositoryTests
     }
 
     [Fact]
-    public void Load_FallsBackToDefaultsWhenFileIsCorrupted()
-    {
-        using var temp = new TempDirectory();
-        File.WriteAllText(Path.Combine(temp.Path, "settings.json"), "{ this is not json");
-
-        // 設定ファイルが壊れていても起動できるよう、読み込み失敗はデフォルト設定へフォールバックする
-        var settings = new AppSettingsRepository(temp.Path).Load();
-
-        Assert.Empty(settings.RootPaths);
-        Assert.Equal(AppSettings.DefaultFullScanIntervalHours, settings.FullScanIntervalHours);
-    }
-
-    [Fact]
     public void Load_FallsBackToDefaultsWhenFileContainsJsonNull()
     {
         using var temp = new TempDirectory();
@@ -205,9 +192,11 @@ public class AppSettingsRepositoryTests
         var path = Path.Combine(temp.Path, "settings.json");
         File.WriteAllText(path, "{ これは JSON ではない");
 
+        // 設定ファイルが壊れていても起動できるよう、読み込み失敗はデフォルト設定へフォールバックする
         var settings = new AppSettingsRepository(temp.Path).Load();
 
         Assert.Empty(settings.RootPaths);
+        Assert.Equal(AppSettings.DefaultFullScanIntervalHours, settings.FullScanIntervalHours);
         // 原因を追えるよう、読めなかったファイルは退避しておく
         Assert.True(File.Exists(Path.Combine(temp.Path, "settings.broken.json")));
     }
