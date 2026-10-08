@@ -73,6 +73,39 @@ public class FileCacheRepositoryTests : IDisposable
         Assert.Empty(_repository.GetEntriesByParentPath(@"C:\Nothing"));
     }
 
+    // ツリーの子の表示用。ファイル行・孫フォルダは返さない（直下に数万ファイルあっても読まずに済ませるため）
+    [Fact]
+    public void GetSubFoldersByParentPath_ReturnsOnlyTheDirectChildFolders()
+    {
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            Folder(@"C:\Root", "Alpha"),
+            File(@"C:\Root", "a.txt"),
+            Folder(@"C:\Root", "Beta")
+        });
+        _repository.ReplaceEntriesByParentPath(@"C:\Root\Alpha", new[] { Folder(@"C:\Root\Alpha", "Grandchild") });
+
+        var subFolders = _repository.GetSubFoldersByParentPath(@"C:\Root");
+
+        Assert.Equal(new[] { "Alpha", "Beta" }, subFolders.Select(x => x.Name).Order());
+        Assert.All(subFolders, x => Assert.True(x.IsFolder));
+        Assert.Empty(_repository.GetSubFoldersByParentPath(@"C:\Unknown"));
+    }
+
+    [Fact]
+    public void GetNameIndexSizeHint_CountsRowsAndNameLengths()
+    {
+        Assert.Equal((0, 0), _repository.GetNameIndexSizeHint());
+
+        _repository.ReplaceEntriesByParentPath(@"C:\Root", new[]
+        {
+            Folder(@"C:\Root", "Alpha"),
+            File(@"C:\Root", "a.txt")
+        });
+
+        Assert.Equal((2, "Alpha".Length + "a.txt".Length), _repository.GetNameIndexSizeHint());
+    }
+
     [Fact]
     public void ReplaceEntriesByParentPath_RemovesEntriesThatNoLongerExist()
     {

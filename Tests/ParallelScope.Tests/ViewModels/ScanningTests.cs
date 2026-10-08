@@ -20,11 +20,29 @@ public class ScanningTests : ShellTestBase
         File.WriteAllText(Path.Combine(_root, "top.txt"), "x");
         File.WriteAllText(Path.Combine(_root, "Sub", "middle.txt"), "x");
         File.WriteAllText(Path.Combine(_root, "Sub", "Deep", "bottom.txt"), "x");
+        PinFolderTimestamps();
+    }
+
+    /// <summary>
+    /// フォルダの更新日時を固定する。親フォルダの一覧に載るフォルダの更新日時はNTFSが遅れて反映するため、
+    /// 作った直後のフォルダでは1回目と2回目のスキャンで値が食い違い、「変化なし」の判定が揺れる。
+    /// </summary>
+    private void PinFolderTimestamps()
+    {
+        var pinned = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        foreach (var folder in Directory.EnumerateDirectories(_root, "*", SearchOption.AllDirectories).Reverse())
+        {
+            Directory.SetLastWriteTimeUtc(folder, pinned);
+        }
     }
 
     private void SaveRoots(IEnumerable<string> rootPaths, IEnumerable<string>? excludedPaths = null)
     {
+        // 起動時にタブが最初のルートを開いて裏で読み直し、作成日時付きの行をキャッシュへ書く。
+        // スキャンは作成日時を書かないため、走査対象を最初のルートにすると両者の書き込みが競合して
+        // 差分の件数が揺れる。タブには空のフォルダを開かせておく
         var settings = new AppSettings();
+        settings.RootPaths.Add(NewTempDirectory().Path);
         settings.RootPaths.AddRange(rootPaths);
         settings.ExcludedPaths.AddRange(excludedPaths ?? Array.Empty<string>());
         SettingsRepository.Save(settings);
@@ -60,6 +78,7 @@ public class ScanningTests : ShellTestBase
         Assert.Equal(0, await viewModel.FullScanConfiguredRootsAsync(CancellationToken.None));
 
         File.WriteAllText(Path.Combine(_root, "Sub", "added.txt"), "x");
+        PinFolderTimestamps();
         Assert.Equal(1, await viewModel.FullScanConfiguredRootsAsync(CancellationToken.None));
     }
 

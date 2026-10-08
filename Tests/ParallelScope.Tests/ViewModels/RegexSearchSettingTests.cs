@@ -75,4 +75,31 @@ public class RegexSearchSettingTests : ShellTestBase
         Assert.False(viewModel.IsRegexSearchActive);
         Assert.True(viewModel.GetRegexSearchEnabled());
     }
+
+    // 打ちかけで式が成立しない間は一覧を据え置き、検索欄を赤くするだけにする（1文字ごとに一覧を消さないため）
+    [Fact]
+    public void BrokenPatternKeepsTheListAndFlagsTheQuery()
+    {
+        var sub = Path.Combine(_root.Path, "Sub");
+        FileCacheRepository.ReplaceEntriesByParentPath(sub, new[]
+        {
+            CacheEntries.File(sub, "alpha.txt"),
+            CacheEntries.File(sub, "beta.txt")
+        });
+        var viewModel = CreateViewModel();
+        viewModel.SetPlusFeaturesEnabled(true);
+        viewModel.SetRegexSearchEnabled(true);
+        var tab = viewModel.ActiveTab;
+
+        tab.SearchQuery = "^a";
+        Wait.ForItemNames(tab, "alpha.txt");
+
+        tab.SearchQuery = "^a(";
+        Assert.True(tab.IsSearchQueryInvalid);
+        Assert.Equal(new[] { "alpha.txt" }, tab.FileItems.Select(x => x.Name));
+
+        tab.SearchQuery = "^b";
+        Assert.False(tab.IsSearchQueryInvalid);
+        Wait.ForItemNames(tab, "beta.txt");
+    }
 }

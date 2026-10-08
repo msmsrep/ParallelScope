@@ -133,4 +133,19 @@ public class TabLifecycleTests : ShellTestBase
 
         Assert.Same(items, tab.FileItems);
     }
+
+    // 一覧はまずキャッシュから出し、裏でファイルシステムを読み直して一覧とキャッシュを置き換える
+    [Fact]
+    public void OpeningAFolder_ReplacesTheCachedListWithTheLiveOne()
+    {
+        FileCacheRepository.ReplaceEntriesByParentPath(_small, new[] { CacheEntries.File(_small, "stale.txt") });
+        var tab = CreateViewModel().ActiveTab;
+
+        tab.LoadFiles(_small);
+
+        Wait.ForItemNames(tab, "a.txt");
+        Wait.Until(
+            () => FileCacheRepository.GetEntriesByParentPath(_small).Select(x => x.Name).SequenceEqual(new[] { "a.txt" }),
+            () => "キャッシュがファイルシステムの内容へ置き換わりませんでした");
+    }
 }
