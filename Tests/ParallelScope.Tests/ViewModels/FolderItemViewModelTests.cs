@@ -11,7 +11,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// 子が2万を超えるフォルダがあるため、読み込みの反映は「1件ずつ追加」ではなく
 /// コレクションごとの差し替えで行う（件数分の CollectionChanged がUIスレッドで発生しないこと）。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class FolderItemViewModelTests : IDisposable
 {
     private readonly TempDirectory _root = new();

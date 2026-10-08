@@ -8,7 +8,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// 正規表現検索の設定（Plus機能）の確認。設定値の保存と、購読状態による有効/無効の切り替わり方を見る。
 /// 照合そのものは <see cref="Utilities.NameSearchPatternTests"/> で確かめている。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class RegexSearchSettingTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

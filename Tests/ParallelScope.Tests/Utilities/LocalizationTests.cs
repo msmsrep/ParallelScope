@@ -4,7 +4,7 @@ using ParallelScope.Utilities;
 
 namespace ParallelScope.Tests.Utilities;
 
-[Collection(LanguageCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class LocalizationTests
 {
     [Fact]

@@ -10,7 +10,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// ファイル名索引の設定（Plus機能）の確認。設定値の保存と、購読状態による有効/無効の切り替わり方を見る。
 /// 索引そのものの検索結果は <see cref="Data.FileNameIndexTests"/> で確かめている。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class NameIndexSettingTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

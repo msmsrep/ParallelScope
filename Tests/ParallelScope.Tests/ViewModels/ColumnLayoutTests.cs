@@ -6,6 +6,7 @@ using ParallelScope.ViewModels;
 namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>ファイル一覧の列レイアウト（並び順・列幅）の保存とリセットの確認。</summary>
+[Collection(SharedStateCollection.Name)]
 public class ColumnLayoutTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

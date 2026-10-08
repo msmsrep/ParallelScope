@@ -8,7 +8,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// 1ペイン内のタブ操作（追加・複製・クローズ・切り替え・並べ替え・開き直し）の確認。
 /// ファイルシステムへ実際に移動できる必要があるため、起点には一時フォルダを使う。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class BrowserTabTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

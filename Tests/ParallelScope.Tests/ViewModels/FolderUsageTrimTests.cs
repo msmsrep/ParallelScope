@@ -9,7 +9,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// アクセス実績（「最近」「よく使う」の元データ）の件数が上限で頭打ちになることの確認。
 /// 上限が無いと訪問したフォルダの数だけ settings.json が際限なく育つ。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class FolderUsageTrimTests : IDisposable
 {
     private const int Cap = MainWindowViewModel.MaxFolderUsages;

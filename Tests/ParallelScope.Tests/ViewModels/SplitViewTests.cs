@@ -5,7 +5,7 @@ using ParallelScope.ViewModels;
 namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>2画面（分割表示）でのペインの増減・操作対象の切り替え・タブのペイン間移動の確認。</summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class SplitViewTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

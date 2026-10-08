@@ -9,7 +9,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// タブ構成・分割状態の保存と復元の確認。
 /// アプリと同じく「起動 → 購読状態が確定した時点で <see cref="MainWindowViewModel.RestorePanes"/>」の順で操作する。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class PaneRestoreTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

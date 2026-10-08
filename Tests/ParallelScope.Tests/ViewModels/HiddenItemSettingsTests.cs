@@ -5,7 +5,7 @@ using ParallelScope.ViewModels;
 namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>隠し属性・システム属性の表示設定が反映され、保存・復元されることの確認。</summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class HiddenItemSettingsTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

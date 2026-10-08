@@ -9,7 +9,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// All Filesモード（フラット表示）の取得結果の確認。取得は「貯まった分から順に出す」段階表示のため、
 /// 途中経過を挟んでも最終的に全件そろうことを見る。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class FlatFileViewTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

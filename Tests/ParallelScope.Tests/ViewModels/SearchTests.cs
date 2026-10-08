@@ -9,7 +9,7 @@ namespace ParallelScope.Tests.ViewModels;
 /// キャッシュに対する検索（インクリメンタルサーチ）の確認。
 /// 検索語は入力の都度リクエストされ、古い検索は途中で打ち切られる。
 /// </summary>
-[Collection(FolderTreeCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class SearchTests : IDisposable
 {
     private readonly TempDirectory _temp = new();

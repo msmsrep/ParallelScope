@@ -60,13 +60,9 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 
 ## テストを書くときの決まりごと
 
-### `MainWindowViewModel` を生成するテストは直列に走らせる
+### 静的な状態に触れるテストは直列に走らせる
 
-フォルダツリーの列挙条件（`FolderItemViewModel.AttributesToSkip`）はプロセス全体で1つの静的な値で、ViewModelの生成・設定変更のたびに書き換わります。生成するテストクラスには `[Collection(FolderTreeCollection.Name)]` を付けてください（同一コレクション内は並列実行されません）。
-
-### 表示言語を切り替えるテストは直列に走らせる
-
-`AppLanguage` はプロセス全体で1つの静的な状態なので、切り替えるテストクラスには `[Collection(LanguageCollection.Name)]` を付けて（同一コレクション内は並列実行されません）、切り替えは `TestSupport/LanguageScope` で囲んで元の言語へ戻してください。
+フォルダツリーの列挙条件（`FolderItemViewModel.AttributesToSkip`。ViewModelの生成・設定変更のたびに書き換わる）と表示言語（`AppLanguage`）は、どちらもプロセス全体で1つの静的な状態です。**`MainWindowViewModel` を生成するテストクラスと、表示言語を切り替えるテストクラスには `[Collection(SharedStateCollection.Name)]` を付けてください**（同一コレクション内は並列実行されません）。2つを別のコレクションに分けると、言語を切り替えるテストとViewModelを生成するテスト（仮想ノードの表示名が言語で決まる）が並列に走るため、1つにまとめています。言語の切り替えは `TestSupport/LanguageScope` で囲んで元の言語へ戻してください。
 
 ### 実際のアプリデータを絶対に触らない
 

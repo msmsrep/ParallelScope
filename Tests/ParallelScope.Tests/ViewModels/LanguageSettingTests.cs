@@ -6,7 +6,7 @@ using ParallelScope.ViewModels;
 namespace ParallelScope.Tests.ViewModels;
 
 /// <summary>表示言語の設定が保存・復元され、ツリーの表示名まで追従することの確認。</summary>
-[Collection(LanguageCollection.Name)]
+[Collection(SharedStateCollection.Name)]
 public class LanguageSettingTests : IDisposable
 {
     private readonly TempDirectory _temp = new();
