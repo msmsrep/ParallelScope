@@ -1,0 +1,60 @@
+ParallelScope - Third-Party Notices
+===================================
+
+ParallelScope is licensed under the GNU Affero General Public License v3.0
+(see LICENSE). Source code: https://github.com/msmsrep/ParallelScope
+
+ParallelScope includes the third-party components listed below. Each
+component is distributed under its own license, reproduced in the files
+referenced here (the "licenses" folder is shipped next to this file).
+
+
+Components licensed under the MIT License
+-----------------------------------------
+License text: licenses/MIT-dotnet-foundation.txt
+Copyright (c) .NET Foundation and Contributors / (c) Microsoft Corporation
+
+- .NET Runtime and Windows Desktop (WPF) Runtime 10.0
+  (bundled because the app is published self-contained)
+  https://github.com/dotnet/runtime
+  https://github.com/dotnet/wpf
+  The .NET Runtime itself includes further third-party components; their
+  notices are reproduced in licenses/dotnet-runtime-THIRD-PARTY-NOTICES.txt.
+- CommunityToolkit.Mvvm 8.4.2
+  https://github.com/CommunityToolkit/dotnet
+- Microsoft.EntityFrameworkCore, .Abstractions, .Relational, .Sqlite 10.0.9
+  Microsoft.Data.Sqlite 10.0.9
+  https://github.com/dotnet/efcore
+- Microsoft.Extensions.* 10.0.9
+  (Caching, Configuration.Abstractions, DependencyInjection,
+  DependencyModel, Logging, Options, Primitives)
+  https://github.com/dotnet/runtime
+- C#/WinRT runtime (WinRT.Runtime.dll)
+  https://github.com/microsoft/CsWinRT
+
+
+Components licensed under the Apache License 2.0
+------------------------------------------------
+License text: licenses/Apache-2.0.txt
+
+- SQLitePCLRaw (SQLitePCLRaw.core, SQLitePCLRaw.batteries_v2,
+  SQLitePCLRaw.provider.e_sqlite3) 2.1.11
+  SQLitePCLRaw.lib.e_sqlite3 3.50.3 (native build packaging)
+  Copyright 2014-2025 SourceGear, LLC
+  https://github.com/ericsink/SQLitePCL.raw
+
+
+Public domain
+-------------
+- SQLite 3.50.3 (e_sqlite3.dll)
+  https://www.sqlite.org/copyright.html
+  The SQLite source code is dedicated to the public domain by its authors.
+
+
+Microsoft Windows SDK
+---------------------
+- Microsoft.Windows.SDK.NET.dll (Windows SDK projection for .NET)
+  (c) Microsoft Corporation. All rights reserved.
+  Licensed under the Microsoft Windows SDK license:
+  https://aka.ms/WinSDKLicenseURL
+  This component is the interface to the Windows operating system APIs.
