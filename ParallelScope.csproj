@@ -51,6 +51,15 @@
       <!-- <CopyToPublishDirectory>Always</CopyToPublishDirectory> -->
     </Content>
 
+    <!-- ライセンス表記。MIT・Apache-2.0 は配布物への同梱が条件のため、発行物（＝MSIX）にも入れる -->
+    <None Include="LICENSE;THIRD-PARTY-NOTICES.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="licenses\*.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>licenses\%(Filename)%(Extension)</Link>
+    </None>
+
     <!-- アプリ左上のアイコン -->
     <Resource Include="Assets/logo.ico" />
 

@@ -181,6 +181,12 @@ Some features are offered as "ParallelScope Plus", an add-on on the Microsoft St
 
 The full source code of this app is public, including the in-app purchase implementation. The Plus license state is verified against the Microsoft Store license, so **the purchase flow (and the Plus feature lock) only takes effect in the version installed from the Microsoft Store**.
 
+## License
+
+ParallelScope is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+Third-party components bundled with the app (.NET runtime, EF Core, SQLitePCLRaw, SQLite, etc.) are distributed under their own licenses. See [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) and the [licenses](licenses) folder; both are also included in the installed app folder.
+
 ## Support
 
 This app (ParallelScope) is independently developed and managed. We accept voluntary support to help with continuous updates and feature improvements.  
