@@ -180,6 +180,12 @@ $env:PARALLELSCOPE_CERT_PASSWORD = '<パスワード>'
 
 本アプリのソースコードは課金機能の実装も含めてすべて公開しています。購入状態の判定は Microsoft Store のライセンス情報に基づくため、**課金（および Plus 機能のロック）が機能するのは Microsoft Store からインストールした版のみ**です。
 
+## ライセンス
+
+ParallelScope は [GNU Affero General Public License v3.0](LICENSE)（AGPL-3.0）で公開しています。
+
+アプリに同梱しているサードパーティ製コンポーネント（.NET ランタイム、EF Core、SQLitePCLRaw、SQLite など）はそれぞれのライセンスに従います。[THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt) と [licenses](licenses) フォルダを参照してください（どちらもインストール先のアプリフォルダにも含まれています）。
+
 ## 開発を支援する
 
 本アプリ（ParallelScope）は個人で開発・運営しています。継続的なアップデートや機能改善のため、任意の開発支援を受け付けています。  
