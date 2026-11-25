@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Diagnostics;
+using System.Threading;
 using ParallelScope.Data;
 using ParallelScope.Utilities;
 
@@ -45,6 +46,11 @@ public partial class BrowserTabViewModel
         // All Filesモード中の検索はファイルのみを対象にする（フォルダは表示しない）。
         // 結果反映までにモードが切り替わっても古い結果を出さないよう、リクエスト時点の値を固定して渡す
         var filesOnly = IsFlatFileViewEnabled;
+
+        if (SearchPerfTrace.IsEnabled)
+        {
+            Volatile.Write(ref _searchRequestedTimestamp, Stopwatch.GetTimestamp());
+        }
 
         // 検索リクエストを統合するキューへ委譲
         _searchCoalescer.Request((searchRootPath, pattern, searchVersion, filesOnly));
@@ -98,6 +104,20 @@ public partial class BrowserTabViewModel
 
     private CompletedSearch? _completedSearch;
 
+    /// <summary>計測用: 最後に検索を要求した時点（コアレサーで待たされた時間を出すため）。</summary>
+    private long _searchRequestedTimestamp;
+
+    private SearchPerfTrace? StartSearchPerfTrace(string rootPath, NameSearchPattern pattern, bool filesOnly)
+    {
+        if (!SearchPerfTrace.IsEnabled)
+        {
+            return null;
+        }
+
+        var queueWait = Stopwatch.GetElapsedTime(Volatile.Read(ref _searchRequestedTimestamp));
+        return SearchPerfTrace.Start(pattern.Text, pattern.IsRegex, filesOnly, rootPath, queueWait);
+    }
+
     /// <summary>検索結果の使い回しをやめる（キャッシュが更新された・検索を終えた・一覧を手放した）。</summary>
     private void ForgetCompletedSearch()
     {
@@ -148,9 +168,18 @@ public partial class BrowserTabViewModel
         // 直前の結果から絞り込めるならDBは引かない。ここはキューが空のとき要求元（UIスレッド）から
         // そのまま同期実行されるため、必ずバックグラウンドへ逃がす
         // （1文字の検索語の結果は数十万件あり、その絞り込みをUIスレッドでやると入力が引っかかる）
+        var trace = StartSearchPerfTrace(rootPath, pattern, filesOnly);
+
         if (await Task.Run(() => TryNarrowCompletedSearch(rootPath, pattern, filesOnly)) is { } narrowedResults)
         {
-            PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, narrowedResults, isComplete: true);
+            if (trace is not null)
+            {
+                trace.Source = "narrow";
+                trace.HitCount = narrowedResults.Count;
+                trace.MarkBackgroundDone();
+            }
+
+            PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, narrowedResults, isComplete: true, trace);
             return;
         }
 
@@ -160,6 +189,8 @@ public partial class BrowserTabViewModel
         {
             cacheResults = await Task.Run(() =>
             {
+                using var traceScope = trace?.Enter();
+
                 var results = new List<FileItemViewModel>();
                 var nextPublishCount = SearchFirstBatchSize;
 
@@ -168,8 +199,14 @@ public partial class BrowserTabViewModel
                 // （ヒットが少ない検索語では、次のヒットまでに配下の全行を読み切ってしまう）
                 bool IsAborted() => !IsSearchResultStillValid(rootPath, pattern, searchVersion);
 
+                var entries = SearchCacheEntries(rootPath, pattern, IsAborted);
+                if (trace is not null)
+                {
+                    entries = trace.TimeSource(entries);
+                }
+
                 foreach (var item in ToViewModels(
-                    SearchCacheEntries(rootPath, pattern, IsAborted)
+                    entries
                         .Where(x => !(filesOnly && x.IsFolder))
                         .Where(x => !_host.IsExcludedNormalizedPath(x.FullPath))))
                 {
@@ -199,7 +236,7 @@ public partial class BrowserTabViewModel
 
                     // 全件そろうのを待たず、貯まった分を先に見せる（結果は並べ替え済みで返ってくるので、
                     // 途中経過は最終結果の先頭部分そのものになる）。この後も追記が続くため渡すのは複製
-                    PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, results.ToList(), isComplete: false);
+                    PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, results.ToList(), isComplete: false, trace);
                     nextPublishCount = results.Count * SearchBatchGrowthFactor;
                 }
 
@@ -211,26 +248,41 @@ public partial class BrowserTabViewModel
             cacheResults = new List<FileItemViewModel>();
         }
 
-        PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, cacheResults, isComplete: true);
+        if (trace is not null)
+        {
+            trace.HitCount = cacheResults.Count;
+            trace.MarkBackgroundDone();
+        }
+
+        PublishSearchResults(rootPath, pattern, searchVersion, filesOnly, cacheResults, isComplete: true, trace);
     }
 
     /// <summary>検索結果を画面へ反映する。全件そろった結果だけ、次の入力で絞り込めるよう控える。</summary>
+    /// <param name="trace">計測中なら、その記録先（全件そろった反映でログへ書き出す）。</param>
     private void PublishSearchResults(
-        string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete)
+        string rootPath, NameSearchPattern pattern, int searchVersion, bool filesOnly, List<FileItemViewModel> results, bool isComplete,
+        SearchPerfTrace? trace = null)
     {
         if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
         {
+            CompleteSearchPerfTrace(trace, isComplete, superseded: true);
             return;
         }
+
+        var postedTicks = trace?.ElapsedTicks ?? 0;
 
         _host.UiContext.Post(_ =>
         {
             if (!IsSearchResultStillValid(rootPath, pattern, searchVersion))
             {
+                CompleteSearchPerfTrace(trace, isComplete, superseded: true);
                 return;
             }
 
+            var applyStarted = Stopwatch.GetTimestamp();
             ReplaceVisibleFileItems(results);
+            trace?.RecordUiApply(postedTicks, Stopwatch.GetTimestamp() - applyStarted);
+            CompleteSearchPerfTrace(trace, isComplete, superseded: false);
 
             // 途中経過から絞り込むと結果が欠けるため、控えるのは全件そろったときだけ。
             // 控えるのは実際に表示したインスタンス —— ReplaceVisibleFileItems は既存の行を
@@ -240,6 +292,18 @@ public partial class BrowserTabViewModel
                 Volatile.Write(ref _completedSearch, new CompletedSearch(rootPath, pattern.Text, filesOnly, FileItems.ToList()));
             }
         }, null);
+    }
+
+    /// <summary>計測を書き出す。途中経過の反映では書かず、最後の1回（用済みで捨てた場合を含む）でだけ書く。</summary>
+    private static void CompleteSearchPerfTrace(SearchPerfTrace? trace, bool isComplete, bool superseded)
+    {
+        if (trace is null || !isComplete)
+        {
+            return;
+        }
+
+        trace.Superseded = superseded;
+        trace.Complete();
     }
 
     /// <summary>結果が届いた時点でもまだ表示すべき状態か（検索語の変更・フォルダ移動が起きていないか）を確認する。</summary>
@@ -256,14 +320,22 @@ public partial class BrowserTabViewModel
     {
         // ファイル名索引（Plus機能）が使えるならそちらで探す。無効・未完成なら null が返るのでDBへ問い合わせる
         var nameIndex = _host.NameIndex;
+        var trace = SearchPerfTrace.Current;
 
         IEnumerable<CachedFileSystemEntry> SearchUnder(string path)
         {
-            return nameIndex?.SearchUnderPath(path, pattern, shouldAbort)
-                ?? _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern, shouldAbort);
+            if (nameIndex?.SearchUnderPath(path, pattern, shouldAbort) is { } indexed)
+            {
+                trace?.Source = "index";
+                return indexed;
+            }
+
+            trace?.Source = "db";
+            return _host.FileCacheRepository.EnumerateSearchEntriesUnderPath(path, pattern, shouldAbort);
         }
 
         var traversalPaths = _host.GetTraversalPaths(rootPath);
+        trace?.TraversalPathCount = traversalPaths.Count;
         if (traversalPaths.Count == 1)
         {
             return SearchUnder(traversalPaths[0]);

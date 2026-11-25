@@ -573,8 +573,11 @@ public class FileCacheRepository
     /// <summary>行IDを指定してエントリ本体を取り出す（索引で絞り込んだ結果の肉付けに使う）。</summary>
     /// <remarks>
     /// 並び順は指定しない。呼び出し側が索引上の位置（＝表示順）へ並べ直せるよう、行IDを添えて返す。
+    /// 親フォルダのパスは索引が同じ文字列を持っているので、DBからは読まず <paramref name="parentPathOfId"/> で受け取る
+    /// （ヒットが多い検索では1件ごとの文字列の読み出しと共有化の辞書引きが効いてくるため）。
+    /// 行IDは使い回されない（AUTOINCREMENT）ので、索引が持つ親フォルダとDBの行の親フォルダは必ず一致する。
     /// </remarks>
-    public List<(int Id, CachedFileSystemEntry Entry)> GetEntriesByIds(IReadOnlyList<int> ids)
+    public List<(int Id, CachedFileSystemEntry Entry)> GetEntriesByIds(IReadOnlyList<int> ids, Func<int, string> parentPathOfId)
     {
         var result = new List<(int Id, CachedFileSystemEntry Entry)>(ids.Count);
         if (ids.Count == 0)
@@ -582,33 +585,121 @@ public class FileCacheRepository
             return result;
         }
 
+        // 索引の並び（表示順）のままだとB-treeの中を飛び回るので、行ID順にして近い葉を続けて読ませる
+        var sortedIds = ids.ToArray();
+        Array.Sort(sortedIds);
+
         using var db = CreateDbContext();
         db.Database.OpenConnection();
         var conn = db.Database.GetDbConnection();
 
-        // 同じ親フォルダの行数だけ同一内容の ParentPath 文字列が返るため、1インスタンスへ共有する
-        var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
-
         // SQLiteのパラメータ数には上限があるうえ、IN句が長すぎると解析コスト自体が効いてくるため小分けにする
-        for (var start = 0; start < ids.Count; start += IdLookupChunkSize)
+        for (var start = 0; start < sortedIds.Length; start += IdLookupChunkSize)
         {
-            var chunkLength = Math.Min(IdLookupChunkSize, ids.Count - start);
+            var chunkLength = Math.Min(IdLookupChunkSize, sortedIds.Length - start);
 
             using var cmd = conn.CreateCommand();
             // 値は自前の索引が持つ行IDそのもの（外部入力ではない）だが、組み立ては数値化を通して行う
             cmd.CommandText = @"
-                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes, Id
+                SELECT Id, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
                 FROM FileSystemEntries
-                WHERE Id IN (" + string.Join(",", ids.Skip(start).Take(chunkLength).Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + ")";
+                WHERE Id IN (" + string.Join(",", sortedIds.Skip(start).Take(chunkLength).Select(id => id.ToString(System.Globalization.CultureInfo.InvariantCulture))) + ")";
 
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                result.Add((reader.GetInt32(8), ReadEntry(reader, parentPathPool)));
+                var id = reader.GetInt32(0);
+                result.Add((id, new CachedFileSystemEntry(
+                    parentPathOfId(id),
+                    reader.GetString(1),
+                    reader.GetString(2),
+                    reader.GetBoolean(3),
+                    reader.IsDBNull(4) ? null : reader.GetInt64(4),
+                    ReadDateTime(reader, 5),
+                    reader.IsDBNull(6) ? null : ReadDateTime(reader, 6),
+                    reader.IsDBNull(7) ? null : reader.GetInt32(7))));
             }
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 日時列を読む。EF CoreはSQLiteに日時を "yyyy-MM-dd HH:mm:ss[.FFFFFFF]" の文字列で書くが、
+    /// <see cref="DbDataReader.GetDateTime"/> は汎用の DateTime.Parse を通すため、検索で数十万行を読むと
+    /// 解析だけで目立つ時間になる。この書式に限って手で解き、それ以外は従来の解析に任せる。
+    /// </summary>
+    internal static DateTime ReadDateTime(DbDataReader reader, int ordinal)
+    {
+        return reader.GetFieldType(ordinal) == typeof(string)
+            && TryParseSqliteDateTime(reader.GetString(ordinal), out var value)
+                ? value
+                : reader.GetDateTime(ordinal);
+    }
+
+    /// <summary>"yyyy-MM-dd HH:mm:ss[.F～FFFFFFF]" を解く（Kind は GetDateTime と同じく Unspecified）。</summary>
+    internal static bool TryParseSqliteDateTime(string text, out DateTime value)
+    {
+        value = default;
+        var s = text.AsSpan();
+        if (s.Length < 19 || s.Length == 20 || s.Length > 27
+            || s[4] != '-' || s[7] != '-' || s[10] != ' ' || s[13] != ':' || s[16] != ':'
+            || (s.Length > 19 && s[19] != '.'))
+        {
+            return false;
+        }
+
+        if (!TryReadDigits(s.Slice(0, 4), out var year)
+            || !TryReadDigits(s.Slice(5, 2), out var month)
+            || !TryReadDigits(s.Slice(8, 2), out var day)
+            || !TryReadDigits(s.Slice(11, 2), out var hour)
+            || !TryReadDigits(s.Slice(14, 2), out var minute)
+            || !TryReadDigits(s.Slice(17, 2), out var second))
+        {
+            return false;
+        }
+
+        long fractionTicks = 0;
+        if (s.Length > 19)
+        {
+            var fraction = s.Slice(20);
+            if (!TryReadDigits(fraction, out var fractionValue))
+            {
+                return false;
+            }
+
+            fractionTicks = fractionValue;
+            for (var digits = fraction.Length; digits < 7; digits++)
+            {
+                fractionTicks *= 10;
+            }
+        }
+
+        if (month is < 1 or > 12 || day < 1 || day > DateTime.DaysInMonth(Math.Max(year, 1), month)
+            || year < 1 || hour > 23 || minute > 59 || second > 59)
+        {
+            return false;
+        }
+
+        value = new DateTime(year, month, day, hour, minute, second).AddTicks(fractionTicks);
+        return true;
+    }
+
+    private static bool TryReadDigits(ReadOnlySpan<char> digits, out int value)
+    {
+        value = 0;
+        foreach (var c in digits)
+        {
+            var digit = c - '0';
+            if ((uint)digit > 9)
+            {
+                return false;
+            }
+
+            value = value * 10 + digit;
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -618,10 +709,21 @@ public class FileCacheRepository
     /// </summary>
     private const int IdLookupChunkSize = 5_000;
 
-    /// <summary>指定した親フォルダ直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
-    public List<CachedFileSystemEntry> GetSearchEntriesInParent(string parentPath, NameSearchPattern pattern)
+    /// <summary>指定した親フォルダ群の直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
+    /// <remarks>
+    /// 親フォルダごとに接続を開き直さないよう、1本の接続・少数の文でまとめて引く。
+    /// なお実測（C:\ 直下、40〜80本）では引き直しの時間はほとんど縮まらなかった ——
+    /// 効いているのは接続の準備ではなく、その親フォルダの行を読んで名前を照合する部分。
+    /// </remarks>
+    public List<CachedFileSystemEntry> GetSearchEntriesInParents(IReadOnlyCollection<string> parentPaths, NameSearchPattern pattern)
     {
-        var normalizedParentPath = PathNormalizer.Normalize(parentPath);
+        var result = new List<CachedFileSystemEntry>();
+        if (parentPaths.Count == 0)
+        {
+            return result;
+        }
+
+        var normalizedParentPaths = parentPaths.Select(PathNormalizer.Normalize).Distinct(StringComparer.Ordinal).ToList();
 
         using var db = CreateDbContext();
 
@@ -629,25 +731,39 @@ public class FileCacheRepository
         RegisterNameMatchFunction(conn, pattern);
         db.Database.OpenConnection();
 
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
-            SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
-            FROM FileSystemEntries
-            WHERE ParentPath = @parentPath" + BuildNameMatchClause(pattern);
-        AddParameter(cmd, "@parentPath", normalizedParentPath);
-        AddNameMatchParametersTo(cmd, pattern);
-
         var parentPathPool = new Dictionary<string, string>(StringComparer.Ordinal);
-        var result = new List<CachedFileSystemEntry>();
 
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
+        // パラメータ数の上限（SQLiteの既定は32766）に余裕を持たせて小分けにする
+        for (var start = 0; start < normalizedParentPaths.Count; start += ParentLookupChunkSize)
         {
-            result.Add(ReadEntry(reader, parentPathPool));
+            var chunkLength = Math.Min(ParentLookupChunkSize, normalizedParentPaths.Count - start);
+
+            using var cmd = conn.CreateCommand();
+            var parameterNames = new string[chunkLength];
+            for (var i = 0; i < chunkLength; i++)
+            {
+                parameterNames[i] = "@p" + i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                AddParameter(cmd, parameterNames[i], normalizedParentPaths[start + i]);
+            }
+
+            cmd.CommandText = @"
+                SELECT ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes
+                FROM FileSystemEntries
+                WHERE ParentPath IN (" + string.Join(",", parameterNames) + ")" + BuildNameMatchClause(pattern);
+            AddNameMatchParametersTo(cmd, pattern);
+
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(ReadEntry(reader, parentPathPool));
+            }
         }
 
         return result;
     }
+
+    /// <summary>1回のIN句にまとめる親フォルダの数。</summary>
+    private const int ParentLookupChunkSize = 500;
 
     /// <summary>ParentPath, FullPath, Name, IsFolder, SizeBytes, LastWriteTimeUtc, CreationTimeUtc, Attributes の並びで1行読む。</summary>
     private static CachedFileSystemEntry ReadEntry(DbDataReader reader, Dictionary<string, string> parentPathPool)
@@ -658,8 +774,8 @@ public class FileCacheRepository
             reader.GetString(2),
             reader.GetBoolean(3),
             reader.IsDBNull(4) ? null : reader.GetInt64(4),
-            reader.GetDateTime(5),
-            reader.IsDBNull(6) ? null : reader.GetDateTime(6),
+            ReadDateTime(reader, 5),
+            reader.IsDBNull(6) ? null : ReadDateTime(reader, 6),
             reader.IsDBNull(7) ? null : reader.GetInt32(7));
     }
 

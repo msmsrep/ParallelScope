@@ -59,6 +59,7 @@ pwsh scripts/ui-tests/Run-UiTests.ps1
   - `TreeNodes`: ツリー最上位ノードのカスタマイズ（表示/非表示・並び順）で使うキーの定義。`FileListColumns` と同じ形で、キーは `VirtualFolderKind` の名前そのまま（settings.json に保存されるためリネーム不可）。`Folders` は常に表示で並び順の対象にだけ入ります。
   - `HiddenItemVisibility`: 隠し属性・システム属性のファイル/フォルダを表示するかの判定。無料版でも使える設定で、**既定は両方とも表示**です（エクスプローラーの既定とは逆ですが、更新前から見えていたファイルが消えないことを優先しています。`AppSettings` 側もプロパティ初期化子で `true` にしてあり、この設定を持たない既存の settings.json も表示側に倒れます）。スキャンとキャッシュは属性に関わらず全件記録し、絞り込みは表示側（`BrowserTabViewModel.ToViewModels`）だけで行うため、切り替えにスキャンし直しは不要です。ツリーの子フォルダ列挙は `FolderItemViewModel.AttributesToSkip`（アプリ全体で1つの静的な値）に反映し、変更後は `FolderItemViewModel.Reload()` で読み込み済みの子を捨てて読み直します。
   - `AppDataPathProvider`: アプリデータフォルダの解決。`Environment.ProcessPath` に `\WindowsApps\` が含まれるかで `%LOCALAPPDATA%\ParallelScope` とMSIXの `WindowsApps\...\LocalState` パスを切り替えます。DEBUGビルドに限り、環境変数 `PARALLELSCOPE_DATA_DIR` があればそちらを使います（UIテスト用）。
+  - `SearchPerfTrace`: 検索1回ぶんの所要時間の内訳（出どころ・DB/索引からの取り出し・ViewModel生成・画面反映）を測る計測用の仕組み。環境変数 `PARALLELSCOPE_SEARCH_PERF=1` のときだけ、アプリデータフォルダの `search-perf.log` へ1検索1行で追記します（MSIX実行でもユーザー環境変数は引き継がれる）。常時有効にしないのは、テストから実際のアプリデータフォルダへ書かせないためです。
   - `FileSizeFormatter`: バイト数を `"12.3 MB"` のような表示用文字列に変換します。
   - `AppVersionProvider`: `AppxManifest.xml`（csprojの設定によりexeと同じフォルダにコピーされる）の `Identity/@Version` を読み取り、ウィンドウタイトルにバージョンを表示するために使います。
   - `AppTheme` / `AppThemeSetting`: 配色テーマ設定（System/Light/Dark）の解釈と、`Application.ThemeMode` へのアプリ全体への適用。`ThemeMode` は実験的APIのため、この中で診断 `WPF0001` を抑止しています。
