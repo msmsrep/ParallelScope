@@ -54,6 +54,7 @@ Visual Studio の場合は、`ParallelScope.Tests.csproj` を開けばテスト�
 | **Data/** | | |
 | `FileCacheRepositoryTests` | `FileCacheRepository` | 一覧の並び順（フォルダ先・名前昇順）、全列のラウンドトリップ、差分書き込みの戻り値、配下ファイルの再帰列挙、検索のLIKEエスケープと正規表現、検索の打ち切り、子フォルダ合計サイズ、直下の子フォルダの取得、索引の大きさの見積もり、`DeleteStaleEntries` の各分岐、キャッシュ内と表記の違うルートでの絞り込み |
 | `FileCacheRepositorySchemaTests` | マイグレーション | `LatestMigrationId` が最後のマイグレーションと一致すること（更新し忘れの検出）、新規・古いDB・最新のDBそれぞれでの起動 |
+| `SqliteDateTimeParseTests` | `FileCacheRepository.ReadDateTime` | 日時列の手書きの解析が `GetDateTime` と同じ値・同じ `Kind` を返すこと、想定外の書式を受け付けず既定の解析へ回すこと |
 | `FileNameIndexTests` | `FileNameIndex` | 索引での検索がキャッシュDBへの検索と同じ内容・同じ並びになること（部分一致・正規表現・範囲の絞り込み）、組み立て後に変わったフォルダの引き直し、上限超過での破棄、見積もりより長い名前（サロゲートペア）でも取りこぼさないこと |
 | `AppSettingsRepositoryTests` | `AppSettingsRepository` | 全設定のラウンドトリップ、ファイル未作成・破損JSON（退避も）・旧形式（プロパティ欠落・型違い）でのフォールバック、遅延書き出し（保存直後でも別インスタンスから読めること、`Flush` でファイルへ書き切ること、保存が無ければファイルを作らないこと） |
 | **Services/** | | |

@@ -711,8 +711,9 @@ public class FileCacheRepository
 
     /// <summary>指定した親フォルダ群の直下から、名前に検索語を含むエントリを取り出す（索引が古い親フォルダの補完用）。</summary>
     /// <remarks>
-    /// 親フォルダごとに接続を開いて引くと、1件あたり約1msの準備コストが本数ぶん積み上がる
-    /// （実測で40〜50本たまると検索1回に数十ms足されていた）。1本の接続・少数の文でまとめて引く。
+    /// 親フォルダごとに接続を開き直さないよう、1本の接続・少数の文でまとめて引く。
+    /// なお実測（C:\ 直下、40〜80本）では引き直しの時間はほとんど縮まらなかった ——
+    /// 効いているのは接続の準備ではなく、その親フォルダの行を読んで名前を照合する部分。
     /// </remarks>
     public List<CachedFileSystemEntry> GetSearchEntriesInParents(IReadOnlyCollection<string> parentPaths, NameSearchPattern pattern)
     {
