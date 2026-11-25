@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Diagnostics;
+using System.Threading;
 using ParallelScope.Utilities;
 
 namespace ParallelScope.Data;
@@ -392,8 +393,15 @@ public sealed class FileNameIndex
         }
 
         // 索引を作ったあとに変わった親フォルダはDBから引き直し、索引側と同じ並びに揃えて混ぜる
+        var trace = SearchPerfTrace.Current;
+        var changedReadStarted = Stopwatch.GetTimestamp();
         var changedEntries = ReadChangedParents(changedParentPaths, normalizedRoot, rootPrefix, pattern);
         var changedIndex = 0;
+        if (trace is not null)
+        {
+            trace.IndexChangedParentCount += changedParentPaths.Length;
+            trace.IndexChangedReadTicks += Stopwatch.GetTimestamp() - changedReadStarted;
+        }
 
         var batchRowIds = new List<int>(FetchBatchSize);
         var batchPositions = new Dictionary<int, int>(FetchBatchSize);
@@ -457,7 +465,15 @@ public sealed class FileNameIndex
         List<(CachedFileSystemEntry Entry, bool IsFolder, string FoldedName)> changedEntries,
         ref int changedIndex)
     {
-        var fetched = _repository.GetEntriesByIds(batchRowIds);
+        var trace = SearchPerfTrace.Current;
+        var fetchStarted = Stopwatch.GetTimestamp();
+        var fetched = _repository.GetEntriesByIds(
+            batchRowIds, id => snapshot.ParentPaths[snapshot.ParentIds[batchPositions[id]]]);
+        if (trace is not null)
+        {
+            trace.IndexFetchCount++;
+            trace.IndexFetchTicks += Stopwatch.GetTimestamp() - fetchStarted;
+        }
 
         // DBは指定した順では返さないため、索引上の位置（＝表示順）で並べ直す
         var ordered = new List<(int Position, CachedFileSystemEntry Entry)>(fetched.Count);
@@ -510,17 +526,13 @@ public sealed class FileNameIndex
     {
         var entries = new List<(CachedFileSystemEntry Entry, bool IsFolder, string FoldedName)>();
 
-        foreach (var changedParentPath in changedParentPaths)
-        {
-            if (!IsUnderRoot(changedParentPath, normalizedRoot, rootPrefix))
-            {
-                continue;
-            }
+        var targetParentPaths = changedParentPaths
+            .Where(changedParentPath => IsUnderRoot(changedParentPath, normalizedRoot, rootPrefix))
+            .ToList();
 
-            foreach (var entry in _repository.GetSearchEntriesInParent(changedParentPath, pattern))
-            {
-                entries.Add((entry, entry.IsFolder, NameSearchMatcher.FoldAscii(entry.Name)));
-            }
+        foreach (var entry in _repository.GetSearchEntriesInParents(targetParentPaths, pattern))
+        {
+            entries.Add((entry, entry.IsFolder, NameSearchMatcher.FoldAscii(entry.Name)));
         }
 
         entries.Sort(static (left, right) =>
